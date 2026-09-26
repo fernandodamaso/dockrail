@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "commands": ["help", "agent-guide", "status", "doctor", "config.schema", "config.get", "config.set", "config.apply", "config.reset", "config.retry", "config.export", "apps.list", "apps.pin", "apps.unpin", "apps.hide", "apps.show", "apps.move", "icons.list", "icons.set", "icons.reset", "icons.reload"],
+  "commands": ["help", "agent-guide", "status", "doctor", "setup", "config.schema", "config.get", "config.set", "config.apply", "config.reset", "config.retry", "config.export", "apps.list", "apps.pin", "apps.unpin", "apps.hide", "apps.show", "apps.move", "icons.list", "icons.set", "icons.reset", "icons.reload"],
   "settings": {
     "iconOverrides": {"type":"object","format":"icon-overrides","resetWithPreferences":false,"description":"SmartDock-only local PNG/SVG artwork by desktop ID. Prefer icons set/reset for single-app edits; no rendering verification is implied."},
     "windowIconOverrides": {"type":"array","format":"window-icon-overrides","resetWithPreferences":false,"description":"Ordered per-window artwork rules keyed by normalized raw Wayland appId plus a case-insensitive titlePattern. Only * is a wildcard; first match wins. Sources must be local PNG/SVG files."},

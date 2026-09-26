@@ -106,7 +106,7 @@ test "$(command -v dockrail)" = "$XDG_BIN_HOME/dockrail"
 test "$(command -v smartdock)" = "$XDG_BIN_HOME/smartdock"
 test -f "$XDG_DATA_HOME/dockrail-cli/.plugin-dir"
 test ! -e "$XDG_DATA_HOME/dockrail-cli/scripts/smartdock_cli.py"
-[[ "$install_output" == *'dockrail doctor'* ]]
+[[ "$install_output" == *'dockrail setup'* ]]
 dockrail help >/dev/null
 smartdock agent-guide >/dev/null
 python3 - "$plugin/config/settings-schema.json" <<'PY'
