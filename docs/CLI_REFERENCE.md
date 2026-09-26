@@ -86,6 +86,31 @@ inherently `ready`.
 Human `dockrail doctor` renders the same feature status, reason and single next
 step without changing the JSON contract.
 
+
+## Guided setup
+
+\`dockrail setup\` is the human, interactive onboarding path for optional features. It first renders the same ONB-05 readiness projection as \`dockrail doctor\`; it does not implement a second detector. Interactive setup requires a TTY. Scripting and agent use is explicit and limited to the final feature names:
+
+\`\`\`sh
+dockrail setup --feature chrome --yes
+dockrail setup --feature herdr --yes
+dockrail setup --feature launcher-counts --yes
+dockrail setup --feature agent-launchers --yes
+\`\`\`
+
+There is no scripted \`sidebar\` feature flag because Sidebar setup must choose a connected monitor. Interactive setup can add exactly one \`presentationModeByMonitor\` entry for the selected connector, preserving every other entry.
+
+Every configuration mutation goes through the selected running host. Setup sends a minimal \`config.apply\` dry run, applies only when the dry run is not a no-op, then reads the requested value and host persistence state back. It never edits \`dock.json\` directly. A missing or ambiguous host fails before installers or mutations run. Collection edits preserve existing order: Herdr appends \`herdr.agents\` only when absent. Unrelated and unknown settings are never sent back as a replacement snapshot. Running the same setup again is a no-op for settings already selected.
+
+Feature behavior is intentionally bounded:
+
+- **Herdr:** \`--feature herdr --yes\` requires \`herdr\` on \`PATH\`, appends \`herdr.agents\` through the host writer, and warns when the detected version is below 0.9.1 because click-to-focus is unavailable. If Herdr is absent, it prints the 0.9.1+ install prerequisite and changes nothing. Setup does not start, stop, or alter the Herdr provider lifecycle.
+- **Chrome:** \`--feature chrome --yes\` installs the browser-profile provider from the selected running Dockrail tree when missing. It prints, but never writes, the required \`chrome-flags.conf\` lines: a separate absolute \`--user-data-dir=...\` and \`--remote-debugging-port=9222\`. That is a fresh Chrome profile. While the localhost DevTools port is open, any local process can control that profile and read its pages and cookies. Setup never edits Chrome flags or restarts Chrome. Existing Dockrail Chrome display preferences are preserved rather than silently re-enabled.
+- **Agent launchers:** \`--feature agent-launchers --yes\` runs the existing \`install.sh --agent-assets-only\` path from the selected running Dockrail tree. It does not launch an agent.
+- **Launcher counts:** \`--feature launcher-counts --yes\` is guidance-only. It prints the installed-plugin-tree \`scripts/build-launcher-badge-provider\` command and the CMake/C++20/Qt 6.6+ requirements; setup never builds the optional native provider automatically.
+
+Setup never runs \`controlCommand\`, starts a host, changes Chrome flags, restarts Chrome, restarts the Omarchy shell, or performs an automatic launcher-count build. Installer failures return \`E_SETUP\` (exit 5). Human output ends with a fresh doctor summary and, only when newly installed assets require it, one \`omarchy restart shell\` instruction. Chrome restart remains a separate manual step after the user edits Chrome flags.
+
 ## Configuration commands
 
 | Command | Arguments and semantics |
