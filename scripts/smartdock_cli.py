@@ -116,12 +116,6 @@ AGENT_LAUNCHERS = (
     'smartdock-agent-cline',
 )
 SETUP_FEATURES = ('chrome', 'herdr', 'launcher-counts', 'agent-launchers')
-SETUP_READINESS_KEYS = {
-    'chrome': 'chromeProfilesTabs',
-    'herdr': 'herdrAgents',
-    'launcher-counts': 'launcherCounts',
-    'agent-launchers': 'agentLaunchers',
-}
 
 
 class ReadinessProbes:
