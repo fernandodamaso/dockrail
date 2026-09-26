@@ -1,0 +1,77 @@
+name: FDM-1019 isolated documentation candidate
+on:
+  push:
+    branches: [exec/fdm-1019-docs-worker]
+    paths: [.github/workflows/fdm-1019-docs-publish.yml, .fdm-1019-docs-worker.py]
+permissions:
+  contents: read
+concurrency:
+  group: fdm-1019-docs-candidate
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.repository == 'fernandodamaso/dockrail' && github.ref == 'refs/heads/exec/fdm-1019-docs-worker'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Read the isolated edit instructions
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          path: worker
+          persist-credentials: false
+      - name: Check out the pinned feature head
+        uses: actions/checkout@v5
+        with:
+          ref: b240c3612f4e7581ed0a3474a574685ade2e94ca
+          path: source
+          fetch-depth: 0
+      - name: Apply only the locally verified docs and tests
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = b240c3612f4e7581ed0a3474a574685ade2e94ca
+          test "$(git ls-remote origin refs/heads/feat/fdm-1019-user-docs-cleanup | cut -f1)" = b240c3612f4e7581ed0a3474a574685ade2e94ca
+          test "$(git ls-remote origin refs/heads/feat/fdm-1017-guided-setup | cut -f1)" = c9fe547e6568c7c29bd2c4e0a398e0e28930ab84
+          test -z "$(git status --porcelain)"
+          python3 ../worker/.fdm-1019-docs-worker.py
+          git diff --check
+      - name: Run documentation regression and real CLI recipe checks
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_user_facing_docs.py -v
+          python3 -m unittest discover -s tests -p test_cli_docs.py -v
+      - name: Publish only to a new isolated candidate branch
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add README.md docs/AGENT_CONFIGURATION.md docs/CLI_REFERENCE.md docs/CONFIGURATION.md docs/HERDR_DATA_ACCESS.md docs/browser-activity.md tests/test_cli_docs.py tests/test_user_facing_docs.py
+          test "$(git write-tree)" = 9907475fb8c361c15e655db1d9935c1f3708197a
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs(FDM-1019): make setup and configuration guidance user-facing'
+          test "$(git rev-parse HEAD^)" = b240c3612f4e7581ed0a3474a574685ade2e94ca
+          test -z "$(git status --porcelain)"
+          test -z "$(git ls-remote origin refs/heads/exec/fdm-1019-docs-candidate)"
+          git push origin HEAD:refs/heads/exec/fdm-1019-docs-candidate
+          git rev-parse HEAD > /tmp/fdm-1019-candidate.sha
+          git cat-file commit HEAD > /tmp/fdm-1019-candidate.commit
+          git diff --stat b240c3612f4e7581ed0a3474a574685ade2e94ca HEAD > /tmp/fdm-1019-candidate.stat
+          cat /tmp/fdm-1019-candidate.sha
+          cat /tmp/fdm-1019-candidate.stat
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fdm-1019-candidate-evidence
+          path: |
+            /tmp/fdm-1019-candidate.sha
+            /tmp/fdm-1019-candidate.commit
+            /tmp/fdm-1019-candidate.stat
+          retention-days: 3
+          if-no-files-found: error
