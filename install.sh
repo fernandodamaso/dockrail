@@ -133,7 +133,15 @@ install_agent_assets() {
 
 if $agent_assets_only; then
   install_agent_assets
-  echo 'Installed Dockrail terminal-agent launchers and icons.'
+  cat <<'EOF'
+Installed Dockrail terminal-agent launchers and icons.
+
+Plugin-folder invocation:
+  bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh" --agent-assets-only
+
+Next: reload the dock with `omarchy restart shell`.
+Then verify with `dockrail doctor`.
+EOF
   exit
 fi
 
