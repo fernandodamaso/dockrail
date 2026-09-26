@@ -183,7 +183,7 @@ assert.match(agents, /does not ship that UI/,
   "AGENTS does not claim the Settings UI is already shipped")
 assert.match(agents, /shares the host-wide single active editing slot with Change Icon/,
   "AGENTS requires one host-wide editing slot shared with Change Icon")
-assert.match(agents, /DockHost\.saveIconChange` and the existing\s+FileView writer/,
+assert.match(agents, /DockHost\.saveIconChange` and the existing\s+FileView\s+writer/,
   "Change Icon continues to save through the existing host writer")
 assert.match(agents, /second config writer/,
   "AGENTS still forbids a second config writer")
