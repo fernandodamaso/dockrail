@@ -87,6 +87,7 @@ class CliDocumentationTests(unittest.TestCase):
         inventory = ROOT / 'docs/CONFIGURATION.md'
         reference = ROOT / 'docs/CLI_REFERENCE.md'
         for path in (inventory, reference, ROOT / 'docs/CLI_RUNTIME_CHECKS.md',
+                     ROOT / 'docs/SETTINGS.md',
                      ROOT / 'docs/plans/2026-09-10-cli-first-migration.md'):
             self.assertTrue(path.is_file(), 'Missing deliverable: ' + str(path))
         rows = re.findall(r'^\| `([^`]+)` \| `([^`]+)` \|', inventory.read_text(), re.M)
@@ -217,6 +218,38 @@ class CliDocumentationTests(unittest.TestCase):
             for target in re.findall(r'\[[^\]]+\]\(([^)]+\.md)\)', text):
                 if '://' not in target:
                     self.assertIn(target, DOCUMENTS, (name, 'Uninstalled documentation link', target))
+
+    def test_settings_policy_and_accepted_design_record(self):
+        agents = (ROOT / 'AGENTS.md').read_text(encoding='utf-8')
+        reference = (ROOT / 'docs/CLI_REFERENCE.md').read_text(encoding='utf-8')
+        record = (ROOT / 'docs/SETTINGS.md').read_text(encoding='utf-8')
+
+        self.assertNotIn('Do not add a settings window', agents)
+        self.assertNotIn('Configuration is CLI-only', self.guide)
+        for text in (agents, self.guide, reference):
+            self.assertIn('AI coding agents', text)
+            self.assertIn('Settings', text)
+            self.assertIn('single host', text)
+        self.assertIn('Change Icon', agents)
+        self.assertRegex(agents, r'sole icon\s+editor')
+        self.assertIn('does not ship', agents)
+        self.assertIn('not shipped', self.guide)
+        self.assertIn('does **not** ship', reference)
+
+        for required in (
+                'KeyboardPanel', '680 px wide', 'two panes', 'Omarchy 4.0.4',
+                'Appearance', 'Layout', 'Behavior', 'Sidebar & Widgets',
+                'Features', 'Apps', 'Apply on change',
+                'Sliders commit on release', 'Classic collapse rule',
+                'One editing slot', 'Changed elsewhere', 'E_STALE',
+                'Saving', 'Saved', 'Not saved', 'E_PERSISTENCE',
+                'E_VALIDATION', 'E_CONFIG_INVALID',
+                '0dbd7c54151577457deb45b3cf282b37fb2fc258',
+                '## Decided'):
+            self.assertIn(required, record)
+        self.assertIn('Change Icon is the sole icon editor', record)
+        self.assertIn('single host FileView/settings writer', record)
+        self.assertIn('SET-01 is documentation and policy only', record)
 
     def test_installed_guide_and_reference_are_offline_and_match_source(self):
         with tempfile.TemporaryDirectory(prefix='smartdock docs ') as temporary:

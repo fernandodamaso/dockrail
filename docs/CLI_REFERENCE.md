@@ -1,8 +1,12 @@
 # Dockrail CLI reference
 
-**Unreleased CLI-first candidate — Draft PR #44, `feat/fdm-914-cli-first`.** This describes implemented source, not an available release, permission to deploy, or completed Omarchy runtime qualification. Older installed builds may not implement this interface. Discover the selected host's schema instead of assuming this document describes that installation.
+**CLI interface (source candidate).** This describes implemented CLI source, not an available release, permission to deploy, or completed Omarchy runtime qualification. Older installed builds may not implement this interface. Discover the selected host's schema instead of assuming this document describes that installation.
 
 Start with [the agent guide](AGENT_CONFIGURATION.md). [Configuration inventory](CONFIGURATION.md) records every declared default and dependency. Source qualification belongs to [CLI_RUNTIME_CHECKS.md](CLI_RUNTIME_CHECKS.md); historical delivery evidence is not evidence for a newer SHA.
+
+## Settings and the CLI
+
+Dockrail 3.1 has an accepted Settings-panel design for people, recorded in `docs/SETTINGS.md`. SET-01 records that policy and design foundation; it does **not** ship the Settings UI or a new `dockrail settings` command. AI coding agents and automation continue to use this CLI as the complete configuration interface. The future Settings surface must send the same host intents through the single host writer and expose the same requested/effective, applied, persisted and retry semantics; it is not an alternate configuration backend. **Change Icon** remains the sole icon editor.
 
 ## Selection and transport
 
