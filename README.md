@@ -155,17 +155,20 @@ will appear.
 ### Launcher badge count provider
 
 Numeric counts are optional and provider-owned. Omarchy plugin installation
-never compiles or executes an install hook. Build the small QtDBus provider from
-a trusted source checkout when you want application-provided counts:
+never compiles or executes an install hook. Build the small QtDBus provider
+directly from the installed plugin folder when you want application-provided
+counts:
 
 ```bash
-bash ./scripts/build-launcher-badge-provider
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/build-launcher-badge-provider"
 ```
 
-The script builds outside the Git checkout, runs the provider tests, and
-installs only the resulting executable under
-`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Reload or restart
-the Dockrail plugin afterwards. If the binary, Qt runtime, D-Bus service, or an
+The script builds outside the installed plugin tree, runs the provider tests,
+and installs only the resulting executable under
+`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Then reload the
+dock with `omarchy restart shell` and verify with `dockrail doctor`. From a
+separate source checkout, `bash ./scripts/build-launcher-badge-provider`
+remains supported. If the binary, Qt runtime, D-Bus service, or an
 application's launcher-count support is unavailable, Dockrail keeps the
 FDM-809 attention dots; it does not poll or scrape another source for a number.
 
@@ -229,12 +232,15 @@ optional browser-profile provider reads Chrome's DevTools endpoint (one CDP
 browser context per profile) and publishes which profile owns each window:
 
 ```bash
-bash ./scripts/install-browser-profile-provider
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/install-browser-profile-provider"
 ```
 
-The script byte-compiles the Python helper and installs it under
-`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Reload or restart
-the Dockrail plugin afterwards. Chrome remote debugging is optional and must
+The script stages its bytecode check outside the installed plugin tree and
+installs the Python helper under
+`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Then reload the
+dock with `omarchy restart shell` and verify with `dockrail doctor`. From a
+separate source checkout, `bash ./scripts/install-browser-profile-provider`
+remains supported. Chrome remote debugging is optional and must
 be enabled explicitly with a separate user data directory. Follow
 **[Enable Chrome profiles and tabs](docs/browser-activity.md#enable-chrome-profiles-and-tabs)**
 for setup, verification, and the security implications. Without a reachable
@@ -295,12 +301,16 @@ in separate Ghostty windows:
 Each launcher runs `ghostty --gtk-single-instance=false` with a unique, valid
 GTK/Wayland application ID. Standalone users get these entries from the
 normal `./install.sh`. Plugin users can install only the launchers and icons
-from a Dockrail source checkout, without requiring Quickshell, installing a
-second dock, enabling autostart, or changing the dock configuration:
+directly from the installed plugin folder, without requiring Quickshell,
+installing a second dock, enabling autostart, or changing the dock configuration:
 
 ```bash
-./install.sh --agent-assets-only
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh" --agent-assets-only
 ```
+
+Then reload the dock with `omarchy restart shell` and verify with
+`dockrail doctor`. From a separate source checkout,
+`./install.sh --agent-assets-only` remains supported.
 
 The plugin itself is installed with:
 
