@@ -89,7 +89,7 @@ step without changing the JSON contract.
 
 ## Guided setup
 
-`dockrail setup` is the human, interactive onboarding path for optional features. It first renders the same ONB-05 readiness projection as `dockrail doctor`; it does not implement a second detector. Interactive setup requires a TTY. Scripting and agent use is explicit and limited to the final feature names:
+The `setup` command is the human, interactive onboarding path for optional features. Run it as `dockrail setup`. It first renders the same ONB-05 readiness projection as `dockrail doctor`; it does not implement a second detector. Interactive setup requires a TTY. Scripting and agent use is explicit and limited to the final feature names:
 
 ```sh
 dockrail setup --feature chrome --yes
