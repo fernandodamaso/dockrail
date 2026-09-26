@@ -1,11 +1,15 @@
-# Herdr data access: Dockrail-owned local + attached-remote provider (FDM-970 / FDM-980)
+# Herdr data access: local and attached-remote agents
 
 Dockrail owns the Herdr integration. It does **not** require omaherdr to be
 installed or running and it does not import, call, stop or configure omaherdr.
 Local servers are discovered directly; remote servers are considered only while
 this desktop has a verified attached `herdr --remote <target>` TUI process.
 
-The production path is:
+**Requirements:** Herdr 0.9.1+ is required for click-to-focus. Older versions can
+report agents but cannot jump to them. Attached remote hosts also need Python 3
+and working non-interactive SSH access; Dockrail does not install either for you.
+
+The data path is:
 
 ```text
 local Herdr session socket(s)
@@ -17,11 +21,11 @@ local Herdr session socket(s)
   -> internal sidebar widget herdr.agents
 ```
 
-Normalized snapshots continue to advertise global `capabilities.remote: false`
-until FDM-982 completes native qualification. FDM-980 can nevertheless emit
-source-qualified server rows with `transport: "remote"`; those rows advertise
-`capabilities.focusAgent: false`. The global bit therefore remains a rollout /
-qualification gate rather than a claim that remote source code is absent.
+Normalized snapshots advertise global `capabilities.remote: false`. Attached
+remote servers can still appear as rows with `transport: "remote"` and
+`capabilities.focusAgent: false`. Check each server's transport, health and
+capabilities rather than treating the global bit as an empty remote inventory.
+Remote availability depends on the attached TUI and SSH connection.
 
 ## Activation and ownership
 
@@ -218,12 +222,7 @@ truncation, process refresh, pane focus transport and clean helper shutdown.
 The lifecycle tests lock the real source registry, shared service
 ownership, standalone/plugin wiring, schema registration and packaging.
 
-These tests use controlled socket/provider fixtures. They establish source and
-protocol behavior but are not a substitute for FDM-982 native
-Omarchy/Quickshell qualification with real local and remote Herdr installations.
-That gate owns real SSH reachability, current installed Herdr/Python compatibility
-and the decision to enable global `capabilities.remote`.
-
-Canonical issues:
-- https://linear.app/fdamaso/issue/FDM-970
-- https://linear.app/fdamaso/issue/FDM-980
+These tests use controlled socket/provider fixtures. They do not confirm SSH
+reachability, Herdr/Python compatibility or focus behavior on your desktop and
+remote hosts. For the corresponding on-desktop checks, see the
+[Herdr desktop verification guide](HERDR_REMOTE_QUALIFICATION.md).

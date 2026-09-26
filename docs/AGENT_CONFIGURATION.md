@@ -1,6 +1,6 @@
 # Configure Dockrail through its CLI
 
-**Agent configuration interface.** The CLI remains the complete configuration interface for AI coding agents and automation. Dockrail 3.1 has an accepted Settings-panel design for people, recorded in `docs/SETTINGS.md`, but SET-01 is policy/design foundation only: the Settings UI is not shipped by this change. When implemented, Settings must submit the same host intents through the single host writer and report the same requested/effective, applied and persisted outcomes as the CLI. Temporary preference previews and alternate writers remain forbidden; ordinary window previews, the app picker, menus, drag reordering, workspace/window actions, auto-hide and Trash remain.
+**Agent configuration interface.** The CLI remains the complete configuration interface for AI coding agents and automation. Dockrail 3.1 has an accepted Settings-panel design for people, recorded in `docs/SETTINGS.md`, but the Settings UI is not shipped yet. When implemented, Settings must submit the same host intents through the single host writer and report the same requested/effective, applied and persisted outcomes as the CLI. Temporary preference previews and alternate writers remain forbidden; ordinary window previews, the app picker, menus, drag reordering, workspace/window actions, auto-hide and Trash remain.
 
 Never edit a deployed checkout, scrape the UI, launch a second dock, restart Omarchy, install a provider, change desktop/theme files, or silently fall back to raw `dock.json` writes for configuration. A missing command in an older host is a compatibility/unsupported-feature result, not permission to bypass its writer. Source work is appropriate only for an explicitly requested unsupported feature or an evidenced defect, in a source branch under its owning issue.
 
@@ -139,7 +139,7 @@ rule and may reveal another matching rule or a lower-priority icon candidate. Do
 replace invalid/empty/oversized titles with broad `*`; the **Change Icon…** dialog
 surfaces validation instead.
 
-The dock watches referenced artwork files and refreshes automatically after same-path edits; explicit reload remains available for compatibility or forcing a refresh and advances the shared artwork revision without saving settings. Other mapped icons can refresh too. Same-source set also requests fresh bytes without a redundant settings write; repeated reset is a true no-op. `reloaded: true` means requested, not decoded; `applied`/`noop` describe settings, so reload can report `applied: false`, `noop: true`, `reloaded: true`. Every successful icon response has `renderVerified: false`. Real cache invalidation, image decoding and multi-monitor redraw remain local qualification, not headless-test claims.
+The dock watches referenced artwork files and refreshes automatically after same-path edits; explicit reload remains available for compatibility or forcing a refresh and advances the shared artwork revision without saving settings. Other mapped icons can refresh too. Same-source set also requests fresh bytes without a redundant settings write; repeated reset is a true no-op. `reloaded: true` means requested, not decoded; `applied`/`noop` describe settings, so reload can report `applied: false`, `noop: true`, `reloaded: true`. Every successful icon response has `renderVerified: false`. Verify cache invalidation, image decoding and multi-monitor redraw on the actual desktop; headless tests cannot establish those results.
 
 ## Persistence, recovery and rollback
 
@@ -155,7 +155,7 @@ Export writes a new owner-only plain JSON file and never overwrites a destinatio
 
 ## Machine contract and installation
 
-`--json` emits one object with `apiVersion: 1`, `ok`, `data`, `warnings`, and `error.code/message` on failure. Exit codes: 0 success; 2 usage/validation; 3 absent/ambiguous host; 4 persistence/export failure; 5 transport/protocol/timeout; 6 busy/invalid config. See [CLI_REFERENCE.md](CLI_REFERENCE.md) for exact fields/codes and [CONFIGURATION.md](CONFIGURATION.md) for all defaults/dependencies. Both ship beside this offline guide, together with the separate [local qualification runbook](CLI_RUNTIME_CHECKS.md); installing that document does not start qualification.
+`--json` emits one object with `apiVersion: 1`, `ok`, `data`, `warnings`, and `error.code/message` on failure. Exit codes: 0 success; 2 usage/validation; 3 absent/ambiguous host; 4 persistence/export failure; 5 transport/protocol/timeout; 6 busy/invalid config. See [CLI_REFERENCE.md](CLI_REFERENCE.md) for exact fields/codes and [CONFIGURATION.md](CONFIGURATION.md) for all defaults/dependencies. Both ship beside this offline guide, together with the separate [desktop verification runbook](CLI_RUNTIME_CHECKS.md); installing that document does not run any desktop checks.
 
 ```sh
 bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
@@ -166,16 +166,16 @@ For an Omarchy plugin install, the installed plugin directory is already the che
 
 From a separate source checkout, `bash ./install.sh --cli-only` keeps the copied bundle behavior; rerun it explicitly to refresh that copy. Full standalone installation keeps its own bundle. `${XDG_BIN_HOME:-$HOME/.local/bin}/smartdock` remains a compatibility command, and legacy `smartdock-cli` discovery is retained only for pre-cutover bundles. Client-only installation/removal does not install/start a dock, user config, autostart, agent launchers or provider. It coexists with standalone in either order; removal retains the launchers while another bundle owns them. The canonical client takes precedence over standalone and legacy bundles.
 
-The adapter uses standard-library Python and bounded argv subprocesses: `qs list --all --json` and exact `qs ipc --pid PID call -- smartdock request PAYLOAD`. It does not use the Omarchy wrapper's newest-instance selection, guess wrapper flags or implement sockets. Standalone lifecycle commands are explicit and separate, never a way to configure a plugin. Full Omarchy IPC/FileView/theme/image/monitor behavior belongs to the exact-SHA local handoff; this guide does not authorize deployment or claim those checks passed.
+The adapter uses standard-library Python and bounded argv subprocesses: `qs list --all --json` and exact `qs ipc --pid PID call -- smartdock request PAYLOAD`. It does not use the Omarchy wrapper's newest-instance selection, guess wrapper flags or implement sockets. Standalone lifecycle commands are explicit and separate, never a way to configure a plugin. Check Omarchy IPC/FileView/theme/image/monitor behavior on the actual installation. This guide does not authorize deployment or claim those checks passed.
 
-## Sidebar candidate boundary
+## Sidebar configuration
 
 Before a sidebar request, discover `presentationMode`,
 `presentationModeByMonitor`, `sidebarEdge`,
 `sidebarMonitor`, `sidebarExpandedWidth`, `sidebarCollapsed`,
 `sidebarCollapsedByMonitor`, `sidebarBrowserTabsEnabled`, and `sidebarWidgets` through the runtime
-schema. They may be unavailable in the installed version. Source SB-02 is a Draft
-foundation, not permission to deploy or change the production desktop.
+schema. They may be unavailable in the installed version. Only change the
+settings the user requested; do not update or restart the desktop implicitly.
 
 Use the sole host writer and change only the requested sidebar field. Never copy
 classic values into sidebar preferences, rewrite classic `workspaceGroups` to fold
@@ -189,15 +189,15 @@ mode gesture writes one connector's entry and never the global default.
 Inspect
 requested and effective values plus `data.presentation` for placement and geometry.
 Do not infer rejection from `E_BUSY` when `data.applied` is true, or claim durability
-without persisted readback. Physical qualification belongs to SB-06; the source
-handoff and runnable production fixture are documented in `docs/SIDEBAR.md` in the source checkout.
+without persisted readback. Desktop checks and the runnable production fixture
+are documented in `docs/SIDEBAR.md` in the source checkout.
 
 For widget requests, read the selected host's `sidebarWidgets.registeredIds`; do not
-assume clock/Herdr/Todoist IDs or inject test IDs. This source slice has no production
-providers. New ordered arrays must be registered/unique; never store provider paths,
+assume clock/Herdr/Todoist IDs or inject test IDs. Available providers depend on
+the installed host. New ordered arrays must be registered/unique; never store provider paths,
 commands, tokens or credentials here. Unknown imported IDs stay requested but
 unavailable and are not executed. Preserve them on unrelated changes; do not
 repair/delete them silently. Provider readiness/authentication is distinct from
 typed write validation. Inspect bounded `data.presentation.widgets` diagnostics
-without logging task/window content. Source API: `docs/SIDEBAR_WIDGETS.md`; actual
-Omarchy footer/input/popup qualification stays with SB-06.
+without logging task/window content. Source API: `docs/SIDEBAR_WIDGETS.md`. Verify Widget scrolling, input and popups
+in the actual Omarchy session.
