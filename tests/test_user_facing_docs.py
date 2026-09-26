@@ -19,7 +19,7 @@ REQUIRED_DOCUMENTS = (
 FUTURE_USER_GUIDE = 'docs/USER_GUIDE.md'
 INTERNAL_TICKET = re.compile(r'FDM-[0-9]', re.IGNORECASE)
 QUALIFICATION_JARGON = re.compile(
-    r'unreleased CLI-first candidate|qualification gate|native qualification',
+    r'unreleased CLI-first candidate|source candidate|\bqualification\b',
     re.IGNORECASE,
 )
 
@@ -60,6 +60,8 @@ class UserFacingDocumentationTests(unittest.TestCase):
             '```sh\necho FDM-9\n```',
             'Unreleased CLI-first candidate',
             'Run the native qualification gate',
+            'Requires local qualification',
+            'CLI interface (source candidate)',
         ):
             with self.subTest(text=text):
                 self.assertTrue(internal_references(text))
@@ -95,7 +97,7 @@ class UserFacingDocumentationTests(unittest.TestCase):
 
     def test_development_switch_is_in_contributing_not_the_introduction(self):
         text = (ROOT / 'README.md').read_text(encoding='utf-8')
-        self.assertIn('## Contributing\n', text)
+        self.assertIn('## Contributing\n', text, 'Missing Contributing section')
         intro, contributing = text.split('## Contributing\n', 1)
         self.assertNotIn('dockrail dev use', intro.split('\n## ', 1)[0])
         self.assertIn('dockrail dev use <worktree-path-or-local-branch>', contributing)

@@ -138,5 +138,5 @@ methods, activity bindings and change handlers with real offscreen Qt
 notifications, including preview switching, activity loss and muted rows.
 QML model, preview, and badge behavior are also covered by the existing
 `qmltestrunner` suites. The checks do not claim live Chrome CDP, image decoding,
-focus, or auto-hide qualification; those require an isolated graphical session
+focus, or auto-hide behavior; those require an isolated graphical session
 with the provider installed and Chrome launched with remote debugging enabled.
