@@ -33,7 +33,7 @@ The standard-library Python adapter currently uses `qs list --all --json` and `q
 | `help` | Prints full help; bare `dockrail` does the same. No host or directories required. |
 | `agent-guide` | Prints the installed `docs/AGENT_CONFIGURATION.md`; works without the source checkout or a host. With JSON, text is `data.text`. |
 | `status` | Selected host identity, config path, load/write state and revision. Not a settings mutation. |
-| `doctor` | Read-only status plus `data.checks`: `python`, `quickshell`, `omarchyShell`, `liveRuntime`. Missing runtime, invalid configuration or failed persistence exits nonzero. |
+| `doctor` | Read-only status plus `data.checks` and stable `data.features` readiness. Optional `missing`/`degraded` features still exit 0; missing runtime, invalid configuration or failed persistence exits nonzero. |
 | `config schema` | Optional `KEY`; keyed `data.settings`, `schemaVersion: 1`, implemented `data.commands`, `source: runtime` or `bundled`. Defaults are loaded from `config/dock.json`, not duplicated in metadata. |
 | `config get` | Optional `KEY` and `--effective`; keyed `data.settings` even for one key, `source`/`view: requested` or `effective`. Includes unknown retained keys on a full read. |
 
@@ -42,6 +42,49 @@ Only `config schema` may fall back to bundled metadata, and only after genuinely
 Status fields: `runtime`, `configPath`, `loadState` (`missing`, `loaded`, `invalid`), `loadError`, `loadPending`, `revision`, `writeState` (`idle`, `saving`, `saved`, `error`), `writeError`, `persisted`, `defaultsInUse`. A missing file is not a saved defaults file. Invalid disk configuration retains last-good live values and blocks ordinary writes; repair explicitly rather than replacing it with defaults. Revision is scoped to the host lifetime, not a compare-and-swap token. Pending readback makes persistence unconfirmed.
 
 Requested values retain intent. Effective output projects current normalization and layout dependencies, not fully resolved rendering. Theme-owned/token colors and theme-owned border width are `null`, with `themeResolution: not-reported` and a warning on effective reads. Do not erase a token because its renderer-resolved value is unknown.
+
+### Doctor feature readiness
+
+`dockrail doctor --json` keeps `apiVersion: 1` and adds a stable
+`data.features` object. Its keys are `sidebar`, `herdrAgents`,
+`chromeProfilesTabs`, `launcherCounts`, `agentLaunchers`, and
+`cliFreshness`. Every feature has exactly these readiness fields:
+
+```json
+{
+  "status": "ready | missing | degraded",
+  "reason": "human-readable current fact",
+  "nextStep": "one human-readable next action"
+}
+```
+
+`ready` means the requested runtime prerequisites are currently observable;
+`missing` means a required optional component or enablement is absent; and
+`degraded` means the feature is configured or partly present but cannot provide
+its complete behavior. Optional readiness does not change doctor exit status.
+Core runtime discovery, invalid configuration, persistence failure, transport
+and protocol failures keep their existing nonzero behavior.
+
+The detector is strictly read-only. It reads effective per-monitor presentation
+from status, requested feature flags through `config.get`, local executable and
+desktop-entry presence, Herdr's bounded `--version` output, current
+`herdr.agents` Widget lease diagnostics, and installed provider processes.
+The Chrome check makes one bounded HTTP request to
+`127.0.0.1:<configured-port>/json/version`; it never follows redirects or
+contacts a non-loopback host. Doctor never starts a provider or host, writes
+configuration, runs migration, installs anything, or changes the desktop.
+
+Herdr below 0.9.1 is `degraded` because click-to-focus is unavailable. Chrome
+profiles/tabs require an installed and running browser-profile provider, a
+reachable local DevTools endpoint, and at least one of
+`browserProfileBadgesEnabled` or `sidebarBrowserTabsEnabled`. Launcher counts
+check only the provider binary as specified by that feature's install contract.
+CLI freshness compares the client source revision and bundled client surface with
+the running plugin/standalone installation; a plugin-linked ONB-01 client is
+inherently `ready`.
+
+Human `dockrail doctor` renders the same feature status, reason and single next
+step without changing the JSON contract.
 
 ## Configuration commands
 
@@ -130,9 +173,18 @@ Every response uses `apiVersion: 1`, Boolean `ok`, object `data`, array `warning
 
 ## Installation and lifecycle boundary
 
-From the intended source checkout, `bash ./install.sh --cli-only` installs the canonical `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` command plus the `${XDG_BIN_HOME:-$HOME/.local/bin}/smartdock` compatibility command, with the adapter, defaults, schema, agent guide, reference and inventory under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`. `bash ./uninstall.sh --cli-only` removes this bundle while preserving settings, plugin and standalone ownership. Both installation orders retain the launchers while another bundle owns them. Help and guide use the installed bundle, not `.source-dir`. When canonical and legacy bundles coexist, the canonical client bundle takes precedence; update that bundle explicitly from the intended source.
+After `omarchy plugin add`, install the CLI from the installed plugin checkout:
 
-Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Use client-only reinstall for client updates and the normal, separately authorized Omarchy deployment path for a released plugin. No merge/deploy is authorized by this candidate reference.
+```sh
+bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
+dockrail doctor
+```
+
+This installs `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` and the `smartdock` compatibility command. The client record under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli` points at the plugin directory; the launchers read its adapter, defaults, schema and offline docs at invocation time. `omarchy plugin update` therefore refreshes those files without another CLI install. If the plugin is removed, the launchers report the reinstall commands. `bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/uninstall.sh --cli-only` removes the client record and its launchers while preserving settings and the plugin.
+
+From a separate source checkout, `bash ./install.sh --cli-only` retains the copied client bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`; refresh that bundle explicitly from the intended checkout. Full standalone installation retains its own bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail`. Client-only and standalone installation can coexist in either order, and removing one retains the launchers while the other owns them. The canonical client takes precedence over standalone and legacy bundles. Help and guide follow the selected bundle, not `.source-dir`.
+
+Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Use the normal, separately authorized Omarchy deployment path for a released plugin. No merge/deploy is authorized by this candidate reference.
 
 ## Sidebar configuration and diagnostics
 

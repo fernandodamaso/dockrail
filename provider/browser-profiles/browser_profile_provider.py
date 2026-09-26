@@ -15,8 +15,8 @@ browser's DevTools endpoint:
   4. Publish window address -> profile key plus profile metadata as a JSON
      snapshot for the dock's FileView consumer.
 
-The browser must be launched with --remote-debugging-port (Omarchy does this
-by default). Without a reachable endpoint the provider stays up and reports
+The browser must be launched with --remote-debugging-port and a separate
+--user-data-dir. Without a reachable endpoint the provider stays up and reports
 available=false; per-window profiles are simply absent.
 """
 

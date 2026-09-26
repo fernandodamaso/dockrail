@@ -10,13 +10,29 @@ config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 config_file="${DOCKRAIL_CONFIG:-${SMARTDOCK_CONFIG:-$config_home/dockrail/dock.json}}"
 autostart_file="$config_home/autostart/smartdock.desktop"
 launcher_path="$(cd -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
+plugin_adapter=""
+if [[ -f "$client_dir/.plugin-dir" ]]; then
+  plugin_dir="$(<"$client_dir/.plugin-dir")"
+  if [[ ! -f "$plugin_dir/scripts/smartdock_cli.py" || ! -f "$plugin_dir/config/settings-schema.json" || ! -f "$plugin_dir/config/dock.json" || ! -f "$plugin_dir/docs/AGENT_CONFIGURATION.md" ]]; then
+    message='Dockrail plugin files are missing. Reinstall with: omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes; then run: bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only'
+    for argument in "$@"; do
+      if [[ "$argument" == --json ]]; then
+        printf '%s\n' '{"apiVersion":1,"ok":false,"error":{"code":"E_TRANSPORT","message":"Dockrail plugin files are missing. Reinstall with: omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes; then run: bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only"},"data":{},"warnings":[]}'
+        exit 5
+      fi
+    done
+    echo "dockrail: $message" >&2
+    exit 5
+  fi
+  plugin_adapter="$plugin_dir/scripts/smartdock_cli.py"
+fi
 
 # Control commands, bare invocation and unknown words always go through the
 # parser. Only explicit lifecycle words below can reach standalone startup.
 case "${1:-}" in
   launch|--daemonize|-d|restart|--restart|stop|--stop|update|--update|uninstall|--uninstall|autostart) ;;
   *)
-    for adapter in "$(dirname -- "$launcher_path")/smartdock_cli.py" \
+    for adapter in "$plugin_adapter" "$(dirname -- "$launcher_path")/smartdock_cli.py" \
       "$client_dir/scripts/smartdock_cli.py" "$app_dir/scripts/smartdock_cli.py" \
       "$legacy_client_dir/scripts/smartdock_cli.py" "$legacy_app_dir/scripts/smartdock_cli.py"; do
       if [[ -f "$adapter" ]]; then

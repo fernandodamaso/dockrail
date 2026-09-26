@@ -58,7 +58,14 @@ Install the Git-managed Omarchy plugin:
 
 ```bash
 omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes
+bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
 ```
+
+Omarchy does not run install hooks. The installed plugin directory is the
+checkout for this CLI command; its launchers read the current plugin files, so
+`omarchy plugin update` also refreshes CLI metadata. Run `dockrail doctor` after
+setup. If `${XDG_BIN_HOME:-$HOME/.local/bin}` is not on `PATH`, add it to your
+shell's `PATH` to use `dockrail` by name.
 
 Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
 Dockrail 3.0.0 uses a new plugin ID, so reinstall once. Your settings in
@@ -155,17 +162,20 @@ will appear.
 ### Launcher badge count provider
 
 Numeric counts are optional and provider-owned. Omarchy plugin installation
-never compiles or executes an install hook. Build the small QtDBus provider from
-a trusted source checkout when you want application-provided counts:
+never compiles or executes an install hook. Build the small QtDBus provider
+directly from the installed plugin folder when you want application-provided
+counts:
 
 ```bash
-bash ./scripts/build-launcher-badge-provider
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/build-launcher-badge-provider"
 ```
 
-The script builds outside the Git checkout, runs the provider tests, and
-installs only the resulting executable under
-`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Reload or restart
-the Dockrail plugin afterwards. If the binary, Qt runtime, D-Bus service, or an
+The script builds outside the installed plugin tree, runs the provider tests,
+and installs only the resulting executable under
+`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Then reload the
+dock with `omarchy restart shell` and verify with `dockrail doctor`. From a
+separate source checkout, `bash ./scripts/build-launcher-badge-provider`
+remains supported. If the binary, Qt runtime, D-Bus service, or an
 application's launcher-count support is unavailable, Dockrail keeps the
 FDM-809 attention dots; it does not poll or scrape another source for a number.
 
@@ -229,15 +239,19 @@ optional browser-profile provider reads Chrome's DevTools endpoint (one CDP
 browser context per profile) and publishes which profile owns each window:
 
 ```bash
-bash ./scripts/install-browser-profile-provider
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/install-browser-profile-provider"
 ```
 
-The script byte-compiles the Python helper and installs it under
-`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Reload or restart
-the Dockrail plugin afterwards. The browser must run with
-`--remote-debugging-port` (Omarchy's Chrome defaults enable it); without a
-reachable endpoint the dock simply keeps the plain application icon, exactly
-like an unavailable launcher-count provider.
+The script stages its bytecode check outside the installed plugin tree and
+installs the Python helper under
+`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Then reload the
+dock with `omarchy restart shell` and verify with `dockrail doctor`. From a
+separate source checkout, `bash ./scripts/install-browser-profile-provider`
+remains supported. Chrome remote debugging is optional and must
+be enabled explicitly with a separate user data directory. Follow
+**[Enable Chrome profiles and tabs](docs/browser-activity.md#enable-chrome-profiles-and-tabs)**
+for setup, verification, and the security implications. Without a reachable
+endpoint the dock keeps the plain application icon.
 
 Detected profiles render as a small corner badge over the app icon: the
 profile's own photo when one exists, otherwise an initial circle in a
@@ -294,12 +308,16 @@ in separate Ghostty windows:
 Each launcher runs `ghostty --gtk-single-instance=false` with a unique, valid
 GTK/Wayland application ID. Standalone users get these entries from the
 normal `./install.sh`. Plugin users can install only the launchers and icons
-from a Dockrail source checkout, without requiring Quickshell, installing a
-second dock, enabling autostart, or changing the dock configuration:
+directly from the installed plugin folder, without requiring Quickshell,
+installing a second dock, enabling autostart, or changing the dock configuration:
 
 ```bash
-./install.sh --agent-assets-only
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh" --agent-assets-only
 ```
+
+Then reload the dock with `omarchy restart shell` and verify with
+`dockrail doctor`. From a separate source checkout,
+`./install.sh --agent-assets-only` remains supported.
 
 The plugin itself is installed with:
 
@@ -349,8 +367,9 @@ the real CLI parser and production host/model harness in the existing CI;
 that is not real Omarchy rendering or IPC qualification.
 
 Use the selected running host through the CLI rather than editing a live
-`dock.json`. Install just the client from a source checkout without starting a
-second dock:
+`dock.json`. The plugin installation command above installs the CLI from the
+installed plugin directory. For a separate source checkout, install a copied
+CLI bundle without starting a second dock:
 
 ```bash
 bash ./install.sh --cli-only
@@ -496,7 +515,7 @@ apply. Read the running host's schema/defaults and preserve the user's values:
 | `borderWidthEnabled` | When `true`, use `borderWidth` instead of the theme border width |
 | `borderWidth` | Custom dock border width from `0` to `8` pixels |
 | `presentationMode` | Global default presentation: `classic` bottom dock (default) or `sidebar`; a connector listed in `presentationModeByMonitor` ignores this default |
-| `presentationModeByMonitor` | Per-connector presentation overrides such as `{"DP-1":"classic"}`; listed connectors ignore `presentationMode` and `sidebarMonitor`, missing connectors inherit the default, disconnected names stay saved, and a menu or background-drag switch writes one entry for its monitor only |
+| `presentationModeByMonitor` | Per-connector presentation overrides such as `{"DP-1":"classic"}`; listed connectors ignore `presentationMode` and `sidebarMonitor`, missing connectors inherit the default, disconnected names stay saved, and the mode-switch drag writes one entry for the dragged monitor only |
 | `position` | Classic dock edge; new writes accept only `bottom` because the vertical presentation is `presentationMode: sidebar`, and legacy `left`, `right` and `top` read as bottom |
 | `fullLength` | Fill the screen width, or height for a vertical dock |
 | `workspaceLayout` | `flat` (default) or `grouped` workspace cards; grouped applies to the bottom dock and scrolls when crowded |
@@ -697,9 +716,8 @@ source while the remaining FDM-809 sources continue to work.
 
 The first dock icon is always the dock controls icon and is not part of
 `pinned`. Clicking it opens the controls menu; **Open App Launcher** runs
-`controlCommand`, while the menu also exposes Add Pinned Application,
-**Switch to sidebar**, and the auto-hide toggle. The sidebar header menu offers
-**Switch to dock**. Application context menus contain only application and window actions.
+`controlCommand`, while the menu also exposes Add Pinned Application and the auto-hide
+toggle. Application context menus contain only application and window actions.
 For example, with the Omarchy app-launcher plugin already installed:
 
 ```bash
@@ -728,7 +746,7 @@ to clear hidden membership. Restoring an application returns it to its existing
 pinned position without pinning or unpinning anything. `config reset --preferences`
 intentionally preserves `hiddenApplications` and the other application collections.
 
-The configuration file is watched and updates automatically. Drag a dock icon to another slot to reorder it; the new `pinned` order is written back to this file. Switch presentation from **Switch to sidebar** in Dock Controls or **Switch to dock** in the sidebar header menu. You can also drag genuinely empty background: drag the bottom dock's background left (48 px or more) to switch that monitor to the sidebar, or drag empty sidebar background downward to return it to the bottom dock. The hint pill, the destination silhouette and the result stay on the monitor where the drag started; other monitors keep their own modes, so a mixed layout with a classic dock beside a sidebar is normal. While you drag, a direction hint pill appears and, once the threshold is crossed, a silhouette of the destination edge previews where it will render; releasing past the threshold commits one `presentationModeByMonitor` entry for that connector once, and releasing earlier, pressing Escape, or an interrupted drag (open menu, popup, resize or row drag) cancels with no settings write. Only background is eligible — rows, widgets, headers, pinned strips and controls keep their own input. The existing settings writer persists the mode only after release. Feedback for a rejected or failed commit appears only on the monitor that produced the gesture. Reserved space follows visibility: while auto-hide is off, the `reserveSpace` option decides whether tiled windows keep a clear dock-sized area; while auto-hide is on, the hidden dock never reserves space.
+The configuration file is watched and updates automatically. Drag a dock icon to another slot to reorder it; the new `pinned` order is written back to this file. Dragging genuinely empty background switches that monitor's presentation: drag the bottom dock's background left (48 px or more) to switch that monitor to the sidebar, or drag empty sidebar background downward to return it to the bottom dock. The hint pill, the destination silhouette and the result stay on the monitor where the drag started; other monitors keep their own modes, so a mixed layout with a classic dock beside a sidebar is normal. While you drag, a direction hint pill appears and, once the threshold is crossed, a silhouette of the destination edge previews where it will render; releasing past the threshold commits one `presentationModeByMonitor` entry for that connector once, and releasing earlier, pressing Escape, or an interrupted drag (open menu, popup, resize or row drag) cancels with no settings write. Only background is eligible — rows, widgets, headers, pinned strips and controls keep their own input. The existing settings writer persists the mode only after release. Feedback for a rejected or failed commit appears only on the monitor that produced the gesture. Reserved space follows visibility: while auto-hide is off, the `reserveSpace` option decides whether tiled windows keep a clear dock-sized area; while auto-hide is on, the hidden dock never reserves space.
 
 Surface override settings are independent. Leave an `*Enabled` flag set to
 `false` to follow the active Omarchy theme; enable it to use the matching
