@@ -1,0 +1,38 @@
+name: FDM-1019 isolated documentation worker
+on:
+  push:
+    branches: [exec/fdm-1019-docs-worker]
+    paths: [.github/workflows/fdm-1019-docs-worker.yml, .fdm-1019-docs.patch]
+permissions:
+  contents: read
+concurrency:
+  group: fdm-1019-docs-worker
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    if: github.repository == 'fernandodamaso/dockrail' && github.ref == 'refs/heads/exec/fdm-1019-docs-worker'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: b240c3612f4e7581ed0a3474a574685ade2e94ca
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Export exact source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = b240c3612f4e7581ed0a3474a574685ade2e94ca
+          git branch fdm-1019-snapshot HEAD
+          git bundle create /tmp/fdm-1019-source.bundle fdm-1019-snapshot
+          git rev-parse HEAD > /tmp/fdm-1019-source.sha
+          sha256sum /tmp/fdm-1019-source.bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fdm-1019-source-snapshot
+          path: |
+            /tmp/fdm-1019-source.bundle
+            /tmp/fdm-1019-source.sha
+          retention-days: 3
+          if-no-files-found: error
