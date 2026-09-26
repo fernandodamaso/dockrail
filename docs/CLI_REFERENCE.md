@@ -33,7 +33,7 @@ The standard-library Python adapter currently uses `qs list --all --json` and `q
 | `help` | Prints full help; bare `dockrail` does the same. No host or directories required. |
 | `agent-guide` | Prints the installed `docs/AGENT_CONFIGURATION.md`; works without the source checkout or a host. With JSON, text is `data.text`. |
 | `status` | Selected host identity, config path, load/write state and revision. Not a settings mutation. |
-| `doctor` | Read-only status plus `data.checks`: `python`, `quickshell`, `omarchyShell`, `liveRuntime`. Missing runtime, invalid configuration or failed persistence exits nonzero. |
+| `doctor` | Read-only status plus `data.checks` and stable `data.features` readiness. Optional `missing`/`degraded` features still exit 0; missing runtime, invalid configuration or failed persistence exits nonzero. |
 | `config schema` | Optional `KEY`; keyed `data.settings`, `schemaVersion: 1`, implemented `data.commands`, `source: runtime` or `bundled`. Defaults are loaded from `config/dock.json`, not duplicated in metadata. |
 | `config get` | Optional `KEY` and `--effective`; keyed `data.settings` even for one key, `source`/`view: requested` or `effective`. Includes unknown retained keys on a full read. |
 
@@ -42,6 +42,49 @@ Only `config schema` may fall back to bundled metadata, and only after genuinely
 Status fields: `runtime`, `configPath`, `loadState` (`missing`, `loaded`, `invalid`), `loadError`, `loadPending`, `revision`, `writeState` (`idle`, `saving`, `saved`, `error`), `writeError`, `persisted`, `defaultsInUse`. A missing file is not a saved defaults file. Invalid disk configuration retains last-good live values and blocks ordinary writes; repair explicitly rather than replacing it with defaults. Revision is scoped to the host lifetime, not a compare-and-swap token. Pending readback makes persistence unconfirmed.
 
 Requested values retain intent. Effective output projects current normalization and layout dependencies, not fully resolved rendering. Theme-owned/token colors and theme-owned border width are `null`, with `themeResolution: not-reported` and a warning on effective reads. Do not erase a token because its renderer-resolved value is unknown.
+
+### Doctor feature readiness
+
+`dockrail doctor --json` keeps `apiVersion: 1` and adds a stable
+`data.features` object. Its keys are `sidebar`, `herdrAgents`,
+`chromeProfilesTabs`, `launcherCounts`, `agentLaunchers`, and
+`cliFreshness`. Every feature has exactly these readiness fields:
+
+```json
+{
+  "status": "ready | missing | degraded",
+  "reason": "human-readable current fact",
+  "nextStep": "one human-readable next action"
+}
+```
+
+`ready` means the requested runtime prerequisites are currently observable;
+`missing` means a required optional component or enablement is absent; and
+`degraded` means the feature is configured or partly present but cannot provide
+its complete behavior. Optional readiness does not change doctor exit status.
+Core runtime discovery, invalid configuration, persistence failure, transport
+and protocol failures keep their existing nonzero behavior.
+
+The detector is strictly read-only. It reads effective per-monitor presentation
+from status, requested feature flags through `config.get`, local executable and
+desktop-entry presence, Herdr's bounded `--version` output, current
+`herdr.agents` Widget lease diagnostics, and installed provider processes.
+The Chrome check makes one bounded HTTP request to
+`127.0.0.1:<configured-port>/json/version`; it never follows redirects or
+contacts a non-loopback host. Doctor never starts a provider or host, writes
+configuration, runs migration, installs anything, or changes the desktop.
+
+Herdr below 0.9.1 is `degraded` because click-to-focus is unavailable. Chrome
+profiles/tabs require an installed and running browser-profile provider, a
+reachable local DevTools endpoint, and at least one of
+`browserProfileBadgesEnabled` or `sidebarBrowserTabsEnabled`. Launcher counts
+check only the provider binary as specified by that feature's install contract.
+CLI freshness compares the client source revision and bundled client surface with
+the running plugin/standalone installation; a plugin-linked ONB-01 client is
+inherently `ready`.
+
+Human `dockrail doctor` renders the same feature status, reason and single next
+step without changing the JSON contract.
 
 ## Configuration commands
 
