@@ -231,7 +231,7 @@ class CliDocumentationTests(unittest.TestCase):
             self.assertIn('Settings', text)
             self.assertIn('single host', text)
         self.assertIn('Change Icon', agents)
-        self.assertIn('sole icon editor', agents)
+        self.assertRegex(agents, r'sole icon\\s+editor')
         self.assertIn('does not ship', agents)
         self.assertIn('not shipped', self.guide)
         self.assertIn('does **not** ship', reference)
