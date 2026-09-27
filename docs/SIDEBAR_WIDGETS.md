@@ -81,6 +81,11 @@ registry replacement and releases the old lease first. Replace descriptor snapsh
 when changing metadata so QML observes the update. View-factory/descriptor revision
 changes alone never restart the backend.
 
+Reactive host registry bindings may rebuild descriptor maps when unrelated
+providers change. Preserve the `acquire` function identity across those rebuilds;
+use a stable host method reference instead of an inline closure. Change that
+reference only when the adapter's acquisition boundary is intentionally replaced.
+
 Each `setActive(true, publish)` receives a **new generation callback**. The provider
 must replace its old callback, cancel sidebar-only pending work on suspension and
 publish snapshots through the current callback:

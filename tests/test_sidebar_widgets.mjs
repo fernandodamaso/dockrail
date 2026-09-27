@@ -34,7 +34,7 @@ function adapter(id, shared = false) {
           if (running && !shared) {running = false; counts.stop++;}
         }};
     }};
-  return {descriptor, counts, callbacks, emit(value) { callbacks.at(-1)(value); },
+  return {descriptor, provider, counts, callbacks, emit(value) { callbacks.at(-1)(value); },
     get active() {return active;}, get running() {return running;}};
 }
 const a = adapter('fixture.one'), b = adapter('fixture.two');
@@ -107,6 +107,17 @@ manager.reconcile(['fixture.one','fixture.two'],registry,true,owner);
 callback({status:'error',revision:1000});
 assert.equal(manager.view('fixture.one').status,'ready','re-enabled ID is a new lifetime');
 assert.equal(a.counts.acquire,2);
+const replacement = adapter('fixture.one');
+const replaced = {'fixture.one':replacement.descriptor,'fixture.two':b.descriptor};
+const staleBeforeReplacement = a.callbacks.at(-1);
+manager.reconcile(['fixture.one','fixture.two'],replaced,true,owner);
+assert.equal(a.counts.release,2,'a deliberate acquisition-boundary replacement releases the old lease');
+assert.equal(replacement.counts.acquire,1,'a deliberate acquisition-boundary replacement acquires the new lease');
+assert.equal(manager.view('fixture.one').provider,replacement.provider,
+  'the manager now exposes the replacement provider');
+const replacementRevision = manager.view('fixture.one').revision;
+staleBeforeReplacement({status:'error',revision:replacementRevision+10});
+assert.equal(manager.view('fixture.one').status,'ready','callbacks from the replaced adapter are ignored');
 const d = plain(manager.diagnostics());
 assert.ok(!JSON.stringify(d).match(/SECRET|PRIVATE|credentials|privateContent/));
 assert.equal(d.rows.length,2);
@@ -115,6 +126,7 @@ manager.dispose();
 manager.dispose();
 assert.equal(a.counts.release,2);
 assert.equal(b.counts.release,1);
+assert.equal(replacement.counts.release,1);
 assert.deepEqual(plain(manager.ids()),[]);
 
 // Shared services belong to their owner. The sidebar may release its lease,

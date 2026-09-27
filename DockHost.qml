@@ -43,6 +43,10 @@ Item {
   function releaseIconDialog(dialog) {
     if (root.activeIconDialog === dialog) root.activeIconDialog = null
   }
+  // Keep the lease boundary stable while unrelated registry entries refresh.
+  function acquireHerdrWidget(owner) {
+    return root.herdrWindowAgents.createConsumerLease(owner)
+  }
   readonly property var connectedScreens: Quickshell.screens
   readonly property var hyprMonitors: Hyprland.monitors ? Hyprland.monitors.values || [] : []
   readonly property var hyprWorkspaces: Hyprland.workspaces ? Hyprland.workspaces.values || [] : []
@@ -63,7 +67,7 @@ Item {
         manageable: false,
         available: root.herdrService.available !== false,
         revision: 1,
-        acquire: function(owner) { return root.herdrWindowAgents.createConsumerLease(owner) },
+        acquire: root.acquireHerdrWidget,
         expandedView: herdrExpandedView,
         compactView: herdrCompactView,
         popupView: herdrPopupView
