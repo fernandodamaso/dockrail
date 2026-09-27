@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import importlib.util
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +91,34 @@ def settings(widget=True, badges=True, tabs=True):
 
 
 class FeatureReadinessTests(unittest.TestCase):
+    def test_devtools_probe_includes_non_default_port_in_host_header(self):
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.server.seen_host = self.headers.get('Host')
+                body = json.dumps({
+                    'webSocketDebuggerUrl':
+                        'ws://' + self.server.seen_host + '/devtools/browser/test',
+                }).encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format, *args):
+                pass
+
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.addCleanup(server.server_close)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        self.addCleanup(thread.join)
+        self.addCleanup(server.shutdown)
+
+        port = server.server_address[1]
+        self.assertTrue(CLI.ReadinessProbes().devtools_reachable(port))
+        self.assertEqual(server.seen_host, '127.0.0.1:' + str(port))
+
     def test_ready_shape_and_fake_provider_port(self):
         probes = FakeProbes()
         features = CLI.feature_readiness(status(), settings(), probes)
