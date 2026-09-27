@@ -10,7 +10,8 @@ context_menu="$plugin_dir/components/DockContextMenu.qml"
 
 for icon in trash-2 settings-2 plus eye eye-off rocket folder-open \
   maximize-2 minimize-2 square pin pin-off x arrow-right-left \
-  chevron-left focus layout-grid move minus app-window; do
+  chevron-left focus layout-grid move minus app-window \
+  panel-left-open panel-bottom; do
   test -s "$assets_dir/$icon.svg" \
     || { echo "Missing bundled Lucide icon: $icon.svg" >&2; exit 1; }
   grep -q '<svg' "$assets_dir/$icon.svg" \
@@ -24,8 +25,10 @@ grep -Eq 'assets/lucide/' "$menu_action" \
 grep -Eq '^[[:space:]]*ColorOverlay \{' "$menu_action" \
   || { echo "DockMenuAction is missing themed SVG recoloring" >&2; exit 1; }
 
-grep -Eq 'onTapped: contextMenu\.open\(\)' "$control_item" \
+grep -Eq 'onTapped: root\.openControlsMenu\(\)' "$control_item" \
   || { echo "Controls left click must open the controls menu" >&2; exit 1; }
+grep -Eq 'contextMenu\.open\(\)' "$control_item" \
+  || { echo "Controls menu trigger does not open the existing popup" >&2; exit 1; }
 grep -Eq 'signal openLauncher' "$context_menu" \
   || { echo "Controls menu is missing its launcher action signal" >&2; exit 1; }
 grep -Eq '"controls:launcher"' "$context_menu" \

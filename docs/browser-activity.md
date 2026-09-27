@@ -2,7 +2,61 @@
 
 Dockrail's optional browser-profile provider publishes profile ownership and
 small, privacy-preserving activity rows for Chrome. It is an additive snapshot
-alongside the existing `windows` and `profiles` maps:
+alongside the existing `windows` and `profiles` maps.
+
+## Enable Chrome profiles and tabs
+
+Chrome's DevTools endpoint is optional; Omarchy does not enable it by default.
+[Chrome requires a non-default user data directory for remote debugging](https://developer.chrome.com/blog/remote-debugging-port).
+This starts a fresh Chrome profile, separate from your normal logins and
+extensions. You will need to sign in again and set up extensions in that profile.
+
+To add the two required flags to `~/.config/chrome-flags.conf`, run:
+
+```bash
+mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}"
+printf '%s\n' \
+  "--user-data-dir=$HOME/.config/google-chrome-debug" \
+  '--remote-debugging-port=9222' \
+  >> "${XDG_CONFIG_HOME:-$HOME/.config}/chrome-flags.conf"
+```
+
+The file must contain an absolute path, such as
+`--user-data-dir=/home/your-name/.config/google-chrome-debug`, followed by
+`--remote-debugging-port=9222`; a literal `$HOME` in this file is not expanded
+by the Chrome launcher. If these flags are already present, edit the existing
+lines instead of appending duplicates. Quit all Chrome windows and restart
+Chrome so it reads the new flags.
+
+From the installed Dockrail plugin folder, install the optional provider and
+reload or restart the Dockrail plugin:
+
+```bash
+cd "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail"
+bash ./scripts/install-browser-profile-provider
+```
+
+With Chrome running, check the endpoint:
+
+```bash
+curl -s localhost:9222/json/version
+```
+
+A JSON response with a `Browser` field confirms that Chrome is listening.
+If the connection fails, check the flags and restart Chrome. This checks the
+DevTools endpoint; profile and tab display also requires the provider and
+Dockrail plugin to be running.
+
+**Security:** The port binds to localhost only, but while it is open any local
+process can control this Chrome profile and read its pages and cookies. Enable
+it only if you want Dockrail's profile and tab features. To turn it off, remove
+`--remote-debugging-port=9222` from `chrome-flags.conf` and restart Chrome.
+Remove the `--user-data-dir` line too if you want Chrome to return to your
+normal profile. Without the endpoint, Dockrail keeps plain application icons.
+
+## Snapshot contract
+
+The provider emits a snapshot such as:
 
 ```json
 {

@@ -116,11 +116,14 @@ Item {
   // Background mode-switch feedback keyed by output connector. Each renderer
   // reports only its own connector, and the host owns the map — so a stale or
   // rejected gesture on one monitor can never display on another, even across
-  // renderer replacement. Persistence failures stay host-wide through
-  // settingsWriteState rather than being stored per connector. Cleared
-  // explicitly when settings reload or save, and overwritten by the next
+  // renderer replacement. Drag persistence failures stay host-wide through
+  // settingsWriteState; menu persistence failures use modeMenuWriteConnector.
+  // Feedback clears when settings reload or save, and is overwritten by the next
   // gesture for that connector.
   property var modeGestureFeedbackByMonitor: ({})
+  // A menu-initiated save failure belongs to the menu's output; background
+  // gesture failures retain their existing host-wide persistence feedback.
+  property string modeMenuWriteConnector: ""
   property bool settingsReloadPending: false
   property string settingsLoadedText: ""
   property string settingsWriteBaseText: ""
@@ -158,6 +161,7 @@ Item {
         iconReloadRevision++
       if (JSON.stringify(settings) !== JSON.stringify(requested)) settingsRevision++
       modeGestureFeedbackByMonitor = ({})
+      modeMenuWriteConnector = ""
       settings = requested
       settingsLoadState = "loaded"
       settingsLoadError = ""
@@ -348,11 +352,13 @@ Item {
   }
 
   // What a surface displays: its own connector's rejection first, plus a
-  // persistence failure host-wide — that applies to every output regardless of
-  // which gesture triggered the save, so no surviving renderer silently drops it.
+  // persistence failure. Drag failures remain host-wide; menu failures appear
+  // only on the output whose menu started the write.
   function modeGestureDisplayFor(connector) {
     var local = modeGestureFeedbackFor(connector)
     if (settingsWriteState !== "error") return local
+    if (modeMenuWriteConnector && String(connector || "") !== modeMenuWriteConnector)
+      return local
     var persistence = DockModel.persistenceFeedback(settingsWriteError)
     return local ? local + " · " + persistence : persistence
   }
@@ -362,10 +368,19 @@ Item {
   // only that connector's presentationModeByMonitor entry may change. Feedback
   // is stored on the host because the gesture's own renderer may be the one
   // torn down by a successful switch.
-  function commitMonitorModeGesture(connector, destination, capturedState) {
+  function commitMonitorModeGesture(connector, destination, capturedState, menuOrigin) {
+    if (menuOrigin !== true) modeMenuWriteConnector = ""
     var feedback = DockModel.modeDragWriteError(
       monitorModeIntent(connector, destination, capturedState))
     setModeGestureFeedback(connector, feedback)
+    return feedback
+  }
+
+  function commitMonitorModeMenu(connector, destination, capturedState) {
+    var previousOrigin = modeMenuWriteConnector
+    modeMenuWriteConnector = String(connector || "")
+    var feedback = commitMonitorModeGesture(connector, destination, capturedState, true)
+    if (feedback) modeMenuWriteConnector = previousOrigin
     return feedback
   }
 
@@ -511,6 +526,7 @@ Item {
     settingsWriteError = ""
     settingsWriteState = "saved"
     modeGestureFeedbackByMonitor = ({})
+    modeMenuWriteConnector = ""
     settingsLoadedText = settingsWriteText
     settingsLoadState = "loaded"
     settingsLoadError = ""
@@ -524,8 +540,8 @@ Item {
       + "Retry before restarting. " + FileViewError.toString(error)
     settingsWriteState = "error"
     settingsPersisted = false
-    // No per-connector message: a persistence failure is host-wide and every
-    // surface derives it from settingsWriteState through modeGestureDisplayFor.
+    // Every surface derives the persistence result from settingsWriteState;
+    // modeGestureDisplayFor applies the menu origin when one is recorded.
     console.warn("Dock: could not save " + configPath + ":", error)
     reloadSettingsIfPending()
   }
@@ -845,6 +861,9 @@ Item {
         onPositionRequested: (position, expectedPosition, gestureToken) =>
           root.handlePositionRequest(classicRoot.owner ? classicRoot.owner.connector : "",
             position, expectedPosition, gestureToken)
+        onMenuModeSwitchRequested: token =>
+          root.commitMonitorModeMenu(classicRoot.owner ? classicRoot.owner.connector : "",
+            "sidebar", token)
         onOpenTrashRequested: root.openTrash()
         onEmptyTrashRequested: root.emptyTrash()
       }
