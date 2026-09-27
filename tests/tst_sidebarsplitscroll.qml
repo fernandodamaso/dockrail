@@ -101,9 +101,9 @@ TestCase {
       repeat: true
       onTriggered: {
         registryHost.externalDescriptors=({})
-        testCase.verify(registryHost.sidebarWidgetRegistry["herdr.agents"].acquire===acquireFunction)
         testCase.compare(manager.diagnostics().counters.acquisitions,1)
         testCase.compare(manager.diagnostics().counters.releases,0)
+        testCase.verify(registryHost.sidebarWidgetRegistry["herdr.agents"].acquire===acquireFunction)
         testCase.compare(backend.starts,1)
         testCase.compare(backend.stops,0)
         testCase.compare(backend.activeCount,1)
@@ -355,10 +355,12 @@ TestCase {
     for(var i=0;i<4;i++) {
       host.externalDescriptors=({})
       wait(20)
+      var counters=c.widgetManager.diagnostics().counters
+      verify(counters.acquisitions===1&&counters.releases===0,
+        "registry refresh keeps one acquisition and zero releases; actual acquisitions="+
+          counters.acquisitions+" releases="+counters.releases)
       verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire,
         "host registry refresh must retain the Herdr acquisition function")
-      compare(c.widgetManager.diagnostics().counters.acquisitions,1)
-      compare(c.widgetManager.diagnostics().counters.releases,0)
       compare(provider.starts,1)
       compare(provider.stops,0)
     }
@@ -374,14 +376,14 @@ TestCase {
       acquire:function(owner){return {setActive:function(){},release:function(){}}}
     }})
     wait(20)
-    verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire)
     compare(c.widgetManager.diagnostics().counters.acquisitions,1)
     compare(c.widgetManager.diagnostics().counters.releases,0)
+    verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire)
     host.externalDescriptors=({})
     wait(20)
-    verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire)
     compare(c.widgetManager.diagnostics().counters.acquisitions,1)
     compare(c.widgetManager.diagnostics().counters.releases,0)
+    verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire)
 
     panel.visible=false; panel.visible=true
     panel.panelCollapsed=true; panel.panelCollapsed=false
