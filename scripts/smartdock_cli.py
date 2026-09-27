@@ -449,7 +449,8 @@ def feature_readiness(status_data, settings, probes=None):
                 'degraded',
                 'Chrome DevTools is not reachable on localhost:' + str(port) + '.',
                 'Launch Chrome with --remote-debugging-port=' + str(port)
-                + ' on localhost, then rerun dockrail doctor.')
+                + ' and a separate --user-data-dir. Follow docs/browser-activity.md '
+                + 'for profile setup and the local-access security note, then rerun dockrail doctor.')
         else:
             enabled = []
             if badges_enabled:

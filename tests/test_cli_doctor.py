@@ -150,6 +150,8 @@ class FeatureReadinessTests(unittest.TestCase):
         value = CLI.feature_readiness(status(), settings(), probes)
         self.assertEqual(value['chromeProfilesTabs']['status'], 'degraded')
         self.assertIn('localhost:9333', value['chromeProfilesTabs']['reason'])
+        self.assertIn('--user-data-dir', value['chromeProfilesTabs']['nextStep'])
+        self.assertIn('security', value['chromeProfilesTabs']['nextStep'])
 
     def test_launcher_agent_and_cli_states(self):
         probes = FakeProbes()
