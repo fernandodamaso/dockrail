@@ -14,6 +14,12 @@ service=components/DockBrowserProfileService.qml
 icon=components/DockAppIcon.qml
 model=components/DockIconModel.js
 
+# Keep onboarding text from claiming remote debugging is an Omarchy default.
+if git grep -nEi "omarchy.{0,40}default(s)? (enable|provide)|enabled by omarchy|omarchy does this" -- \
+  . ':!tests/check_browser_profile_provider.sh'; then
+  fail 'remote-debugging docs must not claim an Omarchy default'
+fi
+
 [[ -f "$provider" ]] || fail 'browser profile provider missing'
 [[ -f "$service" ]] || fail 'DockBrowserProfileService.qml missing'
 [[ -f "$icon" ]] || fail 'DockAppIcon.qml missing'

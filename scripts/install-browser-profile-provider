@@ -23,6 +23,6 @@ Browser profile provider installed:
   $install_dir/smartdock-browser-profile-provider
 
 Restart/reload the Dockrail plugin so its service can start the provider.
-The provider needs Chrome running with a DevTools endpoint
-(--remote-debugging-port, enabled by Omarchy's defaults).
+The provider needs Chrome running with an explicitly enabled DevTools endpoint.
+See $repo_root/docs/browser-activity.md for Chrome setup and the security note.
 EOF

@@ -234,10 +234,11 @@ bash ./scripts/install-browser-profile-provider
 
 The script byte-compiles the Python helper and installs it under
 `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Reload or restart
-the Dockrail plugin afterwards. The browser must run with
-`--remote-debugging-port` (Omarchy's Chrome defaults enable it); without a
-reachable endpoint the dock simply keeps the plain application icon, exactly
-like an unavailable launcher-count provider.
+the Dockrail plugin afterwards. Chrome remote debugging is optional and must
+be enabled explicitly with a separate user data directory. Follow
+**[Enable Chrome profiles and tabs](docs/browser-activity.md#enable-chrome-profiles-and-tabs)**
+for setup, verification, and the security implications. Without a reachable
+endpoint the dock keeps the plain application icon.
 
 Detected profiles render as a small corner badge over the app icon: the
 profile's own photo when one exists, otherwise an initial circle in a
