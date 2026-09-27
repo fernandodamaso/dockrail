@@ -210,7 +210,8 @@ class ReadinessProbes:
             return False
         connection = http.client.HTTPConnection('127.0.0.1', port, timeout=0.5)
         try:
-            connection.request('GET', '/json/version', headers={'Host': '127.0.0.1'})
+            connection.request(
+                'GET', '/json/version', headers={'Host': '127.0.0.1:' + str(port)})
             response = connection.getresponse()
             body = response.read(65537)
             if response.status != 200 or len(body) > 65536:
