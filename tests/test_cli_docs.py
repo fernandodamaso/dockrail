@@ -5,6 +5,7 @@ new runtime, or desktop session is involved. The marked guide blocks are inputs.
 """
 import argparse
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -77,9 +78,9 @@ class CliDocumentationTests(unittest.TestCase):
         self.assertTrue(reply['ok'], reply)
         return reply['data']
 
-    def block(self, name, language):
+    def block(self, name, language, text=None):
         match = re.search(r'<!-- recipe: ' + re.escape(name) + r' -->\s*```'
-                          + language + r'\n(.*?)\n```', self.guide, re.S)
+                          + language + r'\n(.*?)\n```', self.guide if text is None else text, re.S)
         self.assertIsNotNone(match, 'Missing executable guide recipe: ' + name)
         return match.group(1)
 
@@ -153,6 +154,46 @@ class CliDocumentationTests(unittest.TestCase):
         self.assertEqual(self.run_command('dockrail config get presentationMode --json')['settings'],
                          {'presentationMode': 'sidebar'})
         self.run_command('dockrail config set presentationMode classic --json')
+
+    def run_shell_recipe_line(self, command):
+        # Parse the documented printf pipeline without invoking a shell or any
+        # live command. Only transport is replaced; stdin parsing and the host
+        # settings methods are production code.
+        args = shlex.split(command)
+        if args[0] == 'dockrail':
+            return self.run_command(command)
+        self.assertEqual(args[:2], ['printf', '%s\\n'])
+        self.assertEqual(args[3:5], ['|', 'dockrail'])
+        self.assertIn('--stdin', args[5:])
+        with io.TextIOWrapper(io.BytesIO((args[2] + '\n').encode())) as stdin:
+            with patch.object(cli.sys, 'stdin', stdin):
+                reply = cli.execute(cli.build_parser().parse_args(args[5:]))
+        self.assertTrue(reply['ok'], reply)
+        return reply['data']
+
+    def test_readme_sidebar_recipe_preserves_monitor_choices_and_other_settings(self):
+        self.transport.initial['presentationModeByMonitor'] = {'DP-1': 'classic'}
+        text = (ROOT / 'README.md').read_text(encoding='utf-8')
+        before = self.run_command('dockrail config get --json')['settings']
+        result = self.run_shell_recipe_line(self.block('sidebar-default', 'bash', text))
+        self.assertTrue(result['persisted'])
+        after = self.run_command('dockrail config get --json')['settings']
+        self.assertEqual(after, dict(before, presentationMode='sidebar', sidebarEdge='left'))
+        self.assertEqual(after['presentationModeByMonitor'], {'DP-1': 'classic'})
+        self.assertIn('per-monitor choices in `presentationModeByMonitor` take precedence', text)
+
+    def test_reference_sidebar_examples_use_the_real_cli_and_host(self):
+        text = (ROOT / 'docs/CLI_REFERENCE.md').read_text(encoding='utf-8')
+        for line in self.block('sidebar-settings', 'sh', text).splitlines():
+            with self.subTest(command=line):
+                self.run_shell_recipe_line(line)
+        settings = self.run_command('dockrail config get --json')['settings']
+        self.assertEqual(settings['sidebarCollapsedByMonitor'], {'DP-1': True, 'HDMI-A-1': False})
+        self.assertEqual(settings['presentationMode'], 'classic')
+        self.assertEqual(settings['presentationModeByMonitor'], {})
+        self.assertEqual(settings['extensionData'], self.transport.initial['extensionData'])
+        self.assertEqual(settings['iconOverrides'], self.transport.initial['iconOverrides'])
+        self.assertEqual(settings['pinned'], self.transport.initial['pinned'])
 
     def test_application_recipe_restores_and_orders_without_dropping_unknown_ids(self):
         for line in self.block('applications', 'sh').splitlines():

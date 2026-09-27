@@ -1,8 +1,8 @@
 # Dockrail configuration inventory
 
-**Unreleased CLI-first candidate.** Discover `dockrail config schema --json` on the selected running host before changing it. Its keyed metadata and `config/dock.json` are the runtime/default authorities; this table is a tested reference, not a second settings engine or a replacement for the user's configuration.
+**Configuration reference.** Discover `dockrail config schema --json` on the selected running host before changing it. Its keyed metadata and `config/dock.json` are the runtime/default authorities; this table is a tested reference, not a second settings engine or a replacement for the user's configuration.
 
-Use [the agent workflow](AGENT_CONFIGURATION.md) for minimal, reversible changes and [the CLI reference](CLI_REFERENCE.md) for command/output/error details. CLI preferences and icons replace the removed Settings page; ordinary dock menus, app picker and window previews remain.
+Use [the agent workflow](AGENT_CONFIGURATION.md) for minimal, reversible changes and [the CLI reference](CLI_REFERENCE.md) for command/output/error details. The CLI configures preferences, and Change Icon is the sole icon editor. The accepted Settings 3.1 design is not shipped yet; ordinary dock menus, app picker and window previews remain.
 
 ## All declared settings
 
@@ -105,7 +105,7 @@ Grouped/all renders those ordered monitor sections inline in the existing single
 
 Each connected monitor may have one active workspace card simultaneously. The workspace on Hyprland's globally focused monitor remains the unique primary workspace used for automatic reveal and global badge/preview traversal. Focus-only monitor changes update the informational prefix brightness and primary reveal without changing monitor-section order or keyed workspace/application identities. Closed global launchers render once before all sections; **Other windows** renders once after them. When a first card exits or transfers monitors, the next present card acquires the prefix while the keyed card/app delegates are retained.
 
-Workspace-header activation focuses in place on plain click and pulls through the central workspace-on-monitor route only with Ctrl: clicking a grouped header focuses that workspace where it already is, while Ctrl+click pulls it onto the clicked dock monitor and focuses it. A plain click on a window icon inside a workspace card focuses the exact window in place; Ctrl+left click moves just that window to the clicked dock monitor's active workspace and focuses it. The shared controller retains the FDM-942/FDM-943 workspace-monitor pin enforcement hooks for callers that establish a pin, though the current workspace header has no pin menu. Plain app-icon activation already focuses in place. FDM-949 remains the full-host qualification reference.
+Workspace-header activation focuses in place on plain click and pulls through the central workspace-on-monitor route only with Ctrl: clicking a grouped header focuses that workspace where it already is, while Ctrl+click pulls it onto the clicked dock monitor and focuses it. A plain click on a window icon inside a workspace card focuses the exact window in place; Ctrl+left click moves just that window to the clicked dock monitor's active workspace and focuses it. The shared controller retains the workspace-monitor pin enforcement hooks for callers that establish a pin, though the current workspace header has no pin menu. Plain app-icon activation already focuses in place.
 
 Dragging a grouped workspace header to another monitor's Dockrail moves that workspace without sending a focus command. The source must already be visible; an auto-hidden destination reveals only after the pointer reaches its normal reveal strip, and the drop is accepted only over the visible dock background. Release elsewhere, return to the source dock, Escape, invalidation, or a session pin cancels without a command. In `current-monitor` the card transfers from the source dock to the destination; in `all` every dock mirrors its transfer between monitor sections. This does not change app reordering, window-to-card dragging, workspace ordering, settings, schema, or CLI.
 
@@ -140,7 +140,7 @@ Existing unknown keys and untouched legacy values survive minimal mutations. New
 
 `controlCommand` is executable configuration: store only an intentionally chosen command, quote it literally, and never run it merely to check validity. The existing launcher action can execute it later. Pointer `close` can close every live member of an application group when used. Changes to either require explicit intent; schema reads, dry runs and metadata validation do not execute them.
 
-## Sidebar presentation (SB-02 + SB-03 source foundation)
+## Sidebar presentation
 
 Classic remains the default. `presentationMode: "sidebar"` maps mirrored panels on
 connected screens (or one panel when `sidebarMonitor` names a connected connector),
@@ -216,18 +216,18 @@ reported on the source monitor only, through host feedback keyed by connector,
 using the shared wording above; a stale gesture's message can never appear on
 another monitor.
 
-This is an **unreleased Draft foundation**, not integrated sidebar acceptance.
-SB-03 owns resize gestures, SB-04 owns full navigation/menus/keyboard/drag,
-SB-05 owns the internal provider lifecycle and FDM-973 moves Widget cards into the
-hierarchy's shared scroll. Local compositor qualification follows in FDM-974 after
-the reusable UI-kit slice. See the source-only `docs/SIDEBAR.md` contract.
+Sidebar resizing, navigation and Widget lifecycle details are in the source-only
+`docs/SIDEBAR.md` reference. Configuration readback is not proof that a compositor
+has rendered the requested layout; check placement and input on the desktop.
 
-`sidebarWidgets` uses the internal source registry, currently empty in production.
+`sidebarWidgets` uses the selected host's Widget registry.
 Runtime schema `registeredIds` is authoritative for new writes. Unknown imports are
 never executed; requested readback retains them and `data.presentation.widgets`
 reports unavailable state. `config get --effective` lists only registered IDs.
-The normal Widget section has no independent footer cap/scrollbar and consumes zero
-height when no Widgets are enabled; Add/Manage remains available in expanded mode.
+The hierarchy and Widget bodies scroll independently, while the Widget header,
+PINNED and Applications stay fixed. A content-aware 55% hierarchy cap returns
+unused space. The Widget section consumes zero height when no Widgets are enabled;
+Add/Manage remains available in expanded mode.
 `sidebarWidgetCollapsed` stores body state without enabling providers. These
 controls do not change stock topbar services. Source contract:
 `docs/SIDEBAR_WIDGETS.md`.

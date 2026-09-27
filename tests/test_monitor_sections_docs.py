@@ -16,9 +16,9 @@ class MonitorSectionDocsTests(unittest.TestCase):
             "current-monitor",
             "globally focused monitor",
             "Other windows",
-            "FDM-942",
-            "FDM-943",
-            "FDM-949",
+            "workspace-monitor pin enforcement hooks",
+            "current workspace header has no pin menu",
+            "Plain app-icon activation already focuses in place",
         ]:
             self.assertIn(phrase, combined)
 
@@ -29,6 +29,11 @@ class MonitorSectionDocsTests(unittest.TestCase):
         self.assertIn("unique primary workspace", inventory)
         self.assertIn("pulls it onto the clicked dock monitor", inventory)
         self.assertIn("moves just that window", inventory)
+
+    def test_internal_tracking_stays_in_the_developer_reference(self):
+        reference = (ROOT / "docs" / "SIDEBAR.md").read_text(encoding="utf-8")
+        for issue in ("FDM-942", "FDM-943", "FDM-949"):
+            self.assertIn(issue, reference)
 
 
 if __name__ == "__main__":

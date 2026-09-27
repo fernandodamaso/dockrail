@@ -1,12 +1,12 @@
 # Dockrail CLI reference
 
-**CLI interface (source candidate).** This describes implemented CLI source, not an available release, permission to deploy, or completed Omarchy runtime qualification. Older installed builds may not implement this interface. Discover the selected host's schema instead of assuming this document describes that installation.
+**CLI interface.** Older installed builds may not implement every command in this reference. Discover the selected host's schema before changing settings, and use `dockrail doctor` to check the current installation.
 
-Start with [the agent guide](AGENT_CONFIGURATION.md). [Configuration inventory](CONFIGURATION.md) records every declared default and dependency. Source qualification belongs to [CLI_RUNTIME_CHECKS.md](CLI_RUNTIME_CHECKS.md); historical delivery evidence is not evidence for a newer SHA.
+Start with [the agent guide](AGENT_CONFIGURATION.md). [Configuration inventory](CONFIGURATION.md) records every declared default and dependency. Desktop verification steps are in [CLI_RUNTIME_CHECKS.md](CLI_RUNTIME_CHECKS.md). Results from another version do not confirm behavior on your installation.
 
 ## Settings and the CLI
 
-Dockrail 3.1 has an accepted Settings-panel design for people, recorded in `docs/SETTINGS.md`. SET-01 records that policy and design foundation; it does **not** ship the Settings UI or a new `dockrail settings` command. AI coding agents and automation continue to use this CLI as the complete configuration interface. The future Settings surface must send the same host intents through the single host writer and expose the same requested/effective, applied, persisted and retry semantics; it is not an alternate configuration backend. **Change Icon** remains the sole icon editor.
+Dockrail 3.1 has an accepted Settings-panel design for people, recorded in `docs/SETTINGS.md`. That record describes the planned panel; it does **not** ship the Settings UI or a new `dockrail settings` command. AI coding agents and automation continue to use this CLI as the complete configuration interface. The future Settings surface must send the same host intents through the single host writer and expose the same requested/effective, applied, persisted and retry semantics; it is not an alternate configuration backend. **Change Icon** remains the sole icon editor.
 
 ## Selection and transport
 
@@ -24,7 +24,7 @@ All commands below are prefixed with `dockrail`. Control options work before or 
 
 The host's `data.configPath` is authoritative. The canonical configuration is `${XDG_CONFIG_HOME:-$HOME/.config}/dockrail/dock.json`; `DOCKRAIL_CONFIG` is the canonical explicit override and `SMARTDOCK_CONFIG` remains accepted for compatibility. A managed legacy `${XDG_CONFIG_HOME:-$HOME/.config}/smartdock` path may resolve to the canonical state after migration. Changing the client's environment does **not** redirect an already-running host. No configuration command launches, restarts or installs a host.
 
-The standard-library Python adapter currently uses `qs list --all --json` and `qs ipc --pid PID call -- smartdock request PAYLOAD`, with argv arrays, no shell evaluation, a 2-second subprocess timeout and an 8-second discovery/IPC deadline. After host discovery, guided `setup` gives each IPC call its own 2-second timeout, so prompts and installer execution do not consume the discovery deadline. Requests are bounded to 64 KiB and response stdout to 1 MiB. Diagnostics remain separate. The Omarchy wrapper's newest-instance selection cannot provide the exact selection required here; no guessed wrapper flags or raw socket protocol are used. Compatibility with the installed Quickshell build and real scheduling is a local gate.
+The standard-library Python adapter currently uses `qs list --all --json` and `qs ipc --pid PID call -- smartdock request PAYLOAD`, with argv arrays, no shell evaluation, a 2-second subprocess timeout and an 8-second discovery/IPC deadline. After host discovery, guided `setup` gives each IPC call its own 2-second timeout, so prompts and installer execution do not consume the discovery deadline. Requests are bounded to 64 KiB and response stdout to 1 MiB. Diagnostics remain separate. The Omarchy wrapper's newest-instance selection cannot provide the exact selection required here; no guessed wrapper flags or raw socket protocol are used. Verify compatibility and timing with the Quickshell build running on your desktop.
 
 ## Discovery commands
 
@@ -80,7 +80,7 @@ reachable local DevTools endpoint, and at least one of
 `browserProfileBadgesEnabled` or `sidebarBrowserTabsEnabled`. Launcher counts
 check only the provider binary as specified by that feature's install contract.
 CLI freshness compares the client source revision and bundled client surface with
-the running plugin/standalone installation; a plugin-linked ONB-01 client is
+the running plugin/standalone installation; a plugin-linked client is
 inherently `ready`.
 
 Human `dockrail doctor` renders the same feature status, reason and single next
@@ -89,7 +89,7 @@ step without changing the JSON contract.
 
 ## Guided setup
 
-The `setup` command is the human, interactive onboarding path for optional features. Run it as `dockrail setup`. It first renders the same ONB-05 readiness projection as `dockrail doctor`; it does not implement a second detector. Interactive setup requires a TTY. Scripting and agent use is explicit and limited to the final feature names:
+The `setup` command is the human, interactive onboarding path for optional features. Run it as `dockrail setup`. It first renders the same readiness projection as `dockrail doctor`; it does not implement a second detector. Interactive setup requires a TTY. Scripting and agent use is explicit and limited to the final feature names:
 
 ```sh
 dockrail setup --feature chrome --yes
@@ -209,19 +209,21 @@ This installs `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` and the `smartdock` c
 
 From a separate source checkout, `bash ./install.sh --cli-only` retains the copied client bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`; refresh that bundle explicitly from the intended checkout. Full standalone installation retains its own bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail`. Client-only and standalone installation can coexist in either order, and removing one retains the launchers while the other owns them. The canonical client takes precedence over standalone and legacy bundles. Help and guide follow the selected bundle, not `.source-dir`.
 
-Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Use the normal, separately authorized Omarchy deployment path for a released plugin. No merge/deploy is authorized by this candidate reference.
+Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Updating or restarting an installed plugin is a separate, explicit operation; configuration commands never do it automatically.
 
 ## Sidebar configuration and diagnostics
 
-The SB-02 candidate adds `presentationMode`, `presentationModeByMonitor`,
+Sidebar settings include `presentationMode`, `presentationModeByMonitor`,
 `sidebarEdge`, `sidebarMonitor`,
 `sidebarExpandedWidth`, `sidebarCollapsed`, `sidebarCollapsedByMonitor`,
 `sidebarBrowserTabsEnabled`, `sidebarWidgets` and `sidebarWidgetCollapsed`.
 Discover these keys on the selected
-host; do not assume an installed release implements this candidate.
+host; older installations may not expose every setting.
 
-In an isolated candidate session only:
+Examples below replace the named map or value. Read current values first and
+preserve other connectors' entries when applying a per-monitor change:
 
+<!-- recipe: sidebar-settings -->
 ```sh
 dockrail config set presentationMode sidebar --json
 dockrail config set presentationModeByMonitor '{"DP-1":"classic"}' --json
@@ -229,7 +231,7 @@ dockrail config set sidebarEdge right --json
 dockrail config set sidebarMonitor DP-1 --json
 dockrail config set sidebarExpandedWidth 320 --json
 dockrail config set sidebarCollapsed true --json
-dockrail config apply --json '{"sidebarCollapsedByMonitor":{"DP-1":true,"HDMI-A-1":false}}'
+printf '%s\n' '{"sidebarCollapsedByMonitor":{"DP-1":true,"HDMI-A-1":false}}' | dockrail config apply --stdin --json
 dockrail config get --effective --json
 dockrail config set presentationMode classic --json
 dockrail config reset presentationModeByMonitor --json
@@ -263,10 +265,10 @@ A successful model projection is not live rendering evidence. Existing persisten
 flags remain authoritative: accepted-but-saving (`data.applied: true`) must not be
 replayed as though rejected. `config retry` uses the latest host snapshot.
 
-These controls do not install widgets or alter the stock topbar. This Draft slice
-is not an integrated release; see `docs/SIDEBAR.md` in the source checkout.
+These controls do not install widgets or alter the stock topbar. See
+`docs/SIDEBAR.md` in the source checkout for the sidebar implementation details.
 
-### Internal Widgets (FDM-967 / FDM-973)
+### Built-in sidebar widgets
 
 ```sh
 dockrail config schema sidebarWidgets --json
