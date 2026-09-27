@@ -756,6 +756,9 @@ def setup_action(feature, status, message, mutation=None):
 def run_setup(transport, instance, initial_status, args, checks, probes=None,
               actions=None, input_fn=input, stdin_is_tty=None):
     """Run guided setup only after execute() selected a real running host."""
+    # Discovery is already complete. Human prompts and installers must not
+    # consume the discovery deadline; each IPC call keeps its own timeout.
+    transport.deadline = None
     probes = ReadinessProbes() if probes is None else probes
     initial, settings = setup_snapshot(
         transport, instance, checks, probes, status_reply=initial_status)
@@ -1154,7 +1157,8 @@ class Transport:
         self.deadline = time.monotonic() + deadline
 
     def run(self, argv):
-        timeout = min(self.timeout, self.deadline - time.monotonic())
+        timeout = (self.timeout if self.deadline is None
+                   else min(self.timeout, self.deadline - time.monotonic()))
         if timeout <= 0:
             raise CliError('E_TIMEOUT', 'Discovery deadline exceeded. Read status before retrying.',
                            {'applied': None, 'persisted': None})

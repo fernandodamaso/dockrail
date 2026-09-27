@@ -3,6 +3,8 @@ import copy
 import contextlib
 import importlib.util
 import io
+import json
+import subprocess
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -225,6 +227,28 @@ class SetupTests(unittest.TestCase):
             self.assertTrue(parsed.yes)
         with self.assertRaises(CLI.CliError):
             self.parsed('--feature', 'sidebar', '--yes')
+
+    def test_prompt_delay_does_not_consume_discovery_deadline(self):
+        transport = CLI.Transport()
+        transport.deadline = 0  # Simulate a user spending over eight seconds reading.
+        timeouts = []
+
+        def run(argv, **kwargs):
+            timeouts.append(kwargs['timeout'])
+            payload = json.loads(argv[-1])
+            reply = self.transport.request(
+                self.transport.instance, payload['command'], payload['arguments'])
+            return subprocess.CompletedProcess(argv, 0, json.dumps(reply), '')
+
+        args = CLI.build_parser().parse_args(['setup'])
+        with patch.object(CLI.subprocess, 'run', side_effect=run), contextlib.redirect_stdout(io.StringIO()):
+            reply = CLI.run_setup(
+                transport, self.transport.instance, ok(self.transport.status_data),
+                args, {}, probes=self.probes, actions=self.actions,
+                input_fn=lambda prompt: 'n', stdin_is_tty=True)
+        self.assertTrue(reply['ok'])
+        self.assertTrue(timeouts)
+        self.assertEqual(set(timeouts), {transport.timeout})
 
     def test_herdr_dry_run_apply_readback_preserves_widget_order_and_unknown_settings(self):
         original_unknown = copy.deepcopy(self.transport.settings['extensionData'])
