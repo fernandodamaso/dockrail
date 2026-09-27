@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Dockrail's stdlib-only IPC client. Never starts a host or edits its config."""
 import argparse
+import hashlib
+import http.client
 import json
 import math
 import os
@@ -25,7 +27,7 @@ Read-only commands (never launch or restart the dock):
   help                         Show this help
   agent-guide                  Print the bundled agent configuration guide
   status                       Show the selected host and persistence state
-  doctor                       Check dependencies and selected host health
+  doctor                       Check core health and optional feature readiness
   config schema [KEY]          Describe settings; bundled fallback when offline
   config get [KEY] [--effective]
                                Read requested or normalized live settings
@@ -83,6 +85,457 @@ class CliError(Exception):
         self.code = code
         self.data = {} if data is None else data
 
+
+
+FEATURE_ORDER = (
+    'sidebar', 'herdrAgents', 'chromeProfilesTabs',
+    'launcherCounts', 'agentLaunchers', 'cliFreshness',
+)
+FEATURE_LABELS = {
+    'sidebar': 'Sidebar',
+    'herdrAgents': 'Herdr agents',
+    'chromeProfilesTabs': 'Chrome profiles/tabs',
+    'launcherCounts': 'Launcher counts',
+    'agentLaunchers': 'Agent launchers',
+    'cliFreshness': 'CLI freshness',
+}
+HERDR_MIN_VERSION = (0, 9, 1)
+AGENT_LAUNCHERS = (
+    'smartdock-agent-pi',
+    'smartdock-agent-oh-my-pi',
+    'smartdock-agent-command-code',
+    'smartdock-agent-cursor',
+    'smartdock-agent-claude-code',
+    'smartdock-agent-kilo-code',
+    'smartdock-agent-cline',
+)
+
+
+class ReadinessProbes:
+    """Read-only local facts used by doctor and future guided setup."""
+
+    def __init__(self, environ=None, bundle=None):
+        self.environ = os.environ if environ is None else environ
+        self.bundle = Path(BUNDLE if bundle is None else bundle)
+
+    def _home(self):
+        return Path(self.environ.get('HOME') or Path.home())
+
+    def _data_home(self):
+        value = self.environ.get('XDG_DATA_HOME')
+        return Path(value) if value else self._home() / '.local/share'
+
+    def _config_home(self):
+        value = self.environ.get('XDG_CONFIG_HOME')
+        return Path(value) if value else self._home() / '.config'
+
+    def which(self, command):
+        return shutil.which(command, path=self.environ.get('PATH'))
+
+    def herdr_version(self, executable):
+        try:
+            result = subprocess.run(
+                [executable, '--version'], stdin=subprocess.DEVNULL,
+                capture_output=True, text=True, encoding='utf-8',
+                timeout=1.0, check=False)
+        except (OSError, subprocess.TimeoutExpired, UnicodeError):
+            return None
+        output = (result.stdout + '\n' + result.stderr).strip()
+        match = re.search(r'(?<!\d)(\d+)\.(\d+)\.(\d+)(?!\d)', output)
+        if match is None:
+            return None
+        return tuple(int(part) for part in match.groups())
+
+    def _executable(self, path):
+        try:
+            return path.is_file() and os.access(path, os.X_OK)
+        except OSError:
+            return False
+
+    def _process_for_path(self, path):
+        target = os.path.realpath(str(path))
+        try:
+            processes = list(Path('/proc').iterdir())
+        except OSError:
+            return None
+        for process in processes:
+            if not process.name.isdigit():
+                continue
+            try:
+                raw = (process / 'cmdline').read_bytes()
+            except OSError:
+                continue
+            argv = [os.fsdecode(part) for part in raw.split(b'\0') if part]
+            for argument in argv:
+                if not os.path.isabs(argument):
+                    continue
+                try:
+                    if os.path.realpath(argument) == target:
+                        return argv
+                except OSError:
+                    continue
+        return None
+
+    def provider(self, kind):
+        names = {
+            'browser': 'smartdock-browser-profile-provider',
+            'launcher': 'smartdock-launcher-badge-provider',
+        }
+        name = names[kind]
+        data_home = self._data_home()
+        candidates = (
+            data_home / 'dockrail/providers' / name,
+            data_home / 'smartdock/providers' / name,
+        )
+        path = next((candidate for candidate in candidates if self._executable(candidate)),
+                    candidates[0])
+        installed = self._executable(path)
+        argv = self._process_for_path(path) if installed else None
+        return {
+            'path': str(path),
+            'installed': installed,
+            'running': argv is not None,
+            'argv': [] if argv is None else argv,
+        }
+
+    def devtools_reachable(self, port):
+        if type(port) is not int or port <= 0 or port > 65535:
+            return False
+        connection = http.client.HTTPConnection('127.0.0.1', port, timeout=0.5)
+        try:
+            connection.request('GET', '/json/version', headers={'Host': '127.0.0.1'})
+            response = connection.getresponse()
+            body = response.read(65537)
+            if response.status != 200 or len(body) > 65536:
+                return False
+            value = json.loads(body.decode('utf-8'))
+            socket_url = value.get('webSocketDebuggerUrl') if isinstance(value, dict) else None
+            if not isinstance(socket_url, str):
+                return False
+            return (socket_url.startswith('ws://127.0.0.1:' + str(port) + '/')
+                    or socket_url.startswith('ws://localhost:' + str(port) + '/'))
+        except (OSError, UnicodeError, ValueError, http.client.HTTPException):
+            return False
+        finally:
+            connection.close()
+
+    def missing_agent_launchers(self):
+        data_roots = [self._data_home()]
+        for entry in (self.environ.get('XDG_DATA_DIRS')
+                      or '/usr/local/share:/usr/share').split(':'):
+            path = Path(entry) if entry else None
+            if path is not None and path not in data_roots:
+                data_roots.append(path)
+        missing = []
+        for launcher in AGENT_LAUNCHERS:
+            if not any((root / 'applications' / (launcher + '.desktop')).is_file()
+                       for root in data_roots):
+                missing.append(launcher)
+        return missing
+
+    def _same_path(self, left, right):
+        try:
+            return os.path.realpath(str(left)) == os.path.realpath(str(right))
+        except OSError:
+            return False
+
+    def _runtime_root(self, runtime_mode):
+        if runtime_mode == 'plugin':
+            candidates = [
+                self._config_home() / 'omarchy/plugins/io.github.fernandodamaso.dockrail',
+                self._home() / '.config/omarchy/plugins/io.github.fernandodamaso.dockrail',
+            ]
+            for candidate in candidates:
+                if candidate.exists():
+                    return candidate
+            if self.bundle.name == 'io.github.fernandodamaso.dockrail':
+                return self.bundle
+            return candidates[0]
+        if runtime_mode == 'standalone':
+            return self._data_home() / 'dockrail'
+        return None
+
+    def _client_source_root(self):
+        marker = self.bundle / '.source-dir'
+        try:
+            source = marker.read_text(encoding='utf-8').strip()
+        except (OSError, UnicodeError):
+            return self.bundle
+        return Path(source) if source else self.bundle
+
+    def _git_revision(self, root):
+        if root is None:
+            return None
+        try:
+            result = subprocess.run(
+                ['git', '-C', str(root), 'rev-parse', 'HEAD'],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                encoding='utf-8', timeout=0.75, check=False)
+        except (OSError, subprocess.TimeoutExpired, UnicodeError):
+            return None
+        revision = result.stdout.strip()
+        return (revision if result.returncode == 0
+                and re.fullmatch(r'[0-9a-fA-F]{40,64}', revision) else None)
+
+    def _client_fingerprint(self, root):
+        if root is None:
+            return None
+        digest = hashlib.sha256()
+        for relative in (
+                'scripts/smartdock_cli.py',
+                'config/settings-schema.json',
+                'config/dock.json',
+                'docs/AGENT_CONFIGURATION.md',
+                'docs/CLI_REFERENCE.md'):
+            path = Path(root) / relative
+            try:
+                value = path.read_bytes()
+            except OSError:
+                return None
+            digest.update(relative.encode('utf-8'))
+            digest.update(b'\0')
+            digest.update(value)
+            digest.update(b'\0')
+        return digest.hexdigest()
+
+    def cli_sync(self, runtime_mode):
+        runtime_root = self._runtime_root(runtime_mode)
+        if runtime_root is None:
+            return 'unknown'
+        if self._same_path(self.bundle, runtime_root):
+            return 'live'
+        client_source = self._client_source_root()
+        client_revision = self._git_revision(client_source)
+        runtime_revision = self._git_revision(runtime_root)
+        if (client_revision is not None and runtime_revision is not None
+                and client_revision != runtime_revision):
+            return 'stale'
+        client_hash = self._client_fingerprint(self.bundle)
+        runtime_hash = self._client_fingerprint(runtime_root)
+        if client_hash is not None and runtime_hash is not None:
+            return 'match' if client_hash == runtime_hash else 'stale'
+        if client_revision is not None and runtime_revision is not None:
+            return 'match'
+        return 'unknown'
+
+
+def readiness(status, reason, next_step):
+    return {'status': status, 'reason': reason, 'nextStep': next_step}
+
+
+def provider_port(provider):
+    argv = provider.get('argv') if isinstance(provider, dict) else None
+    argv = argv if isinstance(argv, list) else []
+    for index, argument in enumerate(argv):
+        text = str(argument)
+        value = None
+        if text.startswith('--port='):
+            value = text.split('=', 1)[1]
+        elif text == '--port' and index + 1 < len(argv):
+            value = str(argv[index + 1])
+        if value is not None:
+            try:
+                port = int(value)
+            except ValueError:
+                break
+            if 0 < port <= 65535:
+                return port
+            break
+    return 9222
+
+
+def feature_readiness(status_data, settings, probes=None):
+    """Return stable optional-feature readiness without changing machine state."""
+    probes = ReadinessProbes() if probes is None else probes
+    status_data = status_data if isinstance(status_data, dict) else {}
+    settings = settings if isinstance(settings, dict) else {}
+    presentation = status_data.get('presentation')
+    presentation = presentation if isinstance(presentation, dict) else {}
+    features = {}
+
+    monitors = presentation.get('perMonitor')
+    if not isinstance(monitors, list) or not monitors:
+        features['sidebar'] = readiness(
+            'degraded',
+            'No connected monitor is available to verify the effective presentation.',
+            'Connect a display and rerun dockrail doctor.')
+        sidebar_ready = False
+    else:
+        sidebar_monitors = [
+            str(row.get('connector')) for row in monitors
+            if isinstance(row, dict) and row.get('mode') == 'sidebar'
+        ]
+        if sidebar_monitors:
+            features['sidebar'] = readiness(
+                'ready',
+                'Sidebar is effective on: ' + ', '.join(sidebar_monitors) + '.',
+                'No action needed.')
+            sidebar_ready = True
+        else:
+            features['sidebar'] = readiness(
+                'missing',
+                'No connected monitor currently resolves to Sidebar.',
+                'Switch one connected output to Sidebar, then rerun dockrail doctor.')
+            sidebar_ready = False
+
+    herdr_path = probes.which('herdr')
+    sidebar_widgets = settings.get('sidebarWidgets')
+    sidebar_widgets = sidebar_widgets if isinstance(sidebar_widgets, list) else []
+    widget_enabled = 'herdr.agents' in sidebar_widgets
+    widgets = presentation.get('widgets')
+    rows = widgets.get('rows') if isinstance(widgets, dict) else None
+    rows = rows if isinstance(rows, list) else []
+    herdr_row = next((row for row in rows
+                      if isinstance(row, dict) and row.get('id') == 'herdr.agents'), None)
+    lease_active = isinstance(herdr_row, dict) and herdr_row.get('active') is True
+    if not herdr_path:
+        features['herdrAgents'] = readiness(
+            'missing',
+            'Herdr is not available on PATH.',
+            'Install Herdr 0.9.1 or newer, then rerun dockrail doctor.')
+    else:
+        version = probes.herdr_version(herdr_path)
+        if version is None:
+            features['herdrAgents'] = readiness(
+                'degraded',
+                'Herdr is installed, but its version could not be verified.',
+                'Verify that herdr --version works, then rerun dockrail doctor.')
+        elif version < HERDR_MIN_VERSION:
+            features['herdrAgents'] = readiness(
+                'degraded',
+                'Herdr ' + '.'.join(map(str, version))
+                + ' is installed; click-to-focus requires Herdr 0.9.1 or newer.',
+                'Upgrade Herdr to 0.9.1 or newer.')
+        elif not widget_enabled:
+            features['herdrAgents'] = readiness(
+                'missing',
+                'Herdr is compatible, but herdr.agents is not enabled in sidebarWidgets.',
+                'Enable herdr.agents while preserving the current sidebarWidgets order.')
+        elif not lease_active:
+            features['herdrAgents'] = readiness(
+                'degraded',
+                'herdr.agents is enabled, but its current provider lease is not active.',
+                ('Switch a connected output to Sidebar so herdr.agents can activate.'
+                 if not sidebar_ready else
+                 'Show the configured Sidebar and rerun dockrail doctor.'))
+        else:
+            features['herdrAgents'] = readiness(
+                'ready',
+                'Herdr is compatible, herdr.agents is enabled, and its provider lease is active.',
+                'No action needed.')
+
+    browser_provider = probes.provider('browser')
+    badges_enabled = settings.get('browserProfileBadgesEnabled') is True
+    tabs_enabled = settings.get('sidebarBrowserTabsEnabled') is True
+    if not browser_provider.get('installed'):
+        features['chromeProfilesTabs'] = readiness(
+            'missing',
+            'The Dockrail Chrome profile provider is not installed.',
+            'Install the Dockrail Chrome profile provider, then rerun dockrail doctor.')
+    elif not badges_enabled and not tabs_enabled:
+        features['chromeProfilesTabs'] = readiness(
+            'missing',
+            'Chrome profile badges and sidebar browser tabs are both disabled.',
+            'Enable browserProfileBadgesEnabled or sidebarBrowserTabsEnabled.')
+    elif not browser_provider.get('running'):
+        features['chromeProfilesTabs'] = readiness(
+            'degraded',
+            'The Chrome profile provider is installed but is not running.',
+            'Reload the running Dockrail host so the installed Chrome provider can start.')
+    else:
+        port = provider_port(browser_provider)
+        if not probes.devtools_reachable(port):
+            features['chromeProfilesTabs'] = readiness(
+                'degraded',
+                'Chrome DevTools is not reachable on localhost:' + str(port) + '.',
+                'Launch Chrome with --remote-debugging-port=' + str(port)
+                + ' and a separate --user-data-dir. Follow docs/browser-activity.md '
+                + 'for profile setup and the local-access security note, then rerun dockrail doctor.')
+        else:
+            enabled = []
+            if badges_enabled:
+                enabled.append('profile badges')
+            if tabs_enabled:
+                enabled.append('sidebar tabs')
+            features['chromeProfilesTabs'] = readiness(
+                'ready',
+                'Chrome provider and localhost DevTools are reachable; enabled: '
+                + ', '.join(enabled) + '.',
+                'No action needed.')
+
+    launcher_provider = probes.provider('launcher')
+    if launcher_provider.get('installed'):
+        features['launcherCounts'] = readiness(
+            'ready',
+            'The Dockrail launcher-count provider binary is installed.',
+            'No action needed.')
+    else:
+        features['launcherCounts'] = readiness(
+            'missing',
+            'The Dockrail launcher-count provider binary is not installed.',
+            'Install the Dockrail launcher-count provider, then rerun dockrail doctor.')
+
+    missing_launchers = probes.missing_agent_launchers()
+    if missing_launchers:
+        features['agentLaunchers'] = readiness(
+            'missing',
+            str(len(missing_launchers)) + ' terminal-agent launcher(s) are missing: '
+            + ', '.join(missing_launchers) + '.',
+            'Install Dockrail terminal-agent launchers, then rerun dockrail doctor.')
+    else:
+        features['agentLaunchers'] = readiness(
+            'ready',
+            'All Dockrail terminal-agent desktop entries are installed.',
+            'No action needed.')
+
+    runtime = status_data.get('runtime')
+    runtime_mode = runtime.get('mode') if isinstance(runtime, dict) else None
+    sync = probes.cli_sync(runtime_mode)
+    if sync == 'live':
+        features['cliFreshness'] = readiness(
+            'ready',
+            'The CLI reads directly from the running Dockrail installation.',
+            'No action needed.')
+    elif sync == 'match':
+        features['cliFreshness'] = readiness(
+            'ready',
+            'The CLI source revision/client surface matches the running Dockrail installation.',
+            'No action needed.')
+    elif sync == 'stale':
+        features['cliFreshness'] = readiness(
+            'degraded',
+            'The CLI source revision/client surface differs from the running Dockrail installation.',
+            'Reinstall the CLI from the running Dockrail installation, then rerun doctor.')
+    else:
+        features['cliFreshness'] = readiness(
+            'degraded',
+            'CLI freshness could not be compared with the running Dockrail installation.',
+            'Install the CLI from the running Dockrail installation, then rerun doctor.')
+
+    return {key: features[key] for key in FEATURE_ORDER}
+
+
+def format_doctor(data):
+    runtime = data.get('runtime') if isinstance(data, dict) else {}
+    checks = data.get('checks') if isinstance(data, dict) else {}
+    features = data.get('features') if isinstance(data, dict) else {}
+    lines = ['Dockrail doctor']
+    if isinstance(runtime, dict):
+        lines.append('Runtime: ' + str(runtime.get('mode', 'unknown'))
+                     + ' (' + str(runtime.get('instanceId', 'unknown')) + ')')
+    lines.append('Core checks:')
+    if isinstance(checks, dict):
+        for name in ('python', 'quickshell', 'omarchyShell', 'liveRuntime'):
+            lines.append('  ' + name + ': ' + ('ready' if checks.get(name) is True else 'missing'))
+    lines.append('Feature readiness:')
+    for key in FEATURE_ORDER:
+        item = features.get(key) if isinstance(features, dict) else None
+        if not isinstance(item, dict):
+            continue
+        lines.append('  ' + FEATURE_LABELS[key] + ': ' + str(item.get('status', 'degraded')))
+        lines.append('    Reason: ' + str(item.get('reason', 'Unknown.')))
+        lines.append('    Next: ' + str(item.get('nextStep', 'Rerun dockrail doctor.')))
+    return '\n'.join(lines)
 
 def envelope(data, warnings=None):
     return {'apiVersion': 1, 'ok': True, 'data': data,
@@ -581,6 +1034,15 @@ def execute(args):
                 raise CliError('E_CONFIG_INVALID', status['data']['loadError'], status['data'])
             if status['data']['writeState'] == 'error':
                 raise CliError('E_PERSISTENCE', status['data']['writeError'], status['data'])
+            requested = validate_read(
+                transport.request(instance, 'config.get', {'effective': False}), 'get')
+            if not requested['ok']:
+                error = requested['error']
+                data = requested['data']
+                data['checks'] = checks
+                raise CliError(error['code'], error['message'], data)
+            status['data']['features'] = feature_readiness(
+                status['data'], requested['data']['settings'])
         return status
     if args.group in ('apps', 'icons'):
         return app_icon_request(transport, instance, args)
@@ -613,8 +1075,10 @@ def execute(args):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     as_json = '--json' in argv
+    parsed = None
     try:
-        reply = execute(build_parser().parse_args(argv))
+        parsed = build_parser().parse_args(argv)
+        reply = execute(parsed)
     except CliError as error:
         reply = {'apiVersion': 1, 'ok': False, 'error': {'code': error.code, 'message': str(error)},
                  'data': error.data, 'warnings': []}
@@ -622,7 +1086,10 @@ def main(argv=None):
         print(json.dumps(reply, ensure_ascii=False, allow_nan=False, separators=(',', ':')))
     elif reply['ok']:
         data = reply['data']
-        print(data['text'] if 'text' in data else json.dumps(data, ensure_ascii=False, indent=2))
+        if parsed is not None and parsed.group == 'doctor':
+            print(format_doctor(data))
+        else:
+            print(data['text'] if 'text' in data else json.dumps(data, ensure_ascii=False, indent=2))
         for warning in reply['warnings']:
             print('dockrail: ' + str(warning), file=sys.stderr)
     else:
