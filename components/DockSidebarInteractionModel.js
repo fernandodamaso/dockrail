@@ -376,7 +376,7 @@ function newWorkspaceFooterTargetHeight(collapsed) {
 
 function newWorkspaceFooterExtra(collapsed, space) {
   var sp = typeof space === "function" ? space : function(n) { return n }
-  return newWorkspaceFooterTargetHeight(collapsed) + sp(5)
+  return newWorkspaceFooterTargetHeight(collapsed) + sp(10)
 }
 
 function newWorkspaceFooterKey(monitorIdentity) {
