@@ -1,4 +1,5 @@
 import QtQuick
+import "DockHerdrModel.js" as HerdrModel
 
 // Host-owned exact-capture Herdr focus orchestration. Targets are captured and
 // revalidated against DockHerdrWindowAgents, never sidebar projection rows.
@@ -19,23 +20,23 @@ Item {
       String(target.agentId || ""), String(target.paneId || "")].join("\0")
   }
 
+  function serverFocusSupported(serverId) {
+    var servers = root.bridge && root.bridge.snapshot && Array.isArray(root.bridge.snapshot.servers)
+      ? root.bridge.snapshot.servers : []
+    for (var i = 0; i < servers.length; i++) {
+      if (servers[i] && String(servers[i].id || "") === String(serverId))
+        return HerdrModel.serverFocusAgentSupported(servers[i])
+    }
+    return false
+  }
+
   function captureAgentTarget(toplevel, agent) {
     if (!toplevel || !agent || !root.bridge || !root.windowActions) return null
     var windowKey = root.bridge.windowKeyFor(toplevel)
     var canonical = root.bridge.currentAgent(windowKey, String(agent.agentId || agent.id || ""))
     if (!canonical) return null
     var serverId = root.bridge.herdrAssociations.byWindowKey[windowKey]
-    var server = null
-    var servers = root.bridge.snapshot && Array.isArray(root.bridge.snapshot.servers)
-      ? root.bridge.snapshot.servers : []
-    for (var i = 0; i < servers.length; i++) {
-      if (servers[i] && String(servers[i].id || "") === String(serverId)) {
-        server = servers[i]
-        break
-      }
-    }
-    var supported = !!(server && server.capabilities
-      && server.capabilities.focusAgent === true)
+    var supported = root.serverFocusSupported(serverId)
     var generation = Math.floor(Number(canonical.connectionGeneration))
     var paneId = String(canonical.paneId || "")
     var agentId = String(canonical.id || "")
@@ -71,6 +72,7 @@ Item {
         || root.bridge.herdrAssociationEpoch !== String(target.providerEpoch || "")) return false
     if (root.bridge.herdrAssociations.byWindowKey[target.windowKey]
         !== String(target.serverId || "")) return false
+    if (!root.serverFocusSupported(target.serverId)) return false
     var agent = root.bridge.currentAgent(target.windowKey, target.agentId)
     return !!agent
       && String(agent.serverId || "") === String(target.serverId || "")

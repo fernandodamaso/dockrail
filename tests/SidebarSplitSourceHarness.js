@@ -35,7 +35,7 @@ function makeHostRegistry(parent, bridge, service) {
   var acquire = methodStart < 0 ? "" : balancedBlock(host, methodStart)
   var componentPath = Qt.resolvedUrl("../components")
   var code = 'import QtQuick\nimport "' + componentPath + '"\n'
-    + 'Item { id:root; property var herdrWindowAgents; property var herdrService; '
+    + 'Item { id:root; property var herdrWindowAgents; property var herdrService; property bool herdrBinaryInstalled: true; '
     + 'function saveSetting(key,value) { return {ok:true,data:{applied:true}} }\n'
     + 'QtObject { id:demoWidgetRegistry; property var descriptors: ({}) }\n'
     + 'QtObject { id:externalWidgetRegistry; property var descriptors: ({}) }\n'

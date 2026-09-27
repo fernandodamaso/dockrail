@@ -96,6 +96,16 @@ Item {
         session: String(server.session || ""),
         focusAgentSupported: HerdrModel.serverFocusAgentSupported(server)
       })
+      var focusUpgradeMessage = HerdrModel.serverFocusUpgradeMessage(server)
+      if (focusUpgradeMessage) {
+        output.push({
+          kind: "notice",
+          key: "focus-upgrade:" + id,
+          title: focusUpgradeMessage,
+          detail: "",
+          status: "warning"
+        })
+      }
       items.forEach(function(agent) {
         var secondary = HerdrModel.displayAgentSecondary(agent)
         output.push({

@@ -561,6 +561,7 @@ function herdrServerMetadata(server) {
     session: typeof source.session === "string" ? source.session : "",
     serverLabel: HerdrModel.serverDisplayLabel(source),
     focusAgentSupported: HerdrModel.serverFocusAgentSupported(source),
+    focusUpgradeMessage: HerdrModel.serverFocusUpgradeMessage(source),
     serverConnectionGeneration: generation
   }
 }
@@ -819,6 +820,9 @@ function project(input) {
       emitHerdrState(window, serverId, server, epoch, pendingTitle)
       return
     }
+    if (serverMeta.focusUpgradeMessage)
+      emitHerdrState(window, serverId, server, epoch,
+        serverMeta.focusUpgradeMessage, "warning")
     // Actionable agents require verified association + a live ready snapshot.
     // Preserve workspace → tab → pane order while rendering every pane directly
     // under the associated window. Workspace stays on the secondary line.

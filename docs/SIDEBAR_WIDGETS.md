@@ -210,10 +210,12 @@ surface teardown close safely. The Add/Manage picker is a panel-owned native Oma
 independent Widget pane. It therefore remains available from the Dockrail
 header even when zero Widget cards are enabled and the pane has zero height.
 Outside clicks dismiss it through Omarchy's normal click-popup focus handling.
-It lists only trusted source descriptors whose `manageable` flag is not false
-and routes add/remove back through the controller. Source-owned integrations such
-as `herdr.agents` may stay registered/provider-managed while opting out of this
-optional-Widget toggle surface.
+It lists trusted source descriptors whose `manageable` flag is true, plus any
+already-enabled registered descriptor so an unavailable integration always retains
+a removal path, and routes add/remove back through the controller. `herdr.agents`
+sets `manageable` from a bounded Herdr-binary readiness probe: installed Herdr is
+offered in Add/Manage, while a requested widget stays removable if the binary later
+disappears. This probe never acquires a provider lease or starts the Herdr provider.
 
 `widgetManager.diagnostics()` and CLI `data.presentation.widgets` retain the
 bounded, payload-free lifecycle diagnostics from FDM-967.
@@ -356,9 +358,10 @@ from `dock.json` or `sidebarWidgets`. Invalid or incompatible packages are
 isolated and omitted from executable descriptors, and external IDs cannot replace
 built-in/demo or integration-owned IDs.
 
-Source-owned integrations can opt out of Add/Manage with `manageable: false`.
-`herdr.agents` remains source-owned and uses that flag while staying registered
-for runtime features. External packages are manageable by default. See
+Source-owned integrations can opt out of Add/Manage with `manageable: false`;
+already-enabled registered integrations remain listed only for removal.
+`herdr.agents` remains source-owned and becomes manageable only while the Herdr
+binary readiness probe succeeds. External packages are manageable by default. See
 [`WIDGET_PACKAGES.md`](WIDGET_PACKAGES.md) for package validation, install/update,
 development, and source-location rules.
 

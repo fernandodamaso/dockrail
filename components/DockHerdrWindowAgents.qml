@@ -174,8 +174,7 @@ Item {
     var serverId = root.herdrAssociations.byWindowKey[windowKey]
     var server = serverId ? root.liveServerById(serverId) : null
     if (!server) return []
-    var focusAgentSupported = !!(server.capabilities
-      && server.capabilities.focusAgent === true)
+    var focusAgentSupported = HerdrModel.serverFocusAgentSupported(server)
     var agents = Array.isArray(root.snapshot.agents) ? root.snapshot.agents : []
     return agents.filter(function(agent) {
       return agent && String(agent.serverId || "") === String(serverId)
@@ -344,8 +343,8 @@ Item {
     var focusSupportedByServer = Object.create(null)
     servers.forEach(function(server) {
       if (!server || !server.id) return
-      focusSupportedByServer[String(server.id)] = !!(server.capabilities
-        && server.capabilities.focusAgent === true)
+      focusSupportedByServer[String(server.id)] =
+        HerdrModel.serverFocusAgentSupported(server)
     })
     var entries = root.registry && root.registry.entries ? root.registry.entries : []
     for (var i = 0; i < entries.length; i++) {

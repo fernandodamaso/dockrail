@@ -15,7 +15,8 @@ Item {
   required property var viewport
 
   readonly property var popupWindow: managerPopup
-  readonly property var registeredRows: WidgetModel.manageableRows(controller.widgetRegistry)
+  readonly property var registeredRows: WidgetModel.manageableRows(
+    controller.widgetRegistry, controller.widgetIds)
 
   property bool managerOpen: false
   property Item managerAnchor: null
