@@ -345,9 +345,9 @@ PanelWindow {
           anchors.rightMargin: Style.space(8)
           spacing: 0
           Accessible.role: Accessible.StaticText
-          Accessible.name: "SmartDock"
+          Accessible.name: "Dockrail"
           Text {
-            text: "Smart"
+            text: "Dock"
             textFormat: Text.PlainText
             color: Color.foreground
             font.family: Style.font.family
@@ -356,7 +356,7 @@ PanelWindow {
             elide: Text.ElideRight
           }
           Text {
-            text: "Dock"
+            text: "rail"
             textFormat: Text.PlainText
             color: Color.accent
             font.family: Style.font.family

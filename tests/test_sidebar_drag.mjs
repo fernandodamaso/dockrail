@@ -144,8 +144,10 @@ console.log('SB-04 drag closure/address/topology/mode/resize/minimized regressio
   const footerModel=loadModel('DockSidebarInteractionModel')
   assert.equal(footerModel.newWorkspaceFooterTargetHeight(false),32)
   assert.equal(footerModel.newWorkspaceFooterTargetHeight(true),36)
-  assert.equal(footerModel.newWorkspaceFooterExtra(false,n=>n),37)
-  assert.equal(footerModel.newWorkspaceFooterExtra(true,n=>n),41)
+  assert.equal(footerModel.newWorkspaceFooterExtra(false,n=>n),42,
+    'expanded footer reserves equal 5px top and bottom padding')
+  assert.equal(footerModel.newWorkspaceFooterExtra(true,n=>n),46,
+    'collapsed footer reserves equal 5px top and bottom padding')
   const footerKey=footerModel.newWorkspaceFooterKey('id:0')
   assert.equal(footerModel.parseNewWorkspaceFooterKey(footerKey),'id:0')
   assert.equal(footerModel.isNewWorkspaceFooterKey(footerKey),true)
