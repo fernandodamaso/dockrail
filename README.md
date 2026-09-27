@@ -163,6 +163,24 @@ The plugin uses `~/.config/dockrail/dock.json`, shared with the standalone
 version. Do not run the standalone and plugin versions together, or two docks
 will appear.
 
+### Herdr agents
+
+Herdr agents requires Herdr 0.9.1+ for click-to-focus. With the `herdr` binary
+installed, open the sidebar **Add/Manage** picker and enable **Herdr agents**.
+Dockrail checks picker readiness without starting the Herdr provider; the existing
+provider still starts only while a Herdr consumer is active. A connected older
+server stays visible but cannot jump to an agent and shows
+`Update Herdr to 0.9.1+ to jump to agents`.
+
+Classic-dock Herdr indicators are a separate option:
+
+```bash
+dockrail config set dockHerdrIndicators true --json
+```
+
+`dockHerdrIndicators` controls classic dock indicators; it does not enable the
+sidebar Herdr agents widget.
+
 ### Launcher badge count provider
 
 Numeric counts are optional and provider-owned. Omarchy plugin installation

@@ -57,6 +57,18 @@ class ProtocolTests(unittest.TestCase):
         self.assertNotIn("terminal_title_stripped", result["panes"][0])
         self.assertNotIn("cwd", result["workspaces"][0])
 
+    def test_projection_preserves_bounded_server_version_and_protocol(self):
+        result = self.module["project_snapshot"]({
+            "panes": [], "version": "0.9.1", "protocol": 1,
+        })
+        self.assertEqual(result["version"], "0.9.1")
+        self.assertEqual(result["protocol"], 1)
+        result = self.module["project_snapshot"]({
+            "panes": [], "version": ["0.9.0"], "protocol": {"major": 1},
+        })
+        self.assertNotIn("version", result)
+        self.assertNotIn("protocol", result)
+
     def test_missing_inventory_is_not_invented_as_an_empty_list(self):
         result = self.module["project_snapshot"]({"panes": []})
         self.assertNotIn("agents", result)

@@ -23,6 +23,8 @@ Item {
   property var launcherBadgeService: null
   property var browserProfileService: null
   property var herdrService: null
+  property bool herdrBinaryInstalled: false
+  property bool herdrBinaryProbePending: false
   readonly property var applications: DesktopEntries.applications.values || []
   property int iconReloadRevision: 0
   // Menus may cache popup instances, but only one editor owns a live session.
@@ -43,6 +45,18 @@ Item {
   function releaseIconDialog(dialog) {
     if (root.activeIconDialog === dialog) root.activeIconDialog = null
   }
+
+  // Picker readiness is deliberately independent from DockHerdrService.available:
+  // the service reports the bundled provider, while this bounded probe reports
+  // whether the user's Herdr CLI is currently discoverable on PATH.
+  function refreshHerdrBinaryAvailability() {
+    if (herdrBinaryProbe.running) return false
+    root.herdrBinaryProbePending = true
+    herdrBinaryProbeTimeout.restart()
+    herdrBinaryProbe.running = true
+    return true
+  }
+
   // Keep the lease boundary stable while unrelated registry entries refresh.
   function acquireHerdrWidget(owner) {
     return root.herdrWindowAgents.createConsumerLease(owner)
@@ -63,9 +77,9 @@ Item {
     if (root.herdrService) {
       registry["herdr.agents"] = {
         id: "herdr.agents",
-        label: "Coding agents",
-        manageable: false,
-        available: root.herdrService.available !== false,
+        label: "Herdr agents",
+        manageable: root.herdrBinaryInstalled,
+        available: root.herdrBinaryInstalled && root.herdrService.available !== false,
         revision: 1,
         acquire: root.acquireHerdrWidget,
         expandedView: herdrExpandedView,
@@ -606,6 +620,7 @@ Item {
 
   Component.onCompleted: {
     refreshWorkspaceCounts()
+    refreshHerdrBinaryAvailability()
     scopeRefreshController.requestRefresh()
   }
 
@@ -645,6 +660,36 @@ Item {
     function onValuesChanged() {
       workspaceCountsRefreshTimer.restart()
     }
+  }
+
+  Process {
+    id: herdrBinaryProbe
+    command: ["sh", "-c", "command -v herdr >/dev/null 2>&1"]
+    onExited: function(exitCode) {
+      herdrBinaryProbeTimeout.stop()
+      if (!root.herdrBinaryProbePending) return
+      root.herdrBinaryProbePending = false
+      root.herdrBinaryInstalled = exitCode === 0
+    }
+  }
+
+  Timer {
+    id: herdrBinaryProbeTimeout
+    interval: 1500
+    repeat: false
+    onTriggered: {
+      if (!root.herdrBinaryProbePending) return
+      root.herdrBinaryProbePending = false
+      root.herdrBinaryInstalled = false
+      if (herdrBinaryProbe.running) herdrBinaryProbe.running = false
+    }
+  }
+
+  Timer {
+    interval: 30000
+    repeat: true
+    running: true
+    onTriggered: root.refreshHerdrBinaryAvailability()
   }
 
   Process {

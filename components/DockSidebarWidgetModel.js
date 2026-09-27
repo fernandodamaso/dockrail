@@ -87,8 +87,11 @@ function registeredRows(registry) {
     }
   })
 }
-function manageableRows(registry) {
-  return registeredRows(registry).filter(function(row) { return row.manageable })
+function manageableRows(registry, enabledIds) {
+  var enabled = requestedIds(enabledIds)
+  return registeredRows(registry).filter(function(row) {
+    return row.manageable || enabled.indexOf(row.id) >= 0
+  })
 }
 function effectiveIds(value, registry) {
   return requestedIds(value).filter(function(id) { return descriptorFor(registry, id) !== null })

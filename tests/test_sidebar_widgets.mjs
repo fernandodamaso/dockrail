@@ -182,14 +182,29 @@ assert.deepEqual(plain(Model.registeredRows(registry).map(row => ({
   {id:'fixture.one',label:'fixture.one',available:true,manageable:true},
   {id:'fixture.two',label:'fixture.two',available:true,manageable:true}
 ]);
-const managerRegistry = Object.assign({}, registry, {
+const absentHerdrRegistry = Object.assign({}, registry, {
   'herdr.agents': Object.assign({}, a.descriptor, {
-    id:'herdr.agents', label:'Coding agents', manageable:false
+    id:'herdr.agents', label:'Herdr agents', manageable:false, available:false
   })
 });
-assert.deepEqual(plain(Model.manageableRows(managerRegistry).map(row => row.id)),
+const presentHerdrRegistry = Object.assign({}, registry, {
+  'herdr.agents': Object.assign({}, a.descriptor, {
+    id:'herdr.agents', label:'Herdr agents', manageable:true, available:true
+  })
+});
+assert.deepEqual(plain(Model.manageableRows(absentHerdrRegistry, []).map(row => row.id)),
   ['fixture.one','fixture.two'],
-  'source-owned integrations opt out of the optional Widget manager');
+  'absent optional integrations stay out of Add/Manage');
+assert.deepEqual(plain(Model.manageableRows(presentHerdrRegistry, []).map(row => row.id)),
+  ['fixture.one','fixture.two','herdr.agents'],
+  'installed Herdr is offered in Add/Manage');
+const enabledAbsentRows = plain(Model.manageableRows(
+  absentHerdrRegistry, ['herdr.agents']).map(row => ({id:row.id,available:row.available})));
+assert.deepEqual(enabledAbsentRows, [
+  {id:'fixture.one',available:true},
+  {id:'fixture.two',available:true},
+  {id:'herdr.agents',available:false}
+], 'an enabled Herdr widget remains removable after the binary disappears');
 assert.equal(typeof Model.footerLayout, 'undefined',
   'the retired bounded footer layout must not survive the shared-scroll migration');
 
@@ -247,14 +262,24 @@ assert.match(managerSource, /Ui\.PopupCard\s*\{[\s\S]*?id:\s*managerPopup/,
   'Widget manager must use Omarchy native PopupCard chrome');
 assert.match(managerSource, /triggerMode:\s*"click"/,
   'Widget manager must use Omarchy outside-click dismissal');
-assert.match(managerSource, /WidgetModel\.manageableRows\(controller\.widgetRegistry\)/,
-  'manager must exclude source-owned non-manageable integrations');
+assert.match(managerSource,
+  /WidgetModel\.manageableRows\(\s*controller\.widgetRegistry, controller\.widgetIds\)/,
+  'manager must retain enabled unavailable integrations for removal');
 assert.match(managerSource, /contentHeight:\s*managerPopup\.fittedContentHeight/,
   'Widget manager must size to content instead of reserving a fixed tall window');
 assert.match(managerSource, /Ui\.ToggleSwitch\s*\{/,
   'Widget enablement uses the native Omarchy switch affordance');
-assert.match(hostSource, /id:\s*"herdr\.agents"[\s\S]*?manageable:\s*false/,
-  'Herdr must stay out of the optional Widget manager');
+assert.match(hostSource, /id:\s*"herdr\.agents"[\s\S]*?label:\s*"Herdr agents"/);
+assert.match(hostSource, /manageable:\s*root\.herdrBinaryInstalled/);
+assert.match(hostSource,
+  /available:\s*root\.herdrBinaryInstalled\s*&&\s*root\.herdrService\.available !== false/);
+assert.match(hostSource, /acquire:\s*root\.acquireHerdrWidget/,
+  'FDM-1032 stable host method identity must remain the acquisition boundary');
+assert.match(hostSource,
+  /command:\s*\["sh", "-c", "command -v herdr >\/dev\/null 2>&1"\]/,
+  'picker readiness must use a bounded binary probe, not provider startup');
+assert.match(managerSource, /readonly property bool canToggle: enabledWidget \|\| modelData\.available/,
+  'enabled unavailable rows must retain their removal path');
 assert.doesNotMatch(managerSource, /popupGeometryFor\(root\.managerAnchor,\s*360,\s*420\)/,
   'legacy fixed manager geometry must not return');
 assert.doesNotMatch(managerSource, /text:\s*parent\.enabledWidget\s*\?\s*"Remove"\s*:\s*"Add"/,

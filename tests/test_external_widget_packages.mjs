@@ -20,12 +20,13 @@ assert.match(host, /DockExternalWidgetRegistry\s*\{[\s\S]*?id:\s*externalWidgetR
   'the host must own external package discovery and pass the migration-selected data root');
 assert.match(host, /externalWidgetRegistry\.descriptors/,
   'validated external descriptors must merge into the existing host registry');
-assert.match(host, /"herdr\.agents"[\s\S]*?manageable:\s*false/,
-  'Herdr remains source-owned and opts out of Add\/Manage');
-assert.match(model, /function manageableRows\(registry\)/,
-  'registry model must expose the manageable descriptor filter');
-assert.match(manager, /WidgetModel\.manageableRows\(controller\.widgetRegistry\)/,
-  'Add\/Manage must filter source-owned non-manageable descriptors');
+assert.match(host, /"herdr\.agents"[\s\S]*?manageable:\s*root\.herdrBinaryInstalled/,
+  'Herdr remains source-owned while Add/Manage follows bounded binary readiness');
+assert.match(model, /function manageableRows\(registry, enabledIds\)/,
+  'registry model must include enabled integrations so unavailable rows stay removable');
+assert.match(manager,
+  /WidgetModel\.manageableRows\(\s*controller\.widgetRegistry, controller\.widgetIds\)/,
+  'Add/Manage must filter non-manageable descriptors while retaining enabled removals');
 assert.match(view, /presentation \+ "Source"/,
   'the existing Widget view loader must accept registry-owned package sources');
 assert.match(view, /source:\s*root\.factory \? "" : root\.sourceUrl/,

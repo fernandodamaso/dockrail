@@ -47,6 +47,29 @@ class ModelTests(unittest.TestCase):
         )
         self.assertEqual(snap["completeness"]["state"], "complete")
 
+    def test_public_server_propagates_connected_server_version_and_protocol(self):
+        server = state()
+        server.apply_status({"connected": True})
+        server.apply_snapshot({
+            "ok": True,
+            "snapshot": {
+                "panes": [], "agents": [], "version": "0.9.0", "protocol": 1,
+            },
+        }, 10)
+        server.apply_status({"connected": True})
+        public = server.public_server(11)
+        self.assertEqual(public["version"], "0.9.0")
+        self.assertEqual(public["protocol"], 1)
+        snap = normalized_snapshot("e", 1, [server], now=11)
+        self.assertEqual(snap["servers"][0]["version"], "0.9.0")
+        self.assertEqual(snap["servers"][0]["protocol"], 1)
+
+        server.snapshot["version"] = 9
+        server.snapshot["protocol"] = {"major": 1}
+        public = server.public_server(11)
+        self.assertNotIn("version", public)
+        self.assertNotIn("protocol", public)
+
     def test_connected_empty_is_zero_but_disconnected_is_unknown(self):
         server = state()
         connect(server, [])
