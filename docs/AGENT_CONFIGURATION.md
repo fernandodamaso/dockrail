@@ -158,11 +158,13 @@ Export writes a new owner-only plain JSON file and never overwrites a destinatio
 `--json` emits one object with `apiVersion: 1`, `ok`, `data`, `warnings`, and `error.code/message` on failure. Exit codes: 0 success; 2 usage/validation; 3 absent/ambiguous host; 4 persistence/export failure; 5 transport/protocol/timeout; 6 busy/invalid config. See [CLI_REFERENCE.md](CLI_REFERENCE.md) for exact fields/codes and [CONFIGURATION.md](CONFIGURATION.md) for all defaults/dependencies. Both ship beside this offline guide, together with the separate [local qualification runbook](CLI_RUNTIME_CHECKS.md); installing that document does not start qualification.
 
 ```sh
-bash ./install.sh --cli-only
-bash ./uninstall.sh --cli-only
+bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
+dockrail doctor
 ```
 
-Canonical client files live under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`; the canonical wrapper is `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail`. `${XDG_BIN_HOME:-$HOME/.local/bin}/smartdock` remains a compatibility command, and legacy `smartdock-cli` discovery is retained only for pre-cutover bundles. Client-only installation/removal does not install/start a dock, user config, autostart, agent launchers or provider. It coexists with standalone in either order; removal retains the launchers while another bundle owns them. When both bundles exist the canonical client bundle wins, so refresh that bundle deliberately from the intended checkout.
+For an Omarchy plugin install, the installed plugin directory is already the checkout. The command installs launchers in `${XDG_BIN_HOME:-$HOME/.local/bin}` and a small client record under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`. The adapter, schema, defaults and offline docs are read from the plugin directory each time, so `omarchy plugin update` refreshes them automatically. A removed plugin produces a reinstall message. Use `bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/uninstall.sh --cli-only` to remove the client record and launchers.
+
+From a separate source checkout, `bash ./install.sh --cli-only` keeps the copied bundle behavior; rerun it explicitly to refresh that copy. Full standalone installation keeps its own bundle. `${XDG_BIN_HOME:-$HOME/.local/bin}/smartdock` remains a compatibility command, and legacy `smartdock-cli` discovery is retained only for pre-cutover bundles. Client-only installation/removal does not install/start a dock, user config, autostart, agent launchers or provider. It coexists with standalone in either order; removal retains the launchers while another bundle owns them. The canonical client takes precedence over standalone and legacy bundles.
 
 The adapter uses standard-library Python and bounded argv subprocesses: `qs list --all --json` and exact `qs ipc --pid PID call -- smartdock request PAYLOAD`. It does not use the Omarchy wrapper's newest-instance selection, guess wrapper flags or implement sockets. Standalone lifecycle commands are explicit and separate, never a way to configure a plugin. Full Omarchy IPC/FileView/theme/image/monitor behavior belongs to the exact-SHA local handoff; this guide does not authorize deployment or claim those checks passed.
 

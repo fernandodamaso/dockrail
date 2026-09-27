@@ -58,7 +58,14 @@ Install the Git-managed Omarchy plugin:
 
 ```bash
 omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes
+bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
 ```
+
+Omarchy does not run install hooks. The installed plugin directory is the
+checkout for this CLI command; its launchers read the current plugin files, so
+`omarchy plugin update` also refreshes CLI metadata. Run `dockrail doctor` after
+setup. If `${XDG_BIN_HOME:-$HOME/.local/bin}` is not on `PATH`, add it to your
+shell's `PATH` to use `dockrail` by name.
 
 Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
 Dockrail 3.0.0 uses a new plugin ID, so reinstall once. Your settings in
@@ -350,8 +357,9 @@ the real CLI parser and production host/model harness in the existing CI;
 that is not real Omarchy rendering or IPC qualification.
 
 Use the selected running host through the CLI rather than editing a live
-`dock.json`. Install just the client from a source checkout without starting a
-second dock:
+`dock.json`. The plugin installation command above installs the CLI from the
+installed plugin directory. For a separate source checkout, install a copied
+CLI bundle without starting a second dock:
 
 ```bash
 bash ./install.sh --cli-only

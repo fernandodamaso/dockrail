@@ -106,11 +106,24 @@ install_client_bundle() {
 
 if $cli_only; then
   command -v python3 >/dev/null 2>&1 || { echo 'Python 3 is required for the CLI.' >&2; exit 1; }
-  install_client_bundle "$client_dir"
-  printf '%s\n' "$source_dir" >"$client_dir/.source-dir"
+  plugin_dir="$HOME/.config/omarchy/plugins/io.github.fernandodamaso.dockrail"
+  xdg_plugin_dir="$config_home/omarchy/plugins/io.github.fernandodamaso.dockrail"
+  if [[ "$source_dir" == "$plugin_dir" || "$source_dir" == "$xdg_plugin_dir" ]]; then
+    rm -rf -- "$client_dir"
+    install -d "$client_dir" "$bin_home"
+    printf '%s\n' "$source_dir" >"$client_dir/.plugin-dir"
+    install -m 0755 "$source_dir/uninstall.sh" "$client_dir/uninstall.sh"
+    install -m 0755 "$source_dir/scripts/dockrail" "$bin_home/dockrail"
+    install -m 0755 "$source_dir/scripts/smartdock" "$bin_home/smartdock"
+  else
+    rm -f -- "$client_dir/.plugin-dir"
+    install_client_bundle "$client_dir"
+    printf '%s\n' "$source_dir" >"$client_dir/.source-dir"
+  fi
   echo "Installed Dockrail client: $bin_home/dockrail"
   echo "Installed SmartDock compatibility command: $bin_home/smartdock"
   echo 'No dock, configuration, autostart or terminal-agent assets were installed.'
+  echo "Next: $bin_home/dockrail doctor"
   exit
 fi
 

@@ -130,9 +130,18 @@ Every response uses `apiVersion: 1`, Boolean `ok`, object `data`, array `warning
 
 ## Installation and lifecycle boundary
 
-From the intended source checkout, `bash ./install.sh --cli-only` installs the canonical `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` command plus the `${XDG_BIN_HOME:-$HOME/.local/bin}/smartdock` compatibility command, with the adapter, defaults, schema, agent guide, reference and inventory under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`. `bash ./uninstall.sh --cli-only` removes this bundle while preserving settings, plugin and standalone ownership. Both installation orders retain the launchers while another bundle owns them. Help and guide use the installed bundle, not `.source-dir`. When canonical and legacy bundles coexist, the canonical client bundle takes precedence; update that bundle explicitly from the intended source.
+After `omarchy plugin add`, install the CLI from the installed plugin checkout:
 
-Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Use client-only reinstall for client updates and the normal, separately authorized Omarchy deployment path for a released plugin. No merge/deploy is authorized by this candidate reference.
+```sh
+bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
+dockrail doctor
+```
+
+This installs `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` and the `smartdock` compatibility command. The client record under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli` points at the plugin directory; the launchers read its adapter, defaults, schema and offline docs at invocation time. `omarchy plugin update` therefore refreshes those files without another CLI install. If the plugin is removed, the launchers report the reinstall commands. `bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/uninstall.sh --cli-only` removes the client record and its launchers while preserving settings and the plugin.
+
+From a separate source checkout, `bash ./install.sh --cli-only` retains the copied client bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`; refresh that bundle explicitly from the intended checkout. Full standalone installation retains its own bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail`. Client-only and standalone installation can coexist in either order, and removing one retains the launchers while the other owns them. The canonical client takes precedence over standalone and legacy bundles. Help and guide follow the selected bundle, not `.source-dir`.
+
+Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Use the normal, separately authorized Omarchy deployment path for a released plugin. No merge/deploy is authorized by this candidate reference.
 
 ## Sidebar configuration and diagnostics
 
