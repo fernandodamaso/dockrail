@@ -123,7 +123,7 @@ if $cli_only; then
   echo "Installed Dockrail client: $bin_home/dockrail"
   echo "Installed SmartDock compatibility command: $bin_home/smartdock"
   echo 'No dock, configuration, autostart or terminal-agent assets were installed.'
-  echo "Next: $bin_home/dockrail doctor"
+  echo "Next: $bin_home/dockrail setup"
   exit
 fi
 

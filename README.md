@@ -59,12 +59,13 @@ Install the Git-managed Omarchy plugin:
 ```bash
 omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes
 bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
+dockrail setup
 ```
 
 Omarchy does not run install hooks. The installed plugin directory is the
 checkout for this CLI command; its launchers read the current plugin files, so
-`omarchy plugin update` also refreshes CLI metadata. Run `dockrail doctor` after
-setup. If `${XDG_BIN_HOME:-$HOME/.local/bin}` is not on `PATH`, add it to your
+`omarchy plugin update` also refreshes CLI metadata. `dockrail setup` starts
+with the same feature-readiness checks and guides optional setup through the running host. If `${XDG_BIN_HOME:-$HOME/.local/bin}` is not on `PATH`, add it to your
 shell's `PATH` to use `dockrail` by name.
 
 Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
