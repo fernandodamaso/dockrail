@@ -25,14 +25,16 @@ PanelWindow {
   property var menuAnchor: null
   property var menuMembers: []
   property var menuEntry: null
+  property bool headerMenuActive: false
   readonly property string preferenceFeedback: root.modeDragError !== ""
     ? root.modeDragError
     : !host ? "" : host.settingsWriteState === "error"
-    ? DockModel.persistenceFeedback(host.settingsWriteError)
+    ? (host.modeMenuWriteConnector ? "" : DockModel.persistenceFeedback(host.settingsWriteError))
     : host.settingsWriteState === "saving" ? "Saving preferences" : controller.mutationFeedback
   // Host-owned, per-connector gesture feedback for this panel's output. The
-  // host keys it by connector, so a stale gesture on another monitor can never
-  // display here, and a persistence failure stays visible host-wide. Derived:
+  // host keys it by connector, so a stale switch on another monitor can never
+  // display here. Drag persistence failures stay host-wide; menu failures
+  // remain on their source connector. Derived:
   // the host clears it on save/reload and on the next gesture.
   readonly property string modeDragError: !host || !screen ? ""
     : host.modeGestureDisplayFor(screen.name)
@@ -134,6 +136,7 @@ PanelWindow {
 
   function closeSurfaces() {
     sidebarContext.closeAll()
+    root.headerMenuActive = false
     picker.visible = false
     if (root.pinStrip) root.pinStrip.close()
     sidebarViewport.cancelInputs("surface-close")
@@ -167,9 +170,23 @@ PanelWindow {
       if (!root.controller.targetIsCurrent(target)) return false
     }
     root.menuTarget = row || target
+    root.headerMenuActive = false
     root.menuAnchor = anchorItem
     root.menuMembers = InteractionModel.contextMenuMembers(root.menuTarget, anchorItem)
     root.menuEntry = anchorItem.entry || (root.menuTarget.item && root.menuTarget.item.entry) || null
+    sidebarContext.open()
+    return true
+  }
+
+  function openHeaderMenu() {
+    if (root.controller.interactionBusy || !root.screen || !headerMenuButton.visible)
+      return false
+    root.headerMenuActive = true
+    root.menuTarget = null
+    root.menuAnchor = headerMenuButton
+    root.menuMembers = []
+    root.menuEntry = null
+    sidebarContext.modeSwitchToken = root.modeGestureToken
     sidebarContext.open()
     return true
   }
@@ -199,6 +216,12 @@ PanelWindow {
 
   function refreshContext() {
     if (!sidebarContext.visible && !sidebarContext.iconDialogOpen) {
+      root.refreshPickerAnchor()
+      return
+    }
+    if (root.headerMenuActive) {
+      if (!headerMenuButton.visible || !root.screen) sidebarContext.closeAll()
+      else sidebarContext.updatePopupAnchors()
       root.refreshPickerAnchor()
       return
     }
@@ -318,9 +341,8 @@ PanelWindow {
           visible: !root.panelCollapsed
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          anchors.right: collapseButton.left
+          anchors.right: headerMenuButton.left
           anchors.rightMargin: Style.space(8)
-            + (widgetManage.visible ? widgetManage.width + Style.space(8) : 0)
           spacing: 0
           Accessible.role: Accessible.StaticText
           Accessible.name: "SmartDock"
@@ -397,6 +419,31 @@ PanelWindow {
             iconSize: 14
             tint: Color.foreground
             visible: widgetManage.visible
+          }
+        }
+        Ui.Button {
+          id: headerMenuButton
+          visible: !root.panelCollapsed
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: widgetManage.left
+          anchors.rightMargin: Style.space(8)
+          width: visible ? Style.space(30) : 0
+          height: Style.space(30)
+          iconText: ""
+          tooltipText: "Sidebar menu"
+          Accessible.role: Accessible.Button
+          Accessible.name: tooltipText
+          focusable: visible
+          enabled: !root.controller.interactionBusy
+          onClicked: root.openHeaderMenu()
+          DockLucideIcon {
+            anchors.centerIn: parent
+            width: 14
+            height: 14
+            iconName: "settings-2"
+            iconSize: 14
+            tint: Color.foreground
+            visible: headerMenuButton.visible
           }
         }
       }
@@ -677,8 +724,13 @@ PanelWindow {
     windowActions: root.host.windowActions
     originOnly: true
     sidebarMode: true
+    sidebarHeaderMenu: root.headerMenuActive
     workspaceContext: root.menuTarget && root.menuTarget.kind === "workspace" ? root.menuTarget : null
-    externalTargetValidator: function() { return root.controller.targetIsCurrent(root.menuTarget) }
+    externalTargetValidator: function() {
+      return root.headerMenuActive
+        ? !!root.screen && headerMenuButton.visible
+        : root.controller.targetIsCurrent(root.menuTarget)
+    }
     interfaceAnimationsEnabled: root.controller.settings.interfaceAnimationsEnabled !== false
     onOpenNewWindow: {
       if (root.menuEntry && typeof root.menuEntry.execute === "function") root.menuEntry.execute()
@@ -686,6 +738,10 @@ PanelWindow {
     onVisibleChanged: root.syncInteractionBusy()
     onIconDialogOpenChanged: root.syncInteractionBusy()
     onKeyboardDismissed: root.controller.releaseNavigationFocus()
+    onSwitchPresentationRequested: (destination, token) => {
+      if (destination === "classic" && root.screen)
+        root.host.commitMonitorModeMenu(root.screen.name, destination, token)
+    }
   }
   Connections {
     target: sidebarViewport.listView

@@ -497,7 +497,7 @@ apply. Read the running host's schema/defaults and preserve the user's values:
 | `borderWidthEnabled` | When `true`, use `borderWidth` instead of the theme border width |
 | `borderWidth` | Custom dock border width from `0` to `8` pixels |
 | `presentationMode` | Global default presentation: `classic` bottom dock (default) or `sidebar`; a connector listed in `presentationModeByMonitor` ignores this default |
-| `presentationModeByMonitor` | Per-connector presentation overrides such as `{"DP-1":"classic"}`; listed connectors ignore `presentationMode` and `sidebarMonitor`, missing connectors inherit the default, disconnected names stay saved, and the mode-switch drag writes one entry for the dragged monitor only |
+| `presentationModeByMonitor` | Per-connector presentation overrides such as `{"DP-1":"classic"}`; listed connectors ignore `presentationMode` and `sidebarMonitor`, missing connectors inherit the default, disconnected names stay saved, and a menu or background-drag switch writes one entry for its monitor only |
 | `position` | Classic dock edge; new writes accept only `bottom` because the vertical presentation is `presentationMode: sidebar`, and legacy `left`, `right` and `top` read as bottom |
 | `fullLength` | Fill the screen width, or height for a vertical dock |
 | `workspaceLayout` | `flat` (default) or `grouped` workspace cards; grouped applies to the bottom dock and scrolls when crowded |
@@ -698,8 +698,9 @@ source while the remaining FDM-809 sources continue to work.
 
 The first dock icon is always the dock controls icon and is not part of
 `pinned`. Clicking it opens the controls menu; **Open App Launcher** runs
-`controlCommand`, while the menu also exposes Add Pinned Application and the auto-hide
-toggle. Application context menus contain only application and window actions.
+`controlCommand`, while the menu also exposes Add Pinned Application,
+**Switch to sidebar**, and the auto-hide toggle. The sidebar header menu offers
+**Switch to dock**. Application context menus contain only application and window actions.
 For example, with the Omarchy app-launcher plugin already installed:
 
 ```bash
@@ -728,7 +729,7 @@ to clear hidden membership. Restoring an application returns it to its existing
 pinned position without pinning or unpinning anything. `config reset --preferences`
 intentionally preserves `hiddenApplications` and the other application collections.
 
-The configuration file is watched and updates automatically. Drag a dock icon to another slot to reorder it; the new `pinned` order is written back to this file. Dragging genuinely empty background switches that monitor's presentation: drag the bottom dock's background left (48 px or more) to switch that monitor to the sidebar, or drag empty sidebar background downward to return it to the bottom dock. The hint pill, the destination silhouette and the result stay on the monitor where the drag started; other monitors keep their own modes, so a mixed layout with a classic dock beside a sidebar is normal. While you drag, a direction hint pill appears and, once the threshold is crossed, a silhouette of the destination edge previews where it will render; releasing past the threshold commits one `presentationModeByMonitor` entry for that connector once, and releasing earlier, pressing Escape, or an interrupted drag (open menu, popup, resize or row drag) cancels with no settings write. Only background is eligible — rows, widgets, headers, pinned strips and controls keep their own input. The existing settings writer persists the mode only after release. Feedback for a rejected or failed commit appears only on the monitor that produced the gesture. Reserved space follows visibility: while auto-hide is off, the `reserveSpace` option decides whether tiled windows keep a clear dock-sized area; while auto-hide is on, the hidden dock never reserves space.
+The configuration file is watched and updates automatically. Drag a dock icon to another slot to reorder it; the new `pinned` order is written back to this file. Switch presentation from **Switch to sidebar** in Dock Controls or **Switch to dock** in the sidebar header menu. You can also drag genuinely empty background: drag the bottom dock's background left (48 px or more) to switch that monitor to the sidebar, or drag empty sidebar background downward to return it to the bottom dock. The hint pill, the destination silhouette and the result stay on the monitor where the drag started; other monitors keep their own modes, so a mixed layout with a classic dock beside a sidebar is normal. While you drag, a direction hint pill appears and, once the threshold is crossed, a silhouette of the destination edge previews where it will render; releasing past the threshold commits one `presentationModeByMonitor` entry for that connector once, and releasing earlier, pressing Escape, or an interrupted drag (open menu, popup, resize or row drag) cancels with no settings write. Only background is eligible — rows, widgets, headers, pinned strips and controls keep their own input. The existing settings writer persists the mode only after release. Feedback for a rejected or failed commit appears only on the monitor that produced the gesture. Reserved space follows visibility: while auto-hide is off, the `reserveSpace` option decides whether tiled windows keep a clear dock-sized area; while auto-hide is on, the hidden dock never reserves space.
 
 Surface override settings are independent. Leave an `*Enabled` flag set to
 `false` to follow the active Omarchy theme; enable it to use the matching

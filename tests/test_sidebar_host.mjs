@@ -78,7 +78,7 @@ assert.match(host,/model: root\.connectedScreens/)
 assert.match(host,/DockScreenPresentation \{/)
 assert.match(host,/surfaceComponent: mode === "sidebar" \? sidebarSurface : classicSurface/)
 assert.match(host,/readonly property var sidebarPanels:/)
-assert.match(host,/function commitMonitorModeGesture\(connector, destination, capturedState\)/)
+assert.match(host,/function commitMonitorModeGesture\(connector, destination, capturedState, menuOrigin\)/)
 assert.match(host,/function currentPresentation\(\)/)
 // Ownership lifecycle is generic and behavior-tested with fake components by
 // tests/tst_screenownership.qml; here only the teardown-first contract is pinned.

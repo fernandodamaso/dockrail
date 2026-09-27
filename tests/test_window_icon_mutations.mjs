@@ -175,12 +175,16 @@ assert.match(context, /DockIconDialog/)
 const agents = read("AGENTS.md")
 assert.doesNotMatch(agents, /selected live window|FDM-927/i,
   "AGENTS no longer carries the narrow window-only dialog exception")
-assert.match(agents, /Preferences remain CLI-first/,
-  "AGENTS keeps preferences CLI-first")
-assert.match(agents, /host permits only one active\s+editing session at a time/,
-  "AGENTS requires one active editing session, not one popup instance")
-assert.match(agents, /DockHost\.saveIconChange` and its existing\s+FileView writer/,
-  "the dialog saves through the existing host writer")
+assert.match(agents, /CLI remains the complete configuration\s+interface for AI coding agents and automation/,
+  "AGENTS keeps the CLI complete for agent configuration")
+assert.match(agents, /Settings-panel design for people/,
+  "AGENTS records the accepted human Settings audience")
+assert.match(agents, /does not ship that UI/,
+  "AGENTS does not claim the Settings UI is already shipped")
+assert.match(agents, /shares the host-wide single active editing slot with Change Icon/,
+  "AGENTS requires one host-wide editing slot shared with Change Icon")
+assert.match(agents, /DockHost\.saveIconChange` and the existing\s+FileView\s+writer/,
+  "Change Icon continues to save through the existing host writer")
 assert.match(agents, /second config writer/,
   "AGENTS still forbids a second config writer")
 for (const doc of ["README.md", "docs/CONFIGURATION.md", "docs/CLI_REFERENCE.md",
