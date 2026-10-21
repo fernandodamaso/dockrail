@@ -136,9 +136,12 @@ class FakeProbes:
         self.endpoint = True
         self.missing_launchers = []
         self.root = Path('/fake/plugin')
+        self.build_tools = {'cmake', 'c++'}
 
     def which(self, command):
-        return self.herdr_path if command == 'herdr' else None
+        if command == 'herdr':
+            return self.herdr_path
+        return '/usr/bin/' + command if command in self.build_tools else None
 
     def herdr_version(self, executable):
         self.last_herdr = executable
@@ -322,6 +325,42 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(action['status'], 'manual')
         self.assertIn('never builds launcher counts automatically', action['message'])
         self.assertIn('build-launcher-badge-provider', action['message'])
+
+    def test_launcher_counts_missing_cmake_or_compiler_stops_before_build(self):
+        self.probes.providers['launcher']['installed'] = False
+        cases = (
+            ({'c++'}, 'CMake'),
+            ({'cmake'}, 'C++ compiler'),
+            (set(), 'CMake, C++ compiler'),
+        )
+        for available, missing in cases:
+            with self.subTest(available=available):
+                self.probes.build_tools = available
+                reply = self.run_scripted('launcher-counts')
+                self.assertTrue(reply['ok'])
+                self.assertEqual(self.apply_calls(), [])
+                self.assertEqual(self.actions.manual_calls, 0)
+                self.assertEqual(self.actions.agent_calls, 0)
+                action = reply['data']['actions'][0]
+                self.assertEqual(action['status'], 'unavailable')
+                self.assertIn('Missing launcher-count build prerequisites: ' + missing, action['message'])
+                self.assertEqual(action['message'].count(CLI.LAUNCHER_COUNTS_ARCH_PREREQUISITES), 1)
+                self.assertNotIn('build-launcher-badge-provider', action['message'])
+                self.assertIn('No provider build was started.', action['message'])
+
+    def test_launcher_counts_accepts_alternative_cpp_compiler(self):
+        self.probes.providers['launcher']['installed'] = False
+        self.probes.build_tools = {'cmake', 'clang++'}
+        reply = self.run_scripted('launcher-counts')
+        self.assertEqual(reply['data']['actions'][0]['status'], 'manual')
+        self.assertEqual(self.actions.manual_calls, 1)
+        self.assertEqual(self.apply_calls(), [])
+
+    def test_launcher_counts_installed_does_not_require_build_tools(self):
+        self.probes.build_tools = set()
+        reply = self.run_scripted('launcher-counts')
+        self.assertEqual(reply['data']['actions'][0]['status'], 'ready')
+        self.assertEqual(self.actions.manual_calls, 0)
 
     def test_interactive_sidebar_writes_one_monitor_entry_and_preserves_others(self):
         self.probes.herdr_path = None
