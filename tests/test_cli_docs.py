@@ -281,7 +281,7 @@ class CliDocumentationTests(unittest.TestCase):
                 'KeyboardPanel', '680 px wide', 'two panes', 'Omarchy 4.0.4',
                 'Appearance', 'Layout', 'Behavior', 'Sidebar & Widgets',
                 'Features', 'Apps', 'Apply on change',
-                'Sliders commit on release', 'Classic collapse rule',
+                'Sliders commit on release', 'Classic visibility rule',
                 'One editing slot', 'Changed elsewhere', 'E_STALE',
                 'Saving', 'Saved', 'Not saved', 'E_PERSISTENCE',
                 'E_VALIDATION', 'E_CONFIG_INVALID',
@@ -291,6 +291,19 @@ class CliDocumentationTests(unittest.TestCase):
         self.assertIn('Change Icon is the sole icon editor', record)
         self.assertIn('single host FileView/settings writer', record)
         self.assertIn('SET-01 is documentation and policy only', record)
+        self.assertIn('dockrail-settings-implementation-plan-rev18.md', record)
+        self.assertIn('dockrail-settings-design-canvas-2026-10-21.md', record)
+        self.assertIn('Partly on', record)
+        self.assertIn('Apps › Chrome', record)
+        self.assertIn('Classic settings stay visible', record)
+        self.assertIn('Settings may start named typed Dockrail actions', record)
+        frozen = re.findall(
+            r'^\\| `([^`]+)` \\| (?:Appearance|Layout|Behavior|Sidebar & Widgets|Apps) \\|',
+            record, re.M)
+        self.assertEqual(len(frozen), 58)
+        keys = set(json.loads((ROOT / 'config/settings-schema.json').read_text())['settings'])
+        self.assertEqual(set(frozen), keys)
+
 
     def test_installed_guide_and_reference_are_offline_and_match_source(self):
         with tempfile.TemporaryDirectory(prefix='smartdock docs ') as temporary:
