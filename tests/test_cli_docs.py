@@ -298,7 +298,7 @@ class CliDocumentationTests(unittest.TestCase):
         self.assertIn('Classic settings stay visible', record)
         self.assertIn('Settings may start named typed Dockrail actions', record)
         frozen = re.findall(
-            r'^\\| `([^`]+)` \\| (?:Appearance|Layout|Behavior|Sidebar & Widgets|Apps) \\|',
+            r'^\| `([^`]+)` \| (?:Appearance|Layout|Behavior|Sidebar & Widgets|Apps) \|',
             record, re.M)
         self.assertEqual(len(frozen), 58)
         keys = set(json.loads((ROOT / 'config/settings-schema.json').read_text())['settings'])
