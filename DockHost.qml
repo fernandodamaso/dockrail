@@ -18,6 +18,10 @@ Item {
 
   required property string configPath
   required property string runtimeMode
+  readonly property alias settingsActions: settingsActionBroker
+  DockSettingsActions {
+    id: settingsActionBroker
+  }
   // The panel toggles this visibility in SET-03; when closed, no polling.
   readonly property alias featureReadinessBridge: featureReadinessProbe
   DockFeatureReadinessBridge {
