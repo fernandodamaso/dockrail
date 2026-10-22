@@ -1326,7 +1326,7 @@ def build_parser():
     parser = Parser(prog='dockrail', add_help=False, allow_abbrev=False)
     add_globals(parser)
     commands = parser.add_subparsers(dest='group')
-    for name in ('help', 'agent-guide', 'status', 'doctor'):
+    for name in ('help', 'agent-guide', 'status', 'doctor', 'settings'):
         child_parser(commands, name)
     setup = child_parser(commands, 'setup')
     setup.add_argument('--feature', choices=SETUP_FEATURES)
@@ -1580,6 +1580,15 @@ def execute(args):
         if args.group == 'doctor':
             error.data['checks'] = checks
         raise
+    if args.group == 'settings':
+        # Fixed no-arg IPC entry point. Never use the CLI configuration mutator
+        # to implement a second UI writer.
+        response = transport.run(['qs', 'ipc', '--pid', str(instance['pid']), 'call', '--',
+                                  'dockrail-settings', 'open'])
+        if response != 'opened':
+            raise CliError('E_RUNTIME_NOT_FOUND',
+                           'Settings needs an active dock or sidebar anchor on a connected monitor.')
+        return envelope({'opened': True, 'runtime': status['data']['runtime']})
     if args.group == 'setup':
         checks['liveRuntime'] = True
         return run_setup(transport, instance, status, args, checks)
