@@ -42,7 +42,8 @@ grep -Fq "discover -s provider/herdr/tests" .github/workflows/ci.yml   || fail '
 grep -Fq "discover -s tests -p 'test_herdr_*.py'" .github/workflows/ci.yml   || fail 'Herdr lifecycle suite is missing from CI'
 
 grep -Fq '"herdr.agents"' DockHost.qml   || fail 'production source registry is missing herdr.agents'
-grep -Fq '"registeredIds": ["herdr.agents"]' config/settings-schema.json   || fail 'typed schema is missing herdr.agents'
+python3 -c 'import json; s=json.load(open("config/settings-schema.json", encoding="utf-8")); assert "herdr.agents" in s["settings"]["sidebarWidgets"]["registeredIds"]' \
+  || fail 'typed schema is missing herdr.agents'
 grep -Fq 'DockHerdrService {' Service.qml   || fail 'plugin singleton is missing shared Herdr service'
 grep -Fq 'herdrService: root.pluginService.herdrService' Overlay.qml   || fail 'plugin overlay does not consume the migration-gated shared service'
 grep -Fq 'DockHerdrService {' shell.qml   || fail 'standalone host is missing its migration-gated shared Herdr service'
