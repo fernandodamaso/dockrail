@@ -26,6 +26,7 @@ Item {
   required property bool interfaceAnimationsEnabled
   property var modeGestureToken: null
   signal addApplicationRequested()
+  signal settingsRequested(var anchor)
   signal autoHideToggled(bool enabled)
   signal switchToSidebarRequested(var token)
   signal contextMenuVisibilityChanged(bool visible)
@@ -177,6 +178,7 @@ Item {
       Qt.callLater(() => root.activate())
     }
     onAddApplication: root.addApplicationRequested()
+    onSettingsRequested: root.settingsRequested(root)
     onToggleAutoHide: root.autoHideToggled(!root.autoHide)
     onSwitchPresentationRequested: (destination, token) => {
       if (destination === "sidebar") root.switchToSidebarRequested(token)

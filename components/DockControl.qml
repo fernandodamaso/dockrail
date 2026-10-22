@@ -395,6 +395,20 @@ Item {
   }
 
   IpcHandler {
+    target: "dockrail-settings"
+    function open(): string {
+      return root.host.openSettings(null, root.host.settingsConnector) ? "opened" : "no-anchor"
+    }
+    function close(): string {
+      root.host.closeSettings()
+      return "closed"
+    }
+    function toggle(): string {
+      return root.host.toggleSettings() ? "opened" : "closed"
+    }
+  }
+
+  IpcHandler {
     target: "smartdock"
     function request(payload: string): string {
       try {
