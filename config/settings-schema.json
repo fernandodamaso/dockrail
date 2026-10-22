@@ -22,7 +22,8 @@
     "icons.list",
     "icons.set",
     "icons.reset",
-    "icons.reload"
+    "icons.reload",
+    "settings"
   ],
   "settings": {
     "iconOverrides": {
@@ -680,7 +681,7 @@
         "group": "classic-size-position",
         "order": 290,
         "label": "Full width",
-        "help": "Extend the dock along its available screen edge.",
+        "help": "The dock always sits on the bottom edge. Turn on to stretch it edge to edge.",
         "control": "toggle",
         "surface": "classic",
         "visibility": "normal",

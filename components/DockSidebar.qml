@@ -334,7 +334,7 @@ PanelWindow {
       Item {
         id: headerBar
         width: parent.width
-        height: Style.space(44)
+        height: root.panelCollapsed ? Style.space(82) : Style.space(44)
         HoverHandler { cursorShape: Qt.ArrowCursor }
         Row {
           id: brandRow
@@ -373,7 +373,8 @@ PanelWindow {
         // value binding re-centers on every width/mode change.
         Ui.Button {
           id: collapseButton
-          anchors.verticalCenter: parent.verticalCenter
+          anchors.verticalCenter: root.panelCollapsed ? undefined : parent.verticalCenter
+          y: root.panelCollapsed ? Style.space(7) : 0
           x: root.panelCollapsed
             ? Math.round((parent.width - width) / 2)
             : parent.width - width
@@ -397,10 +398,39 @@ PanelWindow {
           }
         }
         Ui.Button {
+          id: settingsGear
+          anchors.verticalCenter: root.panelCollapsed ? undefined : parent.verticalCenter
+          y: root.panelCollapsed ? Style.space(44) : 0
+          anchors.right: root.panelCollapsed ? undefined : collapseButton.left
+          x: root.panelCollapsed ? Math.round((parent.width-width)/2) : 0
+          anchors.rightMargin: Style.space(8)
+          visible: true
+          width: Style.space(30)
+          height: Style.space(30)
+          iconText: ""
+          tooltipText: "Dockrail Settings"
+          Accessible.role: Accessible.Button
+          Accessible.name: tooltipText
+          focusable: visible
+          onClicked: if (root.host) root.host.openSettings(settingsGear,
+            root.screen ? root.screen.name : "")
+          Component.onCompleted: if (root.host)
+            root.host.registerSettingsAnchor(settingsGear,root.screen ? root.screen.name : "", "sidebar")
+          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(settingsGear)
+          DockLucideIcon {
+            anchors.centerIn: parent
+            width: 14
+            height: 14
+            iconName: "settings"
+            iconSize: 14
+            tint: Color.foreground
+          }
+        }
+        Ui.Button {
           id: widgetManage
           visible: !root.panelCollapsed
           anchors.verticalCenter: parent.verticalCenter
-          anchors.right: collapseButton.left
+          anchors.right: settingsGear.left
           anchors.rightMargin: Style.space(8)
           width: visible ? Style.space(30) : 0
           height: Style.space(30)
@@ -737,6 +767,8 @@ PanelWindow {
     }
     onVisibleChanged: root.syncInteractionBusy()
     onIconDialogOpenChanged: root.syncInteractionBusy()
+    onSettingsRequested: if (root.host) root.host.openSettings(headerMenuButton,
+      root.screen ? root.screen.name : "")
     onKeyboardDismissed: root.controller.releaseNavigationFocus()
     onSwitchPresentationRequested: (destination, token) => {
       if (destination === "classic" && root.screen)

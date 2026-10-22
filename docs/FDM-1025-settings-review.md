@@ -1,0 +1,83 @@
+# FDM-1025 SET-03 review corrections
+
+Baseline reviewed: PR #142, `fbc1e093b4649f1a6b692acc62b62b72e30fd562`.
+Frozen requirements: `docs/SETTINGS.md`, the 2026-10-21 canvas export and rev18 implementation plan (plan wins).
+
+## Corrections
+
+- Canonical schema rows own interaction snapshots, validation feedback, Reload / Keep editing and a three-second Changed elsewhere indication. Stable metadata inventories preserve drafts when CLI changes another Layout branch.
+- Schema dependencies disable controls while preserving requested settings. Requested/effective differences are shown, including sidebar width clamping.
+- Panel cursor supports rows, h/l, Enter/Space, Tab between panes, c to copy the selected row's fixed CLI command, Alt+Up/Down for monitor ordering and nested Escape. Search remains SET-08 and is labelled accordingly.
+- Monitor choices use `monitorModeIntent`, including clearing an override for Default; disconnected/stale targets cannot be written. Icon rail uses the existing collapse intent.
+- Automatic/manual order retains the session's disconnected names; manual order supports grip drag and keyboard reorder with accessible position names.
+- The gear is available in the icon rail, Dock Controls uses the specified final separated action, and the Widget manager opens Sidebar & Widgets. Host anchors are registered/unregistered, validated and replaced when their surface disappears. Reanchoring preserves the editing pane.
+- Layout uses three native display-mode cards (Displays, Sidebar, Classic dock with subsections) and Arrange apps tiles; panel height fits content within native available space.
+- Retry accepts the writer's raw envelope, distinguishing accepted pending saves from rejected busy writes.
+
+## Native primitive maintenance check
+
+Inspected `omacom/omarchy` quattro at **3c7027db2a4fa9fa6a49d7af7f87c27ac48e677d**:
+`shell/Ui/KeyboardPanel.qml`, `PanelKeyCatcher.qml`, `Dropdown.qml`, `NumberField.qml`, `PanelSlider.qml`, `ButtonGroup.qml`, `Button.qml`, `Toggle.qml`, plus `shell/plugins/panels/monitor/Panel.qml` as the first-party cursor/sizing composition.
+
+The panel retains native window, outside-click dismissal, focus priming and theme ownership. It adds no focus timer, second writer or command runner. Native Dropdown selection assigns its value internally; the row restores its binding after selection and captures its snapshot when the popup opens.
+
+Installed Omarchy/Hyprland/Quickshell versions and a physical session are unavailable here. Source inspection and fixture rendering are not native qualification.
+
+## Verification
+
+- All repository JavaScript model tests passed, including dependency/outcome/order/anchor regressions and existing icon late-picker tests.
+- All structural guards and shell syntax checks passed.
+- CLI Python suite: 63 passed.
+- Pure QML suite: **491 passed, 0 failed**. New cases exercise production writer/controller methods in the QML engine, draft preservation through the full Layout, dependencies, live feedback, dropdown snapshots/bindings, keyboard pane/row navigation, monitor Default/stale topology, Alt reorder, retry, accepted busy and icon handoff.
+- Compositor and FileView endpoints are substituted in the new QML source harness, as documented in its source; these tests do not assert native disk/Wayland behavior.
+- An offscreen render of the panel was inspected for card/column/scroll geometry, using the headless native-interface fixtures. It is not a native visual acceptance screenshot.
+- `saveSettingsIntent` remains byte-for-byte identical to INF-1 PR #139 head `bc859cc37acd2830d5cc3163f155926ee7882302`. No competing adapter was introduced. Integrate/retest the dependency stack before merge.
+
+### Local full Python suite limitation
+
+With extracted Qt tools on PATH: 251 tests, 12 failures, 17 errors, 2 skipped. Before any product edits, the same environment already had 12 failures and 14 errors (12 skipped without Qt). Failures concern process identity/guest guards and widget QML-validation tool discovery; none are hidden by narrowing the test command. The exact-head GitHub CI remains required, with its normal installed Qt dependencies.
+
+Final local failing/error test names:
+
+- `ERROR: test_forged_a_pid_does_not_signal_b (test_dev_session.CrossTargetingTests.test_forged_a_pid_does_not_signal_b)`
+- `ERROR: test_stop_during_sync_does_not_resurrect_record (test_dev_session.SourceSyncTests.test_stop_during_sync_does_not_resurrect_record)`
+- `ERROR: test_start_exception_releases_port_after_early_stop (test_dev_session.StartRaceTests.test_start_exception_releases_port_after_early_stop)`
+- `ERROR: test_signal_during_spawn_waits_until_child_ownership_is_recorded (test_dev_session_review.SignalCleanupTests.test_signal_during_spawn_waits_until_child_ownership_is_recorded)`
+- `ERROR: test_dev_use_reload_and_reset_preserve_source_and_installed_package (test_widget_packages.WidgetPackagesTest.test_dev_use_reload_and_reset_preserve_source_and_installed_package)`
+- `ERROR: test_enabled_remove_is_refused_without_rewriting_config (test_widget_packages.WidgetPackagesTest.test_enabled_remove_is_refused_without_rewriting_config)`
+- `ERROR: test_install_list_registry_and_remove (test_widget_packages.WidgetPackagesTest.test_install_list_registry_and_remove)`
+- `ERROR: test_install_rejects_duplicate_and_protected (test_widget_packages.WidgetPackagesTest.test_install_rejects_duplicate_and_protected)`
+- `ERROR: test_installed_scaffold_materializes_widgetkit_and_loads_without_global_smartdock_import_path (test_widget_packages.WidgetPackagesTest.test_installed_scaffold_materializes_widgetkit_and_loads_without_global_smartdock_import_path)`
+- `ERROR: test_invalid_dev_reload_keeps_last_working_snapshot (test_widget_packages.WidgetPackagesTest.test_invalid_dev_reload_keeps_last_working_snapshot)`
+- `ERROR: test_invalid_dev_reload_qml_syntax_keeps_last_working_snapshot (test_widget_packages.WidgetPackagesTest.test_invalid_dev_reload_qml_syntax_keeps_last_working_snapshot)`
+- `ERROR: test_invalid_dev_reload_unresolved_import_keeps_last_working_snapshot (test_widget_packages.WidgetPackagesTest.test_invalid_dev_reload_unresolved_import_keeps_last_working_snapshot)`
+- `ERROR: test_invalid_package_isolated_from_valid_registry_package (test_widget_packages.WidgetPackagesTest.test_invalid_package_isolated_from_valid_registry_package)`
+- `ERROR: test_package_manager_never_writes_qml_paths_to_dock_config (test_widget_packages.WidgetPackagesTest.test_package_manager_never_writes_qml_paths_to_dock_config)`
+- `ERROR: test_symlinked_installed_package_is_isolated_from_registry_and_bulk_update (test_widget_packages.WidgetPackagesTest.test_symlinked_installed_package_is_isolated_from_registry_and_bulk_update)`
+- `ERROR: test_update_all_continues_after_one_broken_source (test_widget_packages.WidgetPackagesTest.test_update_all_continues_after_one_broken_source)`
+- `ERROR: test_update_is_atomic_and_preserves_previous_on_invalid_candidate (test_widget_packages.WidgetPackagesTest.test_update_is_atomic_and_preserves_previous_on_invalid_candidate)`
+- `FAIL: test_env_capture_and_stop_dock_refuse_on_host (test_dev_session.GuestControlHostGuardTests.test_env_capture_and_stop_dock_refuse_on_host)`
+- `FAIL: test_start_compositor_refuses_on_host (test_dev_session.GuestControlHostGuardTests.test_start_compositor_refuses_on_host)`
+- `FAIL: test_start_dock_refuses_on_host (test_dev_session.GuestControlHostGuardTests.test_start_dock_refuses_on_host)`
+- `FAIL: test_changed_start_ticks_refuse_signal (test_dev_session.LifecycleTests.test_changed_start_ticks_refuse_signal)`
+- `FAIL: test_stop_during_start_does_not_resurrect_failed (test_dev_session.StartRaceTests.test_stop_during_start_does_not_resurrect_failed)`
+- `FAIL: test_stop_rereads_identity_under_lock (test_dev_session.StartRaceTests.test_stop_rereads_identity_under_lock)`
+- `FAIL: test_repeated_signals_do_not_interrupt_cleanup (test_dev_session_review.SignalCleanupTests.test_repeated_signals_do_not_interrupt_cleanup)`
+- `FAIL: test_sighup_cleans_up_during_guest_boot (test_dev_session_review.SignalCleanupTests.test_sighup_cleans_up_during_guest_boot)`
+- `FAIL: test_sighup_cleans_up_ready_session (test_dev_session_review.SignalCleanupTests.test_sighup_cleans_up_ready_session)`
+- `FAIL: test_sigint_still_cleans_up_ready_session (test_dev_session_review.SignalCleanupTests.test_sigint_still_cleans_up_ready_session)`
+- `FAIL: test_sigterm_cleans_up_during_guest_boot (test_dev_session_review.SignalCleanupTests.test_sigterm_cleans_up_during_guest_boot)`
+- `FAIL: test_sigterm_cleans_up_ready_session (test_dev_session_review.SignalCleanupTests.test_sigterm_cleans_up_ready_session)`
+
+## Remaining acceptance gates
+
+Keep PR #142 Draft. Do not merge/deploy or mark FDM-1025 Done until dependencies are integrated and the native smoke is recorded at the final SHA:
+
+1. Open via Dock Controls, expanded/rail gear, Widget manager footer and CLI/IPC; check one instance and correct monitor/anchor after mode switches and hotplug.
+2. Check focus, tab/cursor/inline editors, dropdown Escape, clipboard and drag/Alt reorder in the real shell, including screen-reader announcements.
+3. Change Layout and verify `dockrail config get`; change via CLI/file/drag/menu and verify live rows, drafts and effective values.
+4. Exercise Change Icon in both directions and late file-picker completion.
+5. Exercise invalid config, validation, stale, rejected busy, accepted saving, persistence failure and Retry.
+6. Check theme changes, narrow/short displays and multiple monitors. Record screenshots and installed revisions.
+
+SET-LOCAL remains the final qualification of all sections; it does not replace this SET-03 smoke.

@@ -114,7 +114,8 @@ Item {
       managerIntro.implicitHeight
         + managerDivider.implicitHeight
         + managerLayout.spacing * 2
-        + Math.min(managerRows.implicitHeight, Style.space(280)),
+        + Math.min(managerRows.implicitHeight, Style.space(280))
+        + Style.space(40),
       Style.space(420))
 
     onOpenChanged: if (open) anchorTimer.restart()
@@ -187,6 +188,18 @@ Item {
       Ui.PanelSeparator {
         id: managerDivider
         width: parent.width
+      }
+
+      Ui.Button {
+        width: parent.width
+        text: "Open Settings…"
+        tooltipText: "Manage all Dockrail preferences"
+        onClicked: {
+          var anchor = root.managerAnchor
+          root.close()
+          if (root.panel.host) root.panel.host.openSettings(anchor,
+            root.panel.screen ? root.panel.screen.name : "", "sidebar-widgets")
+        }
       }
 
       Flickable {

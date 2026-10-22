@@ -46,6 +46,10 @@ TestCase {
       Item {
         width: parent.width; height: 34
         Item { id: collapseButton; anchors.right: parent.right; width: 30; height: 30 }
+        // The extracted production Widget manager now anchors to the new
+        // Settings gear; preserve that real sibling geometry in this fixture.
+        Item { id: settingsGear; anchors.right: collapseButton.left;
+          anchors.rightMargin: Style.space(8); width: 30; height: 30 }
         @@MAIN_BUTTON@@
         property alias button: widgetManage
         objectName: "main-header"
