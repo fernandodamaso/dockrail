@@ -68,6 +68,7 @@ TestCase {
       'import "../components/DockConfigModel.js" as ConfigModel',
       'import "../components/DockIconModel.js" as DockIconModel',
       'import "../components/DockTrashModel.js" as TrashModel',
+      'import "./SettingsFileViewError.js" as FileViewError',
       "Item {",
       "  id: root",
       "  property var dockControl: null",
@@ -90,7 +91,7 @@ TestCase {
       '  property string settingsWriteBaseText: ""',
       '  property string settingsWriteText: ""',
       '  property string configPath: "/tmp/dockrail-test.json"',
-      '  property var FileViewError: ({ toString: function(code) { return String(code) } })',
+
       methods,
       "}"
     ].join("\n")
