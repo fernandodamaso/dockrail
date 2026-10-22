@@ -363,6 +363,44 @@ Item {
     return { accepted: accepted, pending: pending, reply: reply }
   }
 
+  // The Settings page owns the user-visible draft; the host owns the one
+  // canonical writer. Compare the complete touched-key snapshot synchronously
+  // before validation or mutation; a stale colour/feature pair changes nothing.
+  // Expected values are mandatory for every touched key, never inferred here.
+  function saveSettingsIntent(patch, expectedValues) {
+    var blocked = mutationBlocked()
+    if (blocked) return { accepted: false, pending: false, reply: blocked }
+    var valid = patch && typeof patch === "object" && !Array.isArray(patch)
+      && expectedValues && typeof expectedValues === "object" && !Array.isArray(expectedValues)
+    var keys = valid ? Object.keys(patch) : []
+    if (!valid || !keys.length || keys.some(function(key) {
+      return !Object.prototype.hasOwnProperty.call(expectedValues, key)
+    })) {
+      return { accepted: false, pending: false,
+        reply: dockControl.failure("E_VALIDATION",
+          "Every touched setting needs an expected starting value.") }
+    }
+    for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i]
+      if (!DockModel.sameSettingValue(settings[key], expectedValues[key])) {
+        var stale = dockControl.mutationData(settings, settings, [], false, false)
+        stale.key = key
+        stale.currentValue = settings[key]
+        stale.expectedValue = expectedValues[key]
+        return { accepted: false, pending: false,
+          reply: dockControl.failure("E_STALE",
+            "Preference changed after the interaction started; refresh before retrying.", stale) }
+      }
+    }
+    // saveSettings reuses ConfigModel.applyPatch, commitSettings and FileView;
+    // this synchronous call never opens a second writer or editor.
+    var reply = saveSettings(patch, false)
+    var applied = !!(reply && reply.data && reply.data.applied === true)
+    var accepted = !!(reply && (reply.ok || applied))
+    var pending = accepted && !reply.ok && !!reply.error && reply.error.code === "E_BUSY"
+    return { accepted: accepted, pending: pending, reply: reply }
+  }
+
   // Per-connector rejection text stored for a completed background gesture.
   function modeGestureFeedbackFor(connector) {
     var text = modeGestureFeedbackByMonitor[String(connector || "")]
