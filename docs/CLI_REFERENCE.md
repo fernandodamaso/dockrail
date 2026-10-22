@@ -45,6 +45,9 @@ Requested values retain intent. Effective output projects current normalization 
 
 ### Doctor feature readiness
 
+Doctor keeps its legacy `status`, `reason` and `nextStep` fields for existing CLI agents. Each feature also exposes additive `configuration` (`off`, `partly-on`, `on`), `installation` (`missing`, `installed`), `runtime` (`unavailable`, `limited`, `ready`), and `nextAction` with `kind` and `text`. A disabled Chrome or Herdr preference does not by itself mean its provider is uninstalled. The Settings bridge reads `dockrail doctor --json` asynchronously, caches the last good result, and never runs installers.
+
+
 `dockrail doctor --json` keeps `apiVersion: 1` and adds a stable
 `data.features` object. Its keys are `sidebar`, `herdrAgents`,
 `chromeProfilesTabs`, `launcherCounts`, `agentLaunchers`, and

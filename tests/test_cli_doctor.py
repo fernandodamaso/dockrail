@@ -85,6 +85,8 @@ def status(sidebar=True, lease=True, monitors=True):
 def settings(widget=True, badges=True, tabs=True):
     return {
         'sidebarWidgets': ['herdr.agents'] if widget else [],
+        'dockHerdrIndicators': widget,
+        'launcherBadgeMode': 'automatic',
         'browserProfileBadgesEnabled': badges,
         'sidebarBrowserTabsEnabled': tabs,
     }
@@ -124,12 +126,52 @@ class FeatureReadinessTests(unittest.TestCase):
         features = CLI.feature_readiness(status(), settings(), probes)
         self.assertEqual(list(features), list(CLI.FEATURE_ORDER))
         for value in features.values():
-            self.assertEqual(set(value), {'status', 'reason', 'nextStep'})
+            self.assertEqual(set(value), {'status', 'reason', 'nextStep', 'configuration', 'installation', 'runtime', 'nextAction'})
             self.assertEqual(value['status'], 'ready')
             self.assertTrue(value['reason'])
             self.assertTrue(value['nextStep'])
         self.assertEqual(probes.endpoint_ports, [9333])
         self.assertEqual(probes.runtime_mode, 'plugin')
+
+    def test_independent_installation_runtime_and_configuration_dimensions(self):
+        probes = FakeProbes()
+        disabled = CLI.feature_readiness(status(), settings(widget=False, badges=False, tabs=False), probes)
+        chrome = disabled['chromeProfilesTabs']
+        self.assertEqual((chrome['configuration'], chrome['installation'], chrome['runtime']),
+                         ('off', 'installed', 'ready'))
+        self.assertEqual(chrome['status'], 'missing', 'legacy summary is unchanged')
+        self.assertEqual(chrome['nextAction']['kind'], 'enable')
+        self.assertEqual(disabled['herdrAgents']['configuration'], 'off')
+        self.assertEqual(disabled['herdrAgents']['installation'], 'installed')
+        self.assertEqual(disabled['herdrAgents']['runtime'], 'ready')
+
+        mixed = settings(widget=True, badges=True, tabs=False)
+        mixed['dockHerdrIndicators'] = False
+        partly = CLI.feature_readiness(status(), mixed, probes)
+        self.assertEqual(partly['herdrAgents']['configuration'], 'partly-on')
+        self.assertEqual(partly['chromeProfilesTabs']['configuration'], 'partly-on')
+        self.assertEqual(partly['launcherCounts']['configuration'], 'on')
+
+        probes.providers['browser']['running'] = False
+        probes.herdr = (0, 8, 2)
+        probes.providers['launcher']['installed'] = False
+        probes.missing_launchers = ['smartdock-agent-pi']
+        limited = CLI.feature_readiness(status(lease=False), settings(), probes)
+        self.assertEqual(limited['chromeProfilesTabs']['runtime'], 'limited')
+        self.assertEqual(limited['herdrAgents']['runtime'], 'limited')
+        self.assertEqual(limited['launcherCounts']['installation'], 'missing')
+        self.assertEqual(limited['launcherCounts']['runtime'], 'unavailable')
+        self.assertEqual(limited['agentLaunchers']['installation'], 'missing')
+        self.assertEqual(limited['agentLaunchers']['nextAction']['kind'], 'install')
+        self.assertEqual(limited['launcherCounts']['nextAction']['kind'], 'install')
+
+        probes.herdr_path = None
+        probes.providers['browser']['installed'] = False
+        missing = CLI.feature_readiness(status(), settings(), probes)
+        self.assertEqual(missing['herdrAgents']['runtime'], 'unavailable')
+        self.assertEqual(missing['herdrAgents']['nextAction']['kind'], 'install')
+        self.assertEqual(missing['chromeProfilesTabs']['installation'], 'missing')
+        self.assertEqual(missing['chromeProfilesTabs']['runtime'], 'unavailable')
 
     def test_sidebar_missing_and_degraded(self):
         probes = FakeProbes()
@@ -299,7 +341,7 @@ class DoctorIntegrationTests(unittest.TestCase):
         self.assertTrue(value['ok'])
         self.assertEqual(list(value['data']['features']), list(CLI.FEATURE_ORDER))
         for feature in value['data']['features'].values():
-            self.assertEqual(set(feature), {'status', 'reason', 'nextStep'})
+            self.assertEqual(set(feature), {'status', 'reason', 'nextStep', 'configuration', 'installation', 'runtime', 'nextAction'})
             self.assertIn(feature['status'], ('ready', 'missing', 'degraded'))
 
 

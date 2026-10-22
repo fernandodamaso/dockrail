@@ -18,6 +18,11 @@ Item {
 
   required property string configPath
   required property string runtimeMode
+  // The panel toggles this visibility in SET-03; when closed, no polling.
+  readonly property alias featureReadinessBridge: featureReadinessProbe
+  DockFeatureReadinessBridge {
+    id: featureReadinessProbe
+  }
   property string dataRoot: ""
   property var notificationService: null
   property var launcherBadgeService: null
