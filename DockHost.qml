@@ -78,6 +78,8 @@ Item {
       registry["herdr.agents"] = {
         id: "herdr.agents",
         label: "Herdr agents",
+        description: "Show coding-agent sessions from Herdr in the sidebar.",
+        feature: "herdr",
         manageable: root.herdrBinaryInstalled,
         available: root.herdrBinaryInstalled && root.herdrService.available !== false,
         revision: 1,
