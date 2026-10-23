@@ -189,6 +189,27 @@ TestCase {
     compare(merged.servers[0].id, "t3:env")
   }
 
+  function test_gracePeriodPreservesBothSourcesBeforeDeadline() {
+    var value = scene()
+    value.mux.sources = [
+      { id: "herdr", service: value.herdr, enabled: true },
+      { id: "t3", service: value.t3, enabled: true }
+    ]
+    value.herdr.publishSnapshot(snap("herdr", "srv", "epoch-herdr", 1, 0, []))
+    value.t3.publishSnapshot(snap("t3", "t3:env", "epoch-t3", 1, 0, []))
+    verify(value.mux.setWindowProcesses(5, []))
+    value.herdr.publishSnapshot(snap("herdr", "srv", "epoch-herdr", 2, 5, []))
+    var early = lastReady(value)
+    verify(early !== null)
+    compare(early.servers.length, 2)
+    verify(!value.mux.lagDeadlineReached)
+    wait(250)
+    var during = lastReady(value)
+    verify(during !== null)
+    compare(during.servers.length, 2)
+    compare(during.windowProcesses.revision, -1)
+  }
+
   function test_staleT3CannotBlockHerdr() {
     var value = scene()
     value.mux.sources = [

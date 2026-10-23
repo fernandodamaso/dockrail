@@ -87,6 +87,40 @@ TestCase {
     }
   }
 
+  function test_t3FallbackUsesSourceSpecificCompleteness() {
+    var partialServer = t3Server("")
+    partialServer.health = "live"
+    partialServer.connected = true
+    partialServer.sourceCompleteness = {
+      state: "partial", truncated: true, agentTruncated: true
+    }
+    partialServer.sourceLiveCountsKnown = true
+    var partialView = viewFor(partialServer, false)
+    var partialData = snapshotWith(partialServer)
+    partialData.completeness = { state: "complete", truncated: false }
+    partialView.widgetContext = {
+      data: partialData,
+      herdrAssociations: { byWindowKey: ({}), unmatchedServerIds: ["t3:env-1"] }
+    }
+    verify(partialView.summary().indexOf("partial") >= 0,
+      "T3 truncated inventory must be shown even when Herdr is complete")
+
+    var completeServer = t3Server("")
+    completeServer.health = "live"
+    completeServer.connected = true
+    completeServer.sourceCompleteness = { state: "complete", truncated: false }
+    completeServer.sourceLiveCountsKnown = true
+    var completeView = viewFor(completeServer, false)
+    var completeData = snapshotWith(completeServer)
+    completeData.completeness = { state: "partial", truncated: true }
+    completeView.widgetContext = {
+      data: completeData,
+      herdrAssociations: { byWindowKey: ({}), unmatchedServerIds: ["t3:env-1"] }
+    }
+    verify(completeView.summary().indexOf("partial") < 0,
+      "Herdr truncation must not mark a complete T3 inventory partial")
+  }
+
   function test_herdrCopyUnchanged() {
     var view = createTemporaryObject(viewFactory, testCase, { sourceFilter: "herdr" })
     verify(view !== null)

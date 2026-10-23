@@ -151,7 +151,12 @@ Item {
         ? (isT3 ? " thread" : " agent") : (isT3 ? " threads" : " agents"))
     if (root.unmatchedBlocked > 0)
       text += " · " + root.unmatchedBlocked + " blocked"
-    if (SidebarModel.herdrInventoryPartial(root.snapshot))
+    var partial = root.sourceFilter === "t3"
+      ? root.servers.some(function(server) {
+          return SidebarModel.herdrInventoryPartial(root.snapshot, server)
+        })
+      : SidebarModel.herdrInventoryPartial(root.snapshot)
+    if (partial)
       text += " · partial"
     return text
   }
