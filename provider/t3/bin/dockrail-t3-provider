@@ -1,0 +1,921 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""Demand-driven Dockrail-owned local T3 Code provider.
+
+Started only while a Dockrail consumer is active. Pairs through the local T3
+orchestration server (read-only bearer session from ``dockrail t3 pair``),
+subscribes to the shell stream over Effect-RPC WebSocket and emits versioned
+normalized JSON lines in the Herdr provider contract (schema v1). The token
+is only ever read from the 0600 connection file; it never appears on stdout,
+stderr, argv or in QML.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import queue
+import random
+import select
+import signal
+import sys
+import threading
+import time
+import uuid
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+sys.path.insert(0, str(ROOT))
+
+import t3http  # noqa: E402
+import t3model  # noqa: E402
+import t3paths  # noqa: E402
+import t3procfs  # noqa: E402
+import t3rpc  # noqa: E402
+import t3store  # noqa: E402
+import t3ws  # noqa: E402
+from t3http import Failure as HttpFailure  # noqa: E402
+from t3model import BuildState, ShellStore, StatusTracker  # noqa: E402
+from t3store import StoreError  # noqa: E402
+from t3ws import Failure as WsFailure  # noqa: E402
+
+DEBOUNCE_EMIT_EVERY = 0.25
+SAFETY_EMIT_EVERY = 60.0
+FILE_CHECK_EVERY = 1.0
+OUTPUT_TIMEOUT = 2.0
+MAX_STDIN_LINE = 4096
+SESSION_RECHECK_EVERY = 6 * 60 * 60.0
+WS_POLL_EVERY = 0.5
+HTTP_FALLBACK_EVERY = 5.0
+WS_RETRY_AFTER_FALLBACK = 5 * 60.0
+
+ACTION_ERRORS = (
+    "invalid_request",
+    "inventory_reconciling",
+    "agent_gone",
+    "identity_mismatch",
+    "server_unavailable",
+    "timeout",
+    "provider_unavailable",
+    "unsupported",
+    "unsupported_command",
+)
+
+
+def parse_window_processes_command(raw: bytes) -> dict[str, Any] | None:
+    """Parse a bounded window-processes stdin command (Herdr contract)."""
+    if not isinstance(raw, (bytes, bytearray)) or len(raw) > MAX_STDIN_LINE:
+        return None
+    try:
+        message = json.loads(raw)
+    except (ValueError, UnicodeError, TypeError):
+        return None
+    if not isinstance(message, dict):
+        return None
+    if set(message) - {"kind", "revision", "pids"}:
+        return None
+    if message.get("kind") != "window-processes":
+        return None
+    revision = message.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+        return None
+    pids = message.get("pids")
+    if not isinstance(pids, list):
+        return None
+    normalized: list[int] = []
+    seen: set[int] = set()
+    for value in pids:
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            return None
+        if value in seen:
+            continue
+        if len(normalized) >= 256:
+            return None
+        seen.add(value)
+        normalized.append(value)
+    return {"revision": revision, "pids": normalized}
+
+
+def parse_focus_agent_command(raw: bytes) -> dict[str, Any] | None:
+    """Parse a focus-agent stdin command (exact Herdr key set)."""
+    if not isinstance(raw, (bytes, bytearray)) or len(raw) > MAX_STDIN_LINE:
+        return None
+    try:
+        message = json.loads(raw)
+    except (ValueError, UnicodeError, TypeError):
+        return None
+    if not isinstance(message, dict):
+        return None
+    allowed = {
+        "kind",
+        "requestId",
+        "providerEpoch",
+        "serverId",
+        "connectionGeneration",
+        "agentId",
+        "paneId",
+        "terminalId",
+    }
+    if set(message) - allowed:
+        return None
+    if message.get("kind") != "focus-agent":
+        return None
+
+    def bounded(value: object, maximum: int) -> str | None:
+        if not isinstance(value, str) or not value or len(value) > maximum:
+            return None
+        if any(
+            ord(char) < 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
+            for char in value
+        ):
+            return None
+        return value
+
+    request_id = bounded(message.get("requestId"), 64)
+    epoch = bounded(message.get("providerEpoch"), 64)
+    server_id = bounded(message.get("serverId"), 128)
+    agent_id = bounded(message.get("agentId"), 192)
+    pane_id = bounded(message.get("paneId"), 128)
+    if not request_id or not epoch or not server_id or not agent_id or not pane_id:
+        return None
+    generation = message.get("connectionGeneration")
+    if isinstance(generation, bool):
+        return None
+    if isinstance(generation, float):
+        if not generation.is_integer() or generation <= 0:
+            return None
+        generation = int(generation)
+    elif not isinstance(generation, int) or generation <= 0:
+        return None
+    terminal_raw = message.get("terminalId", "")
+    if terminal_raw in ("", None):
+        terminal = ""
+    else:
+        terminal = bounded(terminal_raw, 128)
+        if terminal is None:
+            return None
+    return {
+        "requestId": request_id,
+        "providerEpoch": epoch,
+        "serverId": server_id,
+        "connectionGeneration": generation,
+        "agentId": agent_id,
+        "paneId": pane_id,
+        "terminalId": terminal,
+    }
+
+
+class Provider:
+    """Owns emit state; a worker thread owns blocking network I/O."""
+
+    def __init__(self, connection_file: Path, proc_root: Path) -> None:
+        self.connection_file = connection_file
+        self.proc_root = proc_root
+        self.events: queue.Queue[object] = queue.Queue()
+        self.epoch = uuid.uuid4().hex
+        self.revision = 0
+        self.stopping = False
+        self.dirty = True
+        self.last_emit = 0.0
+        self.last_fingerprint = ""
+        self.stdin_thread: threading.Thread | None = None
+        self.worker_thread: threading.Thread | None = None
+        self.lock = threading.Lock()
+        self.rev = 0
+        self.target_key: tuple[object, ...] = ("init",)
+        self.assignment: tuple[int, str, dict[str, Any] | None] = (0, "unpaired", None)
+        self.store = ShellStore()
+        self.tracker = StatusTracker()
+        self.server_id = "t3:unpaired"
+        self.health = "unavailable"
+        self.error_code: str | None = "pairing_required"
+        self.generation = 1
+        self.clients: list[dict[str, Any]] = []
+        self.inventory_live = False
+        self.last_observed_at: float | None = None
+        self.last_agents: list[dict[str, Any]] = []
+        self.wp_revision = 0
+        self.wp_identities: list[dict[str, int]] = []
+        self.next_file_check = 0.0
+
+    # -- stdin ---------------------------------------------------------
+    def _stdin(self) -> None:
+        for raw in sys.stdin.buffer:
+            command = raw.strip()
+            if len(command) > MAX_STDIN_LINE:
+                continue
+            if command in (b"refresh", b"quit"):
+                self.events.put(("command", command.decode("ascii")))
+                if command == b"quit":
+                    return
+                continue
+            parsed = parse_window_processes_command(command)
+            if parsed is not None:
+                self.events.put(("window-processes", parsed))
+                continue
+            focus = parse_focus_agent_command(command)
+            if focus is not None:
+                self.events.put(("focus-agent", focus))
+                continue
+            try:
+                message = json.loads(command)
+            except (ValueError, UnicodeError):
+                continue
+            if isinstance(message, dict) and message.get("kind") == "focus-agent":
+                request_id = message.get("requestId")
+                if isinstance(request_id, str) and request_id:
+                    self.events.put(("action-result", request_id, False, "invalid_request"))
+        self.events.put(("command", "quit"))
+
+    # -- connection file -----------------------------------------------
+    def _load_target(self) -> tuple[tuple[object, ...], dict[str, Any] | None]:
+        """Load the file once; return its change key plus the valid record."""
+        try:
+            record = t3store.load(self.connection_file)
+        except StoreError as exc:
+            return (("store-error", exc.code), None)
+        if record is None:
+            return (("unpaired",), None)
+        now = time.time()
+        token_hash = hashlib.sha256(str(record["token"]).encode("utf-8")).hexdigest()
+        identity = (
+            record["environmentId"],
+            record["label"],
+            record["url"],
+            token_hash,
+            record["expiresAt"],
+            record["pairedAt"],
+        )
+        if int(record["expiresAt"]) <= int(now):
+            return (("expired",) + identity, record)
+        return (("ok",) + identity, record)
+
+    def check_connection_file(self) -> None:
+        key, record = self._load_target()
+        if key == self.target_key:
+            return
+        self.target_key = key
+        with self.lock:
+            self.rev += 1
+            rev = self.rev
+            kind = str(key[0])
+            if kind != "ok":
+                record = None
+            self.assignment = (rev, kind, record)
+        self.store = ShellStore()
+        self.tracker = StatusTracker()
+        self.last_agents = []
+        if kind == "unpaired":
+            self._set_view("t3:unpaired", "unavailable", "pairing_required", 1, [], False)
+        elif kind == "store-error":
+            code = str(key[1]) if len(key) > 1 else "store_invalid"
+            self._set_view("t3:unpaired", "unavailable", code, 1, [], False)
+        elif kind == "expired":
+            server_id = "t3:unpaired"
+            if record is not None:
+                server_id = "t3:" + str(record["environmentId"])
+            self._set_view(server_id, "unavailable", "pairing_expired", 1, [], False)
+        else:
+            assert record is not None
+            self._set_view(
+                "t3:" + str(record["environmentId"]),
+                "connecting",
+                None,
+                1,
+                [],
+                False,
+            )
+        self.dirty = True
+
+    def _set_view(
+        self,
+        server_id: str,
+        health: str,
+        error_code: str | None,
+        generation: int,
+        clients: list[dict[str, Any]],
+        inventory_live: bool,
+    ) -> None:
+        self.server_id = server_id
+        self.health = health
+        self.error_code = error_code
+        self.generation = generation
+        self.clients = clients
+        self.inventory_live = inventory_live
+        self.last_observed_at = time.monotonic()
+        self.dirty = True
+
+    # -- worker events ---------------------------------------------------
+    def _apply_event(self, event: object) -> None:
+        if not isinstance(event, tuple) or not event:
+            return
+        kind = event[0]
+        if kind == "command":
+            command = event[1]
+            if command == "quit":
+                self.stopping = True
+            elif command == "refresh":
+                self.check_connection_file()
+            return
+        if kind == "window-processes":
+            request = event[1]
+            if isinstance(request, dict):
+                self.wp_revision = int(request["revision"])
+                self.wp_identities = t3procfs.resolve_window_identities(
+                    [int(pid) for pid in request["pids"]]
+                )
+                self.dirty = True
+            return
+        if kind == "focus-agent":
+            request = event[1]
+            if isinstance(request, dict):
+                self.apply_focus_agent(request)
+            return
+        if kind == "action-result":
+            _tag, request_id, ok, error = event
+            if isinstance(request_id, str) and request_id:
+                try:
+                    self.emit_action_result(request_id, bool(ok), str(error))
+                except (BrokenPipeError, OSError):
+                    self.stopping = True
+            return
+        if kind == "view":
+            _tag, rev, health, error_code, clients, inventory_live = event
+            with self.lock:
+                current = self.rev
+            if rev != current:
+                return
+            self.health = str(health)
+            self.error_code = str(error_code) if error_code else None
+            if clients is not None:
+                self.clients = clients
+            self.inventory_live = bool(inventory_live)
+            self.last_observed_at = time.monotonic()
+            self.dirty = True
+            return
+        if kind == "items":
+            _tag, rev, values = event
+            with self.lock:
+                current = self.rev
+            if rev != current:
+                return
+            if isinstance(values, list):
+                for value in values:
+                    if isinstance(value, dict):
+                        try:
+                            self.store.apply(value)
+                        except t3model.Failure:
+                            continue
+                self.last_observed_at = time.monotonic()
+                self.dirty = True
+            return
+        if kind == "http-snapshot":
+            _tag, rev, body = event
+            with self.lock:
+                current = self.rev
+            if rev != current:
+                return
+            if isinstance(body, dict):
+                try:
+                    self.store.load_http_snapshot(body)
+                except t3model.Failure:
+                    self.inventory_live = False
+                    self.health = "connecting"
+                else:
+                    self.inventory_live = True
+                    self.health = "live"
+                self.last_observed_at = time.monotonic()
+                self.dirty = True
+            return
+        if kind == "sync-reset":
+            _tag, rev = event
+            with self.lock:
+                current = self.rev
+            if rev != current:
+                return
+            self.store.synchronized = False
+            self.dirty = True
+            return
+        if kind == "generation-bump":
+            _tag, rev = event
+            with self.lock:
+                current = self.rev
+            if rev != current:
+                return
+            self.generation += 1
+            self.dirty = True
+            return
+
+    # -- focus-agent -------------------------------------------------------
+    def emit_action_result(self, request_id: str, ok: bool, error: str = "") -> None:
+        code = error if isinstance(error, str) and error else ""
+        if ok:
+            code = ""
+        elif code not in ACTION_ERRORS:
+            code = "unsupported"
+        payload = {
+            "kind": "action-result",
+            "requestId": request_id,
+            "ok": ok is True,
+            "error": code,
+        }
+        frame = (
+            json.dumps(payload, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+            + "\n"
+        ).encode("utf-8")
+        view = memoryview(frame)
+        deadline = time.monotonic() + OUTPUT_TIMEOUT
+        while view:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([], [sys.stdout], [], remaining)[1]:
+                raise BrokenPipeError("provider output unavailable")
+            written = os.write(sys.stdout.fileno(), view[:65536])
+            if written <= 0:
+                raise BrokenPipeError("provider output unavailable")
+            view = view[written:]
+
+    def apply_focus_agent(self, request: dict[str, Any]) -> None:
+        request_id = str(request.get("requestId") or "")
+        if not request_id:
+            return
+        if request.get("providerEpoch") != self.epoch:
+            self.emit_action_result(request_id, False, "identity_mismatch")
+            return
+        if str(request.get("serverId") or "") != self.server_id:
+            self.emit_action_result(request_id, False, "server_unavailable")
+            return
+        if self.health != "live":
+            self.emit_action_result(request_id, False, "server_unavailable")
+            return
+        if request.get("connectionGeneration") != self.generation:
+            self.emit_action_result(request_id, False, "identity_mismatch")
+            return
+        agent_id = str(request.get("agentId") or "")
+        pane_id = str(request.get("paneId") or "")
+        terminal_id = str(request.get("terminalId") or "")
+        match = None
+        for agent in self.last_agents:
+            if agent.get("id") != agent_id:
+                continue
+            if agent.get("paneId") != pane_id:
+                continue
+            if terminal_id and agent.get("terminalId", "") != terminal_id:
+                continue
+            match = agent
+            break
+        if match is None:
+            self.emit_action_result(request_id, False, "agent_gone")
+            return
+        self.emit_action_result(request_id, True)
+
+    # -- emit -----------------------------------------------------------------
+    def build(self, revision: int, now_ms: int) -> dict[str, Any]:
+        observed_ms: int | None = None
+        if self.last_observed_at is not None:
+            observed_ms = max(0, int((time.monotonic() - self.last_observed_at) * 1000))
+        state = BuildState(
+            epoch=self.epoch,
+            revision=revision,
+            server_id=self.server_id,
+            health=self.health,
+            error_code=self.error_code,
+            generation=self.generation,
+            clients=list(self.clients),
+            inventory_live=self.inventory_live,
+            wp_revision=self.wp_revision,
+            wp_identities=list(self.wp_identities),
+            now_ms=now_ms,
+            last_snapshot_observed_ms=observed_ms,
+        )
+        return t3model.build_snapshot(state, self.store, self.tracker)
+
+    def emit(self, force: bool = False) -> None:
+        now_ms = int(time.time() * 1000)
+        snapshot = self.build(self.revision + 1, now_ms)
+        self.last_agents = list(snapshot.get("agents", []))
+        fingerprint = t3model.snapshot_fingerprint(snapshot)
+        self.dirty = False
+        if not force and fingerprint == self.last_fingerprint:
+            return
+        self.revision += 1
+        snapshot["revision"] = self.revision
+        frame = t3model.finalize_snapshot(snapshot)
+        view = memoryview(frame)
+        deadline = time.monotonic() + OUTPUT_TIMEOUT
+        while view:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([], [sys.stdout], [], remaining)[1]:
+                raise BrokenPipeError("provider output unavailable")
+            written = os.write(sys.stdout.fileno(), view[:65536])
+            if written <= 0:
+                raise BrokenPipeError("provider output unavailable")
+            view = view[written:]
+        sys.stdout.buffer.flush()
+        self.last_fingerprint = fingerprint
+        self.last_emit = time.monotonic()
+
+    # -- worker ---------------------------------------------------------------
+    def _alive(self, rev: int) -> bool:
+        if self.stopping:
+            return False
+        with self.lock:
+            return self.rev == rev
+
+    def _wait(self, rev: int, seconds: float) -> bool:
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if not self._alive(rev):
+                return False
+            time.sleep(0.1)
+        return self._alive(rev)
+
+    def _send(self, event: object) -> None:
+        self.events.put(event)
+
+    def _worker(self) -> None:
+        while not self.stopping:
+            with self.lock:
+                rev, kind, record = self.assignment
+            if kind != "ok" or not isinstance(record, dict):
+                if not self._wait(rev, 1.0):
+                    continue
+                continue
+            self._run_attempt(rev, record)
+
+    def _run_attempt(self, rev: int, record: dict[str, Any]) -> None:
+        url = str(record["url"])
+        token = str(record["token"])
+        try:
+            host, port = t3http.check_endpoint(url)
+        except HttpFailure:
+            return
+        failures = 0
+        resume_seq = -1
+        while self._alive(rev):
+            if not self._wait_until_listening(rev, port):
+                return
+            if not self._alive(rev):
+                return
+            try:
+                t3procfs.assert_own_listener(port, self.proc_root)
+            except t3procfs.ProcfsError:
+                self._send(("view", rev, "unavailable", "listener_untrusted", [], False))
+                if not self._wait(rev, 30.0):
+                    return
+                continue
+            try:
+                descriptor = t3http.get_descriptor(url, proc_root=self.proc_root)
+            except HttpFailure as exc:
+                if exc.code == "unsupported":
+                    self._send(("view", rev, "unavailable", "unsupported", [], False))
+                    if not self._wait(rev, 30.0):
+                        return
+                    continue
+                self._send(("view", rev, "unavailable", "server_not_running", [], False))
+                if not self._wait(rev, 5.0):
+                    return
+                continue
+            if descriptor.get("environmentId") != record["environmentId"]:
+                self._send(("view", rev, "unavailable", "environment_changed", [], False))
+                if not self._wait(rev, 30.0):
+                    return
+                continue
+            clients = self._resolve_clients(port)
+            if not self._verify_session(rev, url, token):
+                return
+            if not self._alive(rev):
+                return
+            self._send(("view", rev, "connecting", None, clients, False))
+            try:
+                ticket_body = t3http.api_post(
+                    url, "/api/auth/websocket-ticket", token, {}, proc_root=self.proc_root
+                )
+            except HttpFailure as exc:
+                self._session_step_failed(rev, exc)
+                continue
+            ticket = ticket_body.get("ticket")
+            if not isinstance(ticket, str) or not ticket:
+                self._send(("view", rev, "connecting", None, clients, False))
+                if not self._wait(rev, 5.0):
+                    return
+                continue
+            ws = t3ws.WebSocket()
+
+            def pre_handshake() -> None:
+                try:
+                    t3procfs.assert_own_listener(port, self.proc_root)
+                except t3procfs.ProcfsError as exc:
+                    if exc.code == "offline":
+                        raise WsFailure("offline")
+                    raise WsFailure("listener_untrusted")
+
+            try:
+                ws.connect(
+                    host,
+                    port,
+                    "/ws?orchestrationProtocol=2&wsTicket="
+                    + quote(ticket, safe="")
+                    + "&clientSurface=dockrail",
+                    pre_handshake=pre_handshake,
+                )
+            except WsFailure as exc:
+                if exc.code == "unsupported":
+                    self._send(("generation-bump", rev))
+                    self._http_fallback(rev, url, token, clients)
+                    if not self._alive(rev):
+                        return
+                    continue
+                if exc.code == "authentication_required":
+                    self._send(
+                        ("view", rev, "unavailable", "authentication_required", [], False)
+                    )
+                    if not self._wait(rev, 300.0):
+                        return
+                    continue
+                failures += 1
+                self._send(("view", rev, "connecting", None, clients, False))
+                if not self._wait(rev, _backoff(failures)):
+                    return
+                continue
+            resumed, went_live = self._stream(rev, url, token, ws, resume_seq)
+            if resumed is None:
+                return
+            resume_seq = resumed
+            failures = 0 if went_live else failures + 1
+            if not self._wait(rev, _backoff(failures)):
+                return
+
+    def _wait_until_listening(self, rev: int, port: int) -> bool:
+        announced = False
+        while self._alive(rev):
+            try:
+                inodes = t3procfs.listener_inodes(port, self.proc_root)
+            except t3procfs.ProcfsError:
+                inodes = set()
+            if inodes:
+                return True
+            if not announced:
+                self._send(("view", rev, "unavailable", "server_not_running", [], False))
+                announced = True
+            if not self._wait(rev, 2.0):
+                return False
+        return False
+
+    def _resolve_clients(self, port: int) -> list[dict[str, Any]]:
+        pid = t3procfs.listener_pid(port, self.proc_root)
+        if pid is None:
+            return []
+        found = t3procfs.identity(pid)
+        if found is None:
+            return []
+        found["ancestors"] = t3procfs.ancestors(pid)
+        return [found]
+
+    def _verify_session(self, rev: int, url: str, token: str) -> bool:
+        try:
+            session = t3http.api_get(
+                url, "/api/auth/session", token, proc_root=self.proc_root
+            )
+        except HttpFailure as exc:
+            return self._session_step_failed(rev, exc)
+        if session.get("authenticated") is not True:
+            self._send(
+                ("view", rev, "unavailable", "authentication_required", [], False)
+            )
+            return self._wait(rev, 300.0)
+        return True
+
+    def _session_step_failed(self, rev: int, exc: HttpFailure) -> bool:
+        if exc.code == "authentication_required":
+            self._send(
+                ("view", rev, "unavailable", "authentication_required", [], False)
+            )
+            return self._wait(rev, 300.0)
+        self._send(("view", rev, "connecting", None, None, False))
+        return self._wait(rev, 5.0)
+
+    def _stream(
+        self,
+        rev: int,
+        url: str,
+        token: str,
+        ws: t3ws.WebSocket,
+        resume_seq: int,
+    ) -> tuple[int | None, bool]:
+        """Run one subscription; return ``(resume_seq, went_live)``.
+
+        ``None`` resume means the revision was superseded or the provider is
+        stopping; anything else means reconnect with the returned cursor.
+        """
+        rpc = t3rpc.RpcSession(ws)
+        payload: dict[str, object] = {"requestCompletionMarker": True}
+        if resume_seq >= 0:
+            payload["afterSequence"] = resume_seq
+        try:
+            request_id = rpc.stream("orchestration.subscribeShell", payload)
+        except WsFailure:
+            try:
+                ws.close()
+            except WsFailure:
+                pass
+            return resume_seq, False
+        self._send(("sync-reset", rev))
+        self._send(("generation-bump", rev))
+        live_announced = False
+        last_session_check = time.monotonic()
+        try:
+            while self._alive(rev):
+                if time.monotonic() - last_session_check >= SESSION_RECHECK_EVERY:
+                    try:
+                        session = t3http.api_get(
+                            url, "/api/auth/session", token, proc_root=self.proc_root
+                        )
+                    except HttpFailure:
+                        session = None
+                    if not isinstance(session, dict) or session.get(
+                        "authenticated"
+                    ) is not True:
+                        try:
+                            rpc.close()
+                        finally:
+                            pass
+                        self._send(
+                            (
+                                "view",
+                                rev,
+                                "unavailable",
+                                "authentication_required",
+                                [],
+                                False,
+                            )
+                        )
+                        if not self._wait(rev, 300.0):
+                            return None, False
+                        return resume_seq, live_announced
+                    last_session_check = time.monotonic()
+                try:
+                    batch = rpc.poll(WS_POLL_EVERY)
+                except t3rpc.StreamEnded as exc:
+                    if exc.code == "authentication_required":
+                        self._send(
+                            (
+                                "view",
+                                rev,
+                                "unavailable",
+                                "authentication_required",
+                                [],
+                                False,
+                            )
+                        )
+                        if not self._wait(rev, 300.0):
+                            return None, False
+                        return resume_seq, live_announced
+                    self._send(("view", rev, "connecting", None, None, False))
+                    return resume_seq
+                except WsFailure:
+                    self._send(("view", rev, "connecting", None, None, False))
+                    return resume_seq, live_announced
+                if batch:
+                    values = [value for _rid, value in batch if _rid == request_id]
+                    for value in values:
+                        if isinstance(value, dict):
+                            sequence = value.get("sequence")
+                            if (
+                                isinstance(sequence, int)
+                                and not isinstance(sequence, bool)
+                                and sequence > resume_seq
+                            ):
+                                resume_seq = sequence
+                            if value.get("kind") == "snapshot":
+                                snap = value.get("snapshot")
+                                if isinstance(snap, dict):
+                                    snap_seq = snap.get("snapshotSequence")
+                                    if (
+                                        isinstance(snap_seq, int)
+                                        and not isinstance(snap_seq, bool)
+                                        and snap_seq > resume_seq
+                                    ):
+                                        resume_seq = snap_seq
+                    self._send(("items", rev, values))
+                    if not live_announced and any(
+                        isinstance(value, dict) and value.get("kind") == "synchronized"
+                        for value in values
+                    ):
+                        live_announced = True
+                        self._send(("view", rev, "live", None, None, True))
+        finally:
+            try:
+                rpc.close()
+            except WsFailure:
+                pass
+        return None, False
+
+    def _http_fallback(
+        self,
+        rev: int,
+        url: str,
+        token: str,
+        clients: list[dict[str, Any]],
+    ) -> None:
+        ws_retry_at = time.monotonic() + WS_RETRY_AFTER_FALLBACK
+        last_session_check = time.monotonic()
+        while self._alive(rev):
+            now = time.monotonic()
+            if now - last_session_check >= SESSION_RECHECK_EVERY:
+                try:
+                    session = t3http.api_get(
+                        url, "/api/auth/session", token, proc_root=self.proc_root
+                    )
+                except HttpFailure:
+                    session = None
+                if not isinstance(session, dict) or session.get(
+                    "authenticated"
+                ) is not True:
+                    self._send(
+                        ("view", rev, "unavailable", "authentication_required", [], False)
+                    )
+                    if not self._wait(rev, 300.0):
+                        return
+                    last_session_check = time.monotonic()
+                    continue
+                last_session_check = now
+            if now >= ws_retry_at:
+                return
+            try:
+                body = t3http.api_get(
+                    url, "/api/orchestration/shell", token, proc_root=self.proc_root
+                )
+            except HttpFailure:
+                self._send(("view", rev, "connecting", None, None, False))
+            else:
+                self._send(("http-snapshot", rev, body))
+            if not self._wait(rev, HTTP_FALLBACK_EVERY):
+                return
+
+    # -- run --------------------------------------------------------------------
+    def run(self) -> None:
+        self.stdin_thread = threading.Thread(target=self._stdin, daemon=True)
+        self.stdin_thread.start()
+        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
+        self.worker_thread.start()
+        self.check_connection_file()
+        self.next_file_check = time.monotonic() + FILE_CHECK_EVERY
+        try:
+            while not self.stopping:
+                now = time.monotonic()
+                if self.dirty and now - self.last_emit >= DEBOUNCE_EMIT_EVERY:
+                    self.emit()
+                elif now - self.last_emit >= SAFETY_EMIT_EVERY:
+                    self.emit(force=True)
+                if now >= self.next_file_check:
+                    self.next_file_check = now + FILE_CHECK_EVERY
+                    self.check_connection_file()
+                try:
+                    event = self.events.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+                self._apply_event(event)
+                while True:
+                    try:
+                        self._apply_event(self.events.get_nowait())
+                    except queue.Empty:
+                        break
+        finally:
+            self.stopping = True
+
+
+def _backoff(failures: int) -> float:
+    delay = min(30.0, 2.0 ** max(1, failures))
+    return delay * random.uniform(0.8, 1.2)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--connection-file", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--proc-root", default=None, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    connection_file = (
+        Path(args.connection_file)
+        if args.connection_file
+        else t3paths.connection_path()
+    )
+    proc_root = Path(args.proc_root) if args.proc_root else Path("/proc")
+    provider = Provider(connection_file, proc_root)
+
+    def stop(_signum: int, _frame: object) -> None:
+        provider.stopping = True
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    try:
+        provider.run()
+    except (BrokenPipeError, KeyboardInterrupt):
+        provider.stopping = True
+
+
+if __name__ == "__main__":
+    main()
