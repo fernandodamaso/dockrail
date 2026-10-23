@@ -68,16 +68,19 @@ class RpcSession:
         self.ws.send_text(json.dumps(message, separators=(",", ":")))
 
     def _check_ping(self, now: float) -> None:
-        if self.last_ping_at is None or now - self.last_ping_at >= PING_EVERY:
+        # Only one ping may be outstanding. A fresh ping must never postpone
+        # the timeout of an unanswered earlier ping.
+        if (self.ping_sent_at is not None
+                and self.pong_seen_at is not None
+                and self.pong_seen_at >= self.ping_sent_at):
+            self.ping_sent_at = None
+        if (self.ping_sent_at is None
+                and (self.last_ping_at is None or now - self.last_ping_at >= PING_EVERY)):
             self._send({"_tag": "Ping"})
             self.last_ping_at = now
-            # Each ping starts a new acknowledgement deadline.
             self.ping_sent_at = now
-        if (
-            self.ping_sent_at is not None
-            and (self.pong_seen_at is None or self.pong_seen_at < self.ping_sent_at)
-            and now - self.ping_sent_at > PONG_WITHIN
-        ):
+        if (self.ping_sent_at is not None
+                and now - self.ping_sent_at > PONG_WITHIN):
             try:
                 self.ws.close()
             finally:
