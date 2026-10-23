@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- T3 Code threads (sidebar widget `t3.threads`, dock indicators `dockT3Indicators`, `dockrail t3 pair|status|unpair`).
+
 ## 3.0.0 - 2026-09-25
 
 SmartDock for Omarchy is now **Dockrail**. The repository moved to

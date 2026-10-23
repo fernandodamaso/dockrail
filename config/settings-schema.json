@@ -529,17 +529,18 @@
       "type": "array",
       "format": "sidebar-widget-ids",
       "registeredIds": [
-        "herdr.agents"
+        "herdr.agents",
+        "t3.threads"
       ],
       "uniqueItems": true,
       "resetWithPreferences": true,
-      "description": "Ordered internal widget IDs. SmartDock registers herdr.agents; unknown imported IDs are retained but unavailable and explicit writes require registered IDs.",
+      "description": "Ordered internal widget IDs. SmartDock registers herdr.agents and t3.threads; unknown imported IDs are retained but unavailable and explicit writes require registered IDs.",
       "ui": {
         "section": "sidebar-widgets",
         "group": "widgets",
         "order": 480,
         "label": "Widgets list",
-        "help": "Ordered internal widget IDs. SmartDock registers herdr.agents; unknown imported IDs are retained but unavailable and explicit writes require registered IDs.",
+        "help": "Ordered internal widget IDs. SmartDock registers herdr.agents and t3.threads; unknown imported IDs are retained but unavailable and explicit writes require registered IDs.",
         "control": "widget-list",
         "surface": "sidebar",
         "visibility": "normal",
@@ -1138,6 +1139,21 @@
         "visibility": "normal",
         "commit": "change",
         "featureId": "coding-agents"
+      }
+    },
+    "dockT3Indicators": {
+      "type": "boolean",
+      "description": "Show T3 Code thread state on the T3 Code icon, in hover previews and in the context menu. Pair with dockrail t3 pair; requires a classic dock to run for dock-only demand.",
+      "ui": {
+        "section": "behavior",
+        "group": "attention-on-the-dock",
+        "order": 470,
+        "label": "T3 Code threads on dock icons",
+        "help": "Show paired local T3 Code thread state on its dock icon. Pair with dockrail t3 pair. The sidebar widget has its own activation setting.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "commit": "change"
       }
     },
     "browserActivityMutedServices": {

@@ -17,6 +17,16 @@ ShellRoot {
   }
 
   Loader {
+    id: t3Loader
+    active: migration.ready
+    sourceComponent: Component {
+      DockHerdrService {
+        providerRelativePath: "../provider/t3/bin/dockrail-t3-provider"
+      }
+    }
+  }
+
+  Loader {
     id: dockLoader
     active: migration.ready
     sourceComponent: Component {
@@ -25,6 +35,7 @@ ShellRoot {
         configPath: migration.configPath
         dataRoot: migration.dataRoot
         herdrService: herdrLoader.item
+        t3Service: t3Loader.item
       }
     }
   }

@@ -396,6 +396,14 @@ Item {
   }
 
   Component.onDestruction: {
+    // Invalidate handed-out leases first so late release()/setActive() calls
+    // from consumers destroyed after us return before touching root.
+    root.leases.slice().forEach(function(lease) {
+      lease.publish = null
+      lease.released = true
+    })
+    root.leases = []
+    root.activeCount = 0
     for (var id in root.childLeases) {
       try {
         root.childLeases[id].release()

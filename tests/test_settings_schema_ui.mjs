@@ -3,7 +3,7 @@ import { read, loadModel, hostHarness, plain } from './host_harness.mjs';
 
 const settings = JSON.parse(read('config/settings-schema.json')).settings;
 const keys = Object.keys(settings);
-assert.equal(keys.length, 58);
+assert.equal(keys.length, 59);
 const ui = Object.fromEntries(keys.map(key => [key, settings[key].ui]));
 const allowedSections = new Set(['appearance', 'layout', 'behavior', 'sidebar-widgets', 'apps']);
 const allowedVisibility = new Set(['normal', 'conditional', 'advanced', 'hidden', 'in-place']);
@@ -30,6 +30,9 @@ const metadata = loadModel('DockModel');
 assert.deepEqual(plain(metadata.inactiveClassicSettings(true)).sort(), classic.slice().sort());
 assert.deepEqual(plain(metadata.inactiveClassicSettings(false)), []);
 assert.ok(classic.includes('dockHerdrIndicators'), 'Herdr terminal icon state is classic-only');
+assert.ok(classic.includes('dockT3Indicators'), 'T3 dock icon state is classic-only');
+assert.equal(ui.dockT3Indicators.surface, 'classic');
+assert.equal(ui.dockT3Indicators.group, 'attention-on-the-dock');
 const host = hostHarness({ presentationMode: 'sidebar' });
 assert.deepEqual(plain(host.control.statusData().presentation.inactiveClassicSettings).sort(),
                  classic.slice().sort(), 'the real host projection must use the same inventory');
@@ -58,4 +61,4 @@ const rows = plain(widgetModel.registeredRows({
 }));
 assert.equal(rows[0].feature, 'herdr');
 assert.equal(rows[0].description, 'Show agent sessions');
-console.log('Settings metadata: 58 schema keys, paired controls, host classic projection and shortcuts OK');
+console.log('Settings metadata: 59 schema keys, paired controls, host classic projection and shortcuts OK');

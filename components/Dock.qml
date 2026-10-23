@@ -440,6 +440,8 @@ PanelWindow {
       ? settings.urgentWindowAnimationEnabled : true
   readonly property bool dockHerdrIndicators: DockModel.normalizeSetting(
     "dockHerdrIndicators", settings.dockHerdrIndicators)
+  readonly property bool dockT3Indicators: DockModel.normalizeSetting(
+    "dockT3Indicators", settings.dockT3Indicators)
   readonly property bool interfaceAnimationsEnabled: DockModel.normalizeSetting(
     "interfaceAnimationsEnabled", settings.interfaceAnimationsEnabled)
   // Background mode gesture state. The host reports a rejected or still-pending
@@ -814,11 +816,30 @@ PanelWindow {
     }
   }
 
+  function sourceIndicatorsEnabled(toplevel) {
+    var bridge = root.herdrWindowAgents
+    var windowKey = bridge && typeof bridge.windowKeyFor === "function"
+      ? bridge.windowKeyFor(toplevel) : ""
+    var byWindowKey = bridge && bridge.herdrAssociations
+      && bridge.herdrAssociations.byWindowKey
+      ? bridge.herdrAssociations.byWindowKey : ({})
+    var serverId = windowKey ? byWindowKey[windowKey] : ""
+    var servers = bridge && bridge.snapshot && Array.isArray(bridge.snapshot.servers)
+      ? bridge.snapshot.servers : []
+    for (var i = 0; i < servers.length; ++i) {
+      var server = servers[i]
+      if (server && String(server.id || "") === String(serverId || ""))
+        return HerdrModel.serverSource(server) === "t3"
+          ? root.dockT3Indicators : root.dockHerdrIndicators
+    }
+    return root.dockHerdrIndicators
+  }
+
   function herdrSummaryFor(item) {
-    if (!root.dockHerdrIndicators || !root.herdrWindowAgents || !item)
+    if (!(root.dockHerdrIndicators || root.dockT3Indicators) || !root.herdrWindowAgents || !item)
       return root.emptyHerdrSummary()
     var revision = root.herdrWindowAgents.indicatorRevision
-    return root.herdrWindowAgents.summaryForToplevels(item.toplevels || [])
+    return root.herdrWindowAgents.summaryForToplevels((item.toplevels || []).filter(root.sourceIndicatorsEnabled))
   }
 
   function herdrServerLabel(serverId) {
@@ -828,16 +849,40 @@ PanelWindow {
     for (var i = 0; i < servers.length; ++i) {
       var server = servers[i]
       if (server && String(server.id || "") === String(serverId || ""))
-        return HerdrModel.serverDisplayLabel(server)
+        return HerdrModel.serverSource(server) === "t3"
+          ? HerdrModel.serverProduct(server)
+          : HerdrModel.serverDisplayLabel(server)
     }
     return "Herdr"
   }
 
+  function herdrServerForPreview(agents) {
+    var first = Array.isArray(agents) && agents.length ? agents[0] : null
+    var serverId = first && String(first.serverId || "")
+    if (!serverId || !root.herdrWindowAgents || !root.herdrWindowAgents.snapshot) return null
+    var servers = root.herdrWindowAgents.snapshot.servers
+    if (!Array.isArray(servers)) return null
+    for (var i = 0; i < servers.length; ++i) {
+      if (servers[i] && String(servers[i].id || "") === serverId) return servers[i]
+    }
+    return null
+  }
+
+  function herdrPreviewProductFor(agents) {
+    var server = root.herdrServerForPreview(agents)
+    return server ? HerdrModel.serverProduct(server) : "Herdr"
+  }
+
+  function herdrPreviewFocusHintFor(agents) {
+    var server = root.herdrServerForPreview(agents)
+    return server ? HerdrModel.focusHint(server) : "Click a row to focus its pane."
+  }
+
   function herdrPreviewAgentsFor(item) {
-    if (!root.dockHerdrIndicators || !root.herdrWindowAgents || !item) return []
+    if (!(root.dockHerdrIndicators || root.dockT3Indicators) || !root.herdrWindowAgents || !item) return []
     var revision = root.herdrWindowAgents.indicatorRevision
     var rows = []
-    ;(item.toplevels || []).forEach(function(toplevel) {
+    ;((item.toplevels || []).filter(root.sourceIndicatorsEnabled)).forEach(function(toplevel) {
       var summary = root.herdrWindowAgents.summaryForToplevels([toplevel])
       ;(summary.rows || []).forEach(function(agent) {
         rows.push(Object.assign({}, agent, {
@@ -853,14 +898,14 @@ PanelWindow {
     var labels = []
     ;(agents || []).forEach(function(agent) {
       var label = String(agent && agent.serverLabel || "").trim()
-      if (label && label !== "Herdr" && labels.indexOf(label) < 0)
+      if (label && label !== "Herdr" && label !== "T3 Code" && labels.indexOf(label) < 0)
         labels.push(label)
     })
     return labels.join(" · ")
   }
 
   function allItemWindowsHerdrAssociated(item) {
-    if (!root.dockHerdrIndicators || !root.herdrWindowAgents
+    if (!(root.dockHerdrIndicators || root.dockT3Indicators) || !root.herdrWindowAgents
         || !root.herdrWindowAgents.snapshotReady || !item) return false
     var toplevels = item.toplevels || []
     if (!toplevels.length) return false
@@ -1725,6 +1770,8 @@ PanelWindow {
     previewHerdrOnly: dockHerdrPreviewAgents.length > 0
       && root.allItemWindowsHerdrAssociated(modelData)
     previewHerdrLabel: root.herdrPreviewLabelFor(dockHerdrPreviewAgents)
+    previewHerdrProduct: root.herdrPreviewProductFor(dockHerdrPreviewAgents)
+    previewHerdrFocusHint: root.herdrPreviewFocusHintFor(dockHerdrPreviewAgents)
     previewHerdrCounters: dockHerdrSummary.counters || []
     pinnedItem: modelData.pinned
     runningToplevels: modelData.toplevels

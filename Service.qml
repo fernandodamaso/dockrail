@@ -14,6 +14,7 @@ Item {
   readonly property var launcherBadgeService: launcherLoader.item
   readonly property var browserProfileService: browserLoader.item
   readonly property var herdrService: herdrLoader.item
+  readonly property var t3Service: t3Loader.item
 
   DockMigrationBootstrap {
     id: migration
@@ -45,6 +46,16 @@ Item {
     active: migration.ready
     sourceComponent: Component {
       DockHerdrService {}
+    }
+  }
+
+  Loader {
+    id: t3Loader
+    active: migration.ready
+    sourceComponent: Component {
+      DockHerdrService {
+        providerRelativePath: "../provider/t3/bin/dockrail-t3-provider"
+      }
     }
   }
 }
