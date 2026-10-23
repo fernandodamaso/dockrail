@@ -407,6 +407,19 @@ class ProtocolTests(unittest.TestCase):
         payloads = [p for p in fake.subscribe_payloads if "afterSequence" in p]
         self.assertTrue(payloads, "recovery must resume with afterSequence")
 
+    def test_non_auth_stream_exit_reconnects(self) -> None:
+        fake, provider = self.start_live(ws_exit_after_chunks={})
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline:
+            with fake.lock:
+                subscriptions = len(fake.subscribe_payloads)
+            if subscriptions >= 2:
+                break
+            time.sleep(0.1)
+        self.assertIsNone(provider.proc.poll(), "provider process must stay alive")
+        self.assertGreaterEqual(subscriptions, 2,
+                                "ordinary Exit must not kill the connection worker")
+
     def test_http_fallback_on_426(self) -> None:
         fake, provider = self.start_live(handshake_status=426)
         snapshot, _ = provider.wait_snapshot(live_predicate())

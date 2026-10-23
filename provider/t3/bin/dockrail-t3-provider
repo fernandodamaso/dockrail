@@ -775,7 +775,7 @@ class Provider:
                             return None, False
                         return resume_seq, live_announced
                     self._send(("view", rev, "connecting", None, None, False))
-                    return resume_seq
+                    return resume_seq, live_announced
                 except WsFailure:
                     self._send(("view", rev, "connecting", None, None, False))
                     return resume_seq, live_announced

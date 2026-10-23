@@ -66,6 +66,18 @@ class StoreTests(unittest.TestCase):
             t3store.load(self.path)
         self.assertEqual(ctx.exception.code, "store_untrusted")
 
+    def test_repeated_untrusted_reads_close_descriptors(self) -> None:
+        fd_root = Path("/proc/self/fd")
+        if not fd_root.is_dir():
+            self.skipTest("requires Linux procfs")
+        self.write(json.dumps(valid_record()).encode(), mode=0o644)
+        before = len(list(fd_root.iterdir()))
+        for _ in range(32):
+            with self.assertRaises(StoreError):
+                t3store.load(self.path)
+        after = len(list(fd_root.iterdir()))
+        self.assertLessEqual(after, before + 2)
+
     def test_world_readable_rejected(self) -> None:
         self.write(json.dumps(valid_record()).encode(), mode=0o644)
         with self.assertRaises(StoreError) as ctx:
