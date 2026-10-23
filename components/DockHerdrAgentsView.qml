@@ -10,6 +10,7 @@ import "DockHerdrModel.js" as HerdrModel
 Item {
   id: root
   property var widgetContext: ({})
+  property string sourceFilter: "herdr"
 
   readonly property var snapshot: widgetContext && widgetContext.data
     ? widgetContext.data : ({})
@@ -42,14 +43,19 @@ Item {
     var all = snapshot && Array.isArray(snapshot.servers) ? snapshot.servers : []
     return all.filter(function(server) {
       return server && typeof server === "object"
+        && HerdrModel.serverSource(server) === root.sourceFilter
         && root.matchedIdSet[String(server.id || "")] !== true
     })
   }
   readonly property var agents: {
     var all = snapshot && Array.isArray(snapshot.agents) ? snapshot.agents : []
+    var kept = Object.create(null)
+    root.servers.forEach(function(server) {
+      kept[String(server.id || "")] = true
+    })
     return all.filter(function(agent) {
       return agent && typeof agent === "object"
-        && root.matchedIdSet[String(agent.serverId || "")] !== true
+        && kept[String(agent.serverId || "")] === true
     })
   }
   readonly property int unmatchedBlocked: {
@@ -84,6 +90,13 @@ Item {
       if (transport === "remote") {
         detail = String(server.health || "") === "live" && items.length > 0
           ? "Live" : SidebarModel.herdrStateTitle(server, root.snapshot)
+      } else if (HerdrModel.serverSource(server) === "t3") {
+        var pairingHint = SidebarModel.t3PairingHint(server)
+        if (pairingHint) detail = pairingHint
+        else if (String(server.errorCode || "") === "server_not_running")
+          detail = "T3 Code is not running"
+        else if (String(server.health || "") !== "live")
+          detail = SidebarModel.herdrStateTitle(server, root.snapshot)
       }
       output.push({
         kind: "session",
@@ -130,12 +143,20 @@ Item {
   function summary() {
     if (!root.hasFallbackContent) return ""
     var total = root.agents.length
-    var text = "Unmatched / unattached Herdr sessions"
+    var isT3 = root.sourceFilter === "t3"
+    var text = isT3 ? "Unmatched / unattached T3 Code threads"
+      : "Unmatched / unattached Herdr sessions"
     if (total > 0)
-      text += " · " + String(total) + (total === 1 ? " agent" : " agents")
+      text += " · " + String(total) + (total === 1
+        ? (isT3 ? " thread" : " agent") : (isT3 ? " threads" : " agents"))
     if (root.unmatchedBlocked > 0)
       text += " · " + root.unmatchedBlocked + " blocked"
-    if (SidebarModel.herdrInventoryPartial(root.snapshot))
+    var partial = root.sourceFilter === "t3"
+      ? root.servers.some(function(server) {
+          return SidebarModel.herdrInventoryPartial(root.snapshot, server)
+        })
+      : SidebarModel.herdrInventoryPartial(root.snapshot)
+    if (partial)
       text += " · partial"
     return text
   }

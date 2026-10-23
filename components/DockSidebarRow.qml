@@ -156,7 +156,8 @@ Item {
   }
   readonly property string windowTitle: {
     if (kind === "browser-tab" || kind === "herdr-agent" || kind === "herdr-state")
-      return String(row.title || (kind === "herdr-state" ? "Herdr"
+      return String(row.title || (kind === "herdr-state"
+        ? String(row.serverLabel || "").trim() || "Herdr"
         : kind === "herdr-agent" ? "Coding agent" : "Tab"))
     if (kind === "window" && row.toplevel)
       return String(row.toplevel.title || "").trim() || "Untitled window"
@@ -257,14 +258,14 @@ Item {
       return (row.active === true ? "Active tab: " : "Tab: ") + root.windowTitle + alertBits
         + (attention.muted ? " · Alerts excluded from totals" : "")
     if (kind === "herdr-agent")
-      return "Herdr agent: " + liveTitle
+      return (row.serverLabel === "T3 Code" ? "T3 Code thread: " : "Herdr agent: ") + liveTitle
         + (root.herdrAgentSubtitle ? " · " + root.herdrAgentSubtitle : "")
         + " · " + InteractionModel.herdrStatusAccessibleText(row.status)
         + (root.herdrActionable && root.controller.herdrFocusErrorFor(root.rowKey)
           ? " · Focus failed (" + root.controller.herdrFocusErrorFor(root.rowKey) + ")"
           : "")
     if (kind === "herdr-state")
-      return "Herdr: " + liveTitle
+      return (row.serverLabel === "T3 Code" ? "T3 Code: " : "Herdr: ") + liveTitle
     var titleLabel = kind === "window"
       ? InteractionModel.sidebarWindowTooltipTitle({
         kind: "window",

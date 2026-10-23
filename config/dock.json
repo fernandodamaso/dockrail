@@ -54,6 +54,7 @@
   "launcherBadgeMode": "automatic",
   "browserProfileBadgesEnabled": true,
   "dockHerdrIndicators": false,
+  "dockT3Indicators": false,
   "browserActivityMutedServices": [],
   "hiddenApplications": [],
   "pinned": [

@@ -487,7 +487,9 @@ function sidebarWindowDisplayTitle(input) {
   if (kind === "browser-tab")
     display = String(source.tabTitle || "").trim() || "Tab"
   if (kind === "herdr-agent" || kind === "herdr-state")
-    return String(source.title || "").trim() || (kind === "herdr-state" ? "Herdr" : "Coding agent")
+    return String(source.title || "").trim()
+      || (kind === "herdr-state"
+        ? String(source.serverLabel || "").trim() || "Herdr" : "Coding agent")
   var windowTitle = String(source.windowTitle || "").trim() || "Untitled window"
   if (kind === "window" && source.isHerdr === true) {
     var herdrLabel = String(source.herdrLabel || "").trim()

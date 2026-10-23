@@ -438,6 +438,7 @@ function settingsDefaults() {
     interfaceAnimationsEnabled: true,
     browserProfileBadgesEnabled: true,
     dockHerdrIndicators: false,
+    dockT3Indicators: false,
     windowIconOverrides: []
   }
 }
@@ -778,6 +779,7 @@ function normalizeSetting(key, value) {
   case "interfaceAnimationsEnabled":
   case "browserProfileBadgesEnabled":
   case "dockHerdrIndicators":
+  case "dockT3Indicators":
   case "sidebarBrowserTabsEnabled":
     return typeof value === "boolean" ? value : defaults[key]
   case "backgroundColor":
@@ -1583,7 +1585,8 @@ var classicOnlySettings = [
   "magnificationRadius",
   "urgentWindowAnimationEnabled",
   "showUrgentOutsideScope",
-  "dockHerdrIndicators"
+  "dockHerdrIndicators",
+  "dockT3Indicators"
 ]
 
 function inactiveClassicSettings(hasSidebar) {
