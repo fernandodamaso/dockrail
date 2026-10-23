@@ -71,8 +71,8 @@ class RpcSession:
         if self.last_ping_at is None or now - self.last_ping_at >= PING_EVERY:
             self._send({"_tag": "Ping"})
             self.last_ping_at = now
-            if self.ping_sent_at is None:
-                self.ping_sent_at = now
+            # Each ping starts a new acknowledgement deadline.
+            self.ping_sent_at = now
         if (
             self.ping_sent_at is not None
             and (self.pong_seen_at is None or self.pong_seen_at < self.ping_sent_at)

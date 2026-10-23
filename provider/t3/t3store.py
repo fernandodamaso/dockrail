@@ -83,16 +83,17 @@ def load(path: str | Path) -> dict[str, Any] | None:
     except (OSError, ValueError):
         raise StoreError("store_untrusted")
     try:
-        file_stat = os.fstat(fd)
-        if not stat.S_ISREG(file_stat.st_mode):
-            raise StoreError("store_untrusted")
-        if file_stat.st_uid != os.getuid():
-            raise StoreError("store_untrusted")
-        if file_stat.st_mode & 0o077:
-            raise StoreError("store_untrusted")
-        if file_stat.st_size > MAX_STORE_BYTES:
-            raise StoreError("store_untrusted")
+        # Adopt the descriptor before validating it: all rejection paths close it.
         with os.fdopen(fd, "r", encoding="utf-8") as handle:
+            file_stat = os.fstat(handle.fileno())
+            if not stat.S_ISREG(file_stat.st_mode):
+                raise StoreError("store_untrusted")
+            if file_stat.st_uid != os.getuid():
+                raise StoreError("store_untrusted")
+            if file_stat.st_mode & 0o077:
+                raise StoreError("store_untrusted")
+            if file_stat.st_size > MAX_STORE_BYTES:
+                raise StoreError("store_untrusted")
             raw = handle.read(MAX_STORE_BYTES + 1)
     except StoreError:
         raise

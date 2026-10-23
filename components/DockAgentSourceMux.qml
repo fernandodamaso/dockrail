@@ -26,6 +26,7 @@ Item {
   property var lagging: ({})
   property var focusRoutes: ({})
   property int pendingRevision: -1
+  property bool lagDeadlineReached: false
   property var lastMerged: null
 
   function publishLease(lease, status, data) {
@@ -134,7 +135,8 @@ Item {
           delete root.lagging[entry.id]
           root.purgeFocusRoutes(entry.id)
           lease = null
-          if (root.pendingRevision >= 0) lagTimer.restart()
+          if (root.pendingRevision >= 0 && !root.lagDeadlineReached && !lagTimer.running)
+            lagTimer.start()
         }
         if (!entry.service) {
           if (lease) {
@@ -183,7 +185,8 @@ Item {
 
   function childChanged(sourceId) {
     root.updateSourceEpoch()
-    if (root.pendingRevision >= 0) lagTimer.restart()
+    if (root.pendingRevision >= 0 && !root.lagDeadlineReached && !lagTimer.running)
+      lagTimer.start()
     root.republish()
   }
 
@@ -234,8 +237,11 @@ Item {
       // A lone source is never lagging: Herdr alone keeps today's wait.
       // A lone current source also ends the race.
       for (var stale in root.lagging) delete root.lagging[stale]
-      if (candidates.length === 1 && current[candidates[0]])
+      if (candidates.length === 1 && current[candidates[0]]) {
         root.pendingRevision = -1
+        root.lagDeadlineReached = false
+        lagTimer.stop()
+      }
       return
     }
     // No current evidence anywhere: keep waiting, exclude nothing.
@@ -244,12 +250,18 @@ Item {
     for (var j = 0; j < candidates.length; j++) {
       if (current[candidates[j]]) delete root.lagging[candidates[j]]
       else {
-        root.lagging[candidates[j]] = true
+        // Keep both inventories during the grace interval, even if one
+        // provider already echoed the requested window revision.
+        if (root.lagDeadlineReached) root.lagging[candidates[j]] = true
         allCurrent = false
       }
     }
     // Every enabled source current: the race is over.
-    if (allCurrent) root.pendingRevision = -1
+    if (allCurrent) {
+      root.pendingRevision = -1
+      root.lagDeadlineReached = false
+      lagTimer.stop()
+    }
   }
 
   function republish() {
@@ -309,6 +321,7 @@ Item {
     // A repeated send for the same revision must not postpone the deadline.
     if (revision !== root.pendingRevision) {
       root.pendingRevision = revision
+      root.lagDeadlineReached = false
       for (var id in root.lagging) delete root.lagging[id]
       lagTimer.restart()
     }
@@ -392,7 +405,10 @@ Item {
     id: lagTimer
     interval: 2000
     repeat: false
-    onTriggered: root.republish()
+    onTriggered: {
+      root.lagDeadlineReached = true
+      root.republish()
+    }
   }
 
   Component.onDestruction: {

@@ -320,20 +320,73 @@ def write_connection(record: dict[str, Any], path: Path | None = None) -> Path:
     return target
 
 
+MAX_STORE_BYTES = 64 * 1024
+
+
+def _reject_store_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    record: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in record:
+            raise ValueError("duplicate pairing key")
+        record[key] = value
+    return record
+
+
 def read_connection(path: Path | None = None) -> dict[str, Any] | None:
-    """Read the connection record without trusting its permissions blindly."""
+    """Apply the same fail-closed file and schema checks as provider/t3/t3store.
+
+    Kept self-contained for CLI-only installs without provider/t3.
+    """
     target = path if path is not None else connection_path()
     try:
-        raw = target.read_bytes()
+        os.lstat(target)
     except FileNotFoundError:
         return None
-    except OSError:
+    except (OSError, ValueError):
         raise CliError("store_untrusted", "cannot read the pairing file")
     try:
-        record = json.loads(raw.decode("utf-8"))
+        directory = os.lstat(target.parent)
+    except (OSError, ValueError):
+        raise CliError("store_untrusted", "cannot trust the pairing directory")
+    if (not stat.S_ISDIR(directory.st_mode) or stat.S_ISLNK(directory.st_mode)
+            or directory.st_uid != os.getuid() or directory.st_mode & 0o077):
+        raise CliError("store_untrusted", "cannot trust the pairing directory")
+    try:
+        fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        raise CliError("store_untrusted", "cannot trust the pairing file")
+    try:
+        with os.fdopen(fd, "r", encoding="utf-8") as handle:
+            info = os.fstat(handle.fileno())
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                    or info.st_mode & 0o077 or info.st_size > MAX_STORE_BYTES):
+                raise CliError("store_untrusted", "cannot trust the pairing file")
+            raw = handle.read(MAX_STORE_BYTES + 1)
+    except CliError:
+        raise
+    except (OSError, ValueError, UnicodeError):
+        raise CliError("store_untrusted", "cannot read the pairing file")
+    if len(raw) > MAX_STORE_BYTES:
+        raise CliError("store_untrusted", "cannot trust the pairing file")
+    try:
+        record = json.loads(raw, object_pairs_hook=_reject_store_duplicates)
     except (ValueError, UnicodeError):
         raise CliError("store_invalid", "the pairing file is invalid; pair again")
-    if not isinstance(record, dict):
+    valid = isinstance(record, dict)
+    if valid:
+        valid = (record.get("version") == 1 and not isinstance(record.get("version"), bool)
+                 and all(isinstance(record.get(key), str) and bool(record[key])
+                         for key in ("environmentId", "label", "url", "token"))
+                 and all(isinstance(record.get(key), int)
+                         and not isinstance(record[key], bool) and record[key] > 0
+                         for key in ("expiresAt", "pairedAt")))
+    if not valid:
+        raise CliError("store_invalid", "the pairing file is invalid; pair again")
+    try:
+        check_endpoint(record["url"])
+    except CliError:
         raise CliError("store_invalid", "the pairing file is invalid; pair again")
     return record
 

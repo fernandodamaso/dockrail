@@ -160,6 +160,20 @@ class RpcTests(unittest.TestCase):
             rpc.poll(5.0)
         self.assertEqual(ctx.exception.code, "offline")
 
+    def test_new_ping_requires_new_pong(self) -> None:
+        ws = OrderWs("", "")
+        rpc = RpcSession(ws)  # type: ignore[arg-type]
+        rpc.last_ping_at = 0.0
+        first = t3rpc.PING_EVERY + 1.0
+        rpc._check_ping(first)
+        self.assertEqual(rpc.ping_sent_at, first)
+        rpc.pong_seen_at = first + 0.1
+        second = first + t3rpc.PING_EVERY + 1.0
+        rpc._check_ping(second)
+        self.assertEqual(rpc.ping_sent_at, second)
+        with self.assertRaises(Failure):
+            rpc._check_ping(second + t3rpc.PONG_WITHIN + 1.0)
+
     def test_pong_keeps_session_alive(self) -> None:
         old_every, old_within = t3rpc.PING_EVERY, t3rpc.PONG_WITHIN
         t3rpc.PING_EVERY, t3rpc.PONG_WITHIN = 0.2, 30.0

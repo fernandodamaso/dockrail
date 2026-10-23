@@ -138,6 +138,23 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["environmentId"], ENV)
         self.assertNotIn(TOKEN, status.stdout)
 
+    def test_status_rejects_untrusted_and_invalid_connection(self) -> None:
+        self.write_fake_t3()
+        fake = self.start_fake()
+        self.assertEqual(self.run_cli("pair", "--url", fake.url).returncode, 0)
+        target = self.conn_path()
+        target.chmod(0o644)
+        rejected = self.run_cli("status", "--json")
+        self.assertEqual(rejected.returncode, 1)
+        self.assertEqual(json.loads(rejected.stdout)["reason"], "store_untrusted")
+        target.chmod(0o600)
+        record = json.loads(target.read_text())
+        record.pop("token")
+        target.write_text(json.dumps(record))
+        malformed = self.run_cli("status", "--json")
+        self.assertEqual(malformed.returncode, 1)
+        self.assertEqual(json.loads(malformed.stdout)["reason"], "store_invalid")
+
     def test_unpair_deletes_and_hints_revoke(self) -> None:
         self.write_fake_t3()
         fake = self.start_fake()
