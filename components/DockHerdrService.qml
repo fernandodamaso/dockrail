@@ -22,8 +22,9 @@ Item {
   signal focusAgentFinished(string requestId, bool ok, string errorCode)
   readonly property bool running: providerProcess.running
   readonly property bool available: providerPath.length > 0
+  property string providerRelativePath: "../provider/herdr/bin/smartdock-herdr-provider"
   readonly property string providerPath: localPath(
-    Qt.resolvedUrl("../provider/herdr/bin/smartdock-herdr-provider"))
+    Qt.resolvedUrl(root.providerRelativePath))
 
   function localPath(url) {
     var value = String(url || "")
