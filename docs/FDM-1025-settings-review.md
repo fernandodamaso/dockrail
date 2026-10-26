@@ -104,9 +104,10 @@ Driver: hypruse 0.13.0 shell verbs from source (rootless, `HYPRUSE_JOURNAL=1`; j
 - Dock Controls route: left-click Controls → menu with gear-glyphed `Dockrail Settings…` after separator (17) → click opens panel (18).
 - Editing slot: right-click dock icon while panel open hits the panel's dismissal veil (panel closes, 19) — dock unreachable while open, by design. With panel closed: app menu → Change Icon… opens dialog (22, 23); `dockrail settings` then closes dialog and opens panel (24).
 - Per-row Reset rows render with defaults (11, 28); reset behavior itself covered headlessly.
+- Invalid config on the live host: wrote `{bad` to the real `dock.json` → `loadState: invalid`, write attempt rejected `E_CONFIG_INVALID` with nothing changed (last-good retained); panel opens showing the read-only banner with live values (30, 31); restored the byte-exact backup → `loaded`, banner clears live with no reopen (32); post-restore export diff empty.
 - Settings after all native writes byte-identical to pre-test backup (`config export` diff empty); status idle/persisted.
 
-Explicitly NOT covered natively (no sidebar surface, one monitor): sidebar/icon-rail gear (removed per owner decision), Widget-manager footer entry, multi-monitor matrix, `E_CONFIG_INVALID` (not deliberately breaking the live config), screen-reader announcements, `c` clipboard copy (skipped to preserve owner clipboard).
+Explicitly NOT covered natively (no sidebar surface, one monitor): sidebar/icon-rail gear (removed per owner decision), Widget-manager footer entry, multi-monitor matrix, persistence-failure injection, screen-reader announcements, `c` clipboard copy (skipped to preserve owner clipboard).
 
 ### Owner-directed change (2026-10-26, live desktop review)
 
