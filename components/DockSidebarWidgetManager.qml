@@ -3,6 +3,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui as Ui
 import "DockSidebarWidgetModel.js" as WidgetModel
+import "DockSettingsWidgetsModel.js" as SettingsWidgets
 
 // Panel-owned Widget management popup. This intentionally lives outside the
 // independent Widget pane so Add/Manage remains available even when there are
@@ -15,8 +16,11 @@ Item {
   required property var viewport
 
   readonly property var popupWindow: managerPopup
-  readonly property var registeredRows: WidgetModel.manageableRows(
-    controller.widgetRegistry, controller.widgetIds)
+  readonly property var registeredRows: SettingsWidgets.rows(
+    controller.widgetRegistry, controller.widgetIds,
+    !!(panel.host && panel.host.settingsDeveloperBuild)).filter(function(row) {
+      return row.registered
+    })
 
   property bool managerOpen: false
   property Item managerAnchor: null
@@ -192,7 +196,7 @@ Item {
 
       Ui.Button {
         width: parent.width
-        text: "Open Settings…"
+        text: "Manage in Settings…"
         tooltipText: "Manage all Dockrail preferences"
         onClicked: {
           var anchor = root.managerAnchor

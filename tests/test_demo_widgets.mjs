@@ -5,10 +5,11 @@ import test from 'node:test'
 const read = path => fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8')
 const ids = ['demo.display', 'demo.lists', 'demo.inputs', 'demo.actions-states']
 
-test('branch host exposes the source-owned demo registry', () => {
+test('source-owned demo registry is gated by an explicit development session', () => {
   const host = read('DockHost.qml')
   assert.match(host, /DockDemoWidgetRegistry\s*\{/)
-  assert.match(host, /demoWidgetRegistry\.descriptors/)
+  assert.match(host, /root\.settingsDeveloperBuild \? demoWidgetRegistry\.descriptors : \(\{\}\)/)
+  assert.match(host, /Quickshell\.env\("DOCKRAIL_DEV_BUILD"\)/)
   assert.match(host, /registry\["herdr\.agents"\]/)
   const registry = read('components/DockDemoWidgetRegistry.qml')
   for (const id of ids) assert.match(registry, new RegExp(id.replace(/[.-]/g, '\\$&')))

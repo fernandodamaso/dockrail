@@ -29,7 +29,8 @@ Item {
   readonly property alias layoutView: layoutSection
   readonly property var activeSectionView: selectedSection === "layout" ? layoutSection
     : selectedSection === "appearance" ? appearanceSection
-    : selectedSection === "behavior" ? behaviorSection : null
+    : selectedSection === "behavior" ? behaviorSection
+    : selectedSection === "sidebar-widgets" ? widgetsSection : null
   readonly property alias keyCatcher: keyboard
   TextEdit { id: clipboard; visible: false }
 
@@ -68,6 +69,7 @@ Item {
     if (layoutSection) layoutSection.cancelPending()
     if (appearanceSection) appearanceSection.cancelPending()
     if (behaviorSection) behaviorSection.cancelPending()
+    if (widgetsSection) widgetsSection.cancelPending()
     panelOpen = false
     showHelp = false
     if (root.host && root.host.releaseSettingsPanel)
@@ -310,9 +312,28 @@ Item {
                     settingsScroll.contentY = Math.max(0, point.y + item.height - settingsScroll.height)
                 }
               }
+              DockSettingsWidgetsSection {
+                id:widgetsSection
+                width:parent.width
+                panelActive:root.panelOpen
+                visible:root.selectedSection === "sidebar-widgets"
+                host:root.host
+                metadata:root.metadata
+                onFocusSettings:root.focusPane="settings"
+                onFocusSections:{root.focusPane="sections";keyboard.forceActiveFocus()}
+                onChanged:root.rowFeedback=""
+                onOpenFeatures:root.selectSection("features")
+                onReveal:function(item) {
+                  var point=item.mapToItem(layoutHost,0,0)
+                  if(point.y<settingsScroll.contentY) settingsScroll.contentY=point.y
+                  else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
+                    settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
+                }
+              }
               Text {
                 visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
                   && root.selectedSection !== "behavior"
+                  && root.selectedSection !== "sidebar-widgets"
                 width: parent.width
                 text: root.selectedSection === "sidebar-widgets"
                   ? "Sidebar & Widgets controls will be added in SET-05. Layout is available now."
@@ -324,6 +345,7 @@ Item {
               Ui.Button {
                 visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
                   && root.selectedSection !== "behavior"
+                  && root.selectedSection !== "sidebar-widgets"
                 text: "Open Layout"
                 onClicked: root.selectSection("layout")
               }
