@@ -26,7 +26,7 @@ Item {
 
   function protectedId(value) {
     return ["demo.display", "demo.lists", "demo.inputs", "demo.actions-states",
-      "herdr.agents"].indexOf(value) >= 0
+      "herdr.agents", "t3.threads"].indexOf(value) >= 0
   }
 
   function validRevision(value) {

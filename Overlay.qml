@@ -30,6 +30,7 @@ Item {
         launcherBadgeService: root.pluginService.launcherBadgeService
         browserProfileService: root.pluginService.browserProfileService
         herdrService: root.pluginService.herdrService
+        t3Service: root.pluginService.t3Service
       }
     }
   }

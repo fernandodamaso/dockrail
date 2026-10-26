@@ -523,10 +523,15 @@ Item {
       return service.tabs || ({})
     })()
     var herdrView = root.widgetView("herdr.agents")
+    var t3View = root.widgetView("t3.threads")
     var herdrSnapshot = root.herdrWindowAgents && root.herdrWindowAgents.snapshotReady
       ? root.herdrWindowAgents.snapshot : null
-    var herdrVerified = !!(root.herdrWindowAgents
-      && root.herdrWindowAgents.snapshotReady && herdrView && herdrView.active)
+    var ready = !!(root.herdrWindowAgents && root.herdrWindowAgents.snapshotReady)
+    var herdrActive = !!herdrView && herdrView.active
+    var t3Active = !!t3View && t3View.active
+    var herdrVerified = ready && (herdrActive || t3Active)
+    var verifiedSources = { herdr: ready && herdrActive, t3: ready && t3Active,
+                            t3Present: t3Active }
     var projectInput = {
       desktop: desktop, screens: root.screens,
       monitors: root.monitors, monitorOrder: root.settings.workspaceMonitorOrder || [],
@@ -542,7 +547,8 @@ Item {
       browserTabs: browserTabs,
       herdrSnapshot: herdrSnapshot,
       herdrAssociations: root.herdrAssociations,
-      herdrAssociationsVerified: herdrVerified
+      herdrAssociationsVerified: herdrVerified,
+      herdrVerifiedSources: verifiedSources
     }
     var projected = SidebarModel.project(Object.assign({}, projectInput, { collapsed: false }))
     var railProjected = SidebarModel.project(Object.assign({}, projectInput, { collapsed: true }))
