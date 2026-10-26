@@ -69,20 +69,18 @@ def _is_subagent(thread: dict[str, Any]) -> bool:
 
 
 def unread(thread: dict[str, Any]) -> bool:
-    """True when the latest run completed after the thread was last visited."""
+    """True when the latest completion has not been visited or settled."""
     completed = thread.get("latestRunCompletedAt")
     if not isinstance(completed, str) or not completed:
         return False
     completed_ms = _parse_ms(completed)
     if completed_ms is None:
         return False
-    visited = thread.get("lastVisitedAt")
-    if not isinstance(visited, str) or not visited:
-        return True
-    visited_ms = _parse_ms(visited)
-    if visited_ms is None:
-        return True
-    return visited_ms < completed_ms
+    for field in ("lastVisitedAt", "settledAt"):
+        acknowledged_ms = _parse_ms(thread.get(field))
+        if acknowledged_ms is not None and acknowledged_ms >= completed_ms:
+            return False
+    return True
 
 
 def classify(thread: dict[str, Any], now_ms: int) -> str:
