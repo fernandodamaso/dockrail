@@ -137,7 +137,7 @@ Column {
     enabled: root.editable
     onChanged: value => root.choose(value)
   }
-  Ui.Dropdown {
+  Ui.SearchableDropdown {
     id: chooser
     visible: !root.isWidth
     width: Math.min(root.width,Style.space(300))
@@ -163,27 +163,16 @@ Column {
     onMoved: value => {root.beginEdit();root.draftWidth=value}
     onReleased: value => {root.beginEdit();root.draftWidth=value;root.commitPair(value,true)}
   }
-  Ui.BorderSurface {
+  Ui.TextField {
+    id: customHex
     visible: !root.isWidth && (root.customOpen || (root.flag && root.selection === "custom"))
     width: Math.min(root.width,Style.space(300))
-    height: Style.space(36)
-    color: Color.background
-    borderSpec: Border.surfaceSpec("popups","border",Color.foreground,1)
-    radius: Style.cornerRadius
-    TextInput {
-      id: customHex
-      anchors.fill: parent
-      anchors.margins: Style.space(8)
-      text: root.flag && root.selection === "custom" ? String(root.current) : ""
-      color: Color.foreground
-      font.family: Style.font.family
-      font.pixelSize: Style.font.body
-      selectByMouse: true
-      enabled: root.editable
-      onActiveFocusChanged: if (activeFocus) root.beginEdit()
-      onAccepted: root.saveHex()
-      Keys.onEscapePressed: {root.reloadDraft();root.forceActiveFocus()}
-    }
+    placeholderText: "#RRGGBB or #AARRGGBB"
+    text: root.flag && root.selection === "custom" ? String(root.current) : ""
+    enabled: root.editable
+    onActiveFocusChanged: if (activeFocus) root.beginEdit()
+    onAccepted: root.saveHex()
+    Keys.onEscapePressed: {root.reloadDraft();root.forceActiveFocus()}
   }
   Ui.Button {
     visible: !root.isWidth && root.customOpen
