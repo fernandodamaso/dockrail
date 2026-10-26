@@ -116,7 +116,7 @@ Item {
               text:card.classicCard ? (root.classicUsed ? "Classic dock" : "Classic dock · Not in use") : "Dock and sidebar"
               wrapMode:Text.WordWrap
               color:Color.foreground
-              opacity:0.75
+              opacity:0.9
               font.family:Style.font.family
               font.pixelSize:Style.font.caption
             }
