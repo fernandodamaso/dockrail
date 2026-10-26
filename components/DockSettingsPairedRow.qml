@@ -72,8 +72,13 @@ Column {
   function choose(value) {
     if (value === "default") { customOpen = false; commitPair(current, false); return }
     if (value === "custom") {
-      customOpen = true
-      beginEdit()
+      if (isWidth) {
+        customOpen = false
+        commitPair(current, true)
+      } else {
+        customOpen = true
+        beginEdit()
+      }
       return
     }
     customOpen = false
