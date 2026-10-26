@@ -155,7 +155,8 @@ Column {
   }
   function options() {
     return (spec.enum || []).map(function(value) { return {value:value,
-      label:ui.optionLabels && ui.optionLabels[value] || value} })
+      label:(ui.optionLabels && ui.optionLabels[value] || value)
+        + (ui.destructiveOptions && ui.destructiveOptions.indexOf(value) >= 0 ? " · destructive" : "")} })
   }
   Timer { id: highlight; interval:3000; onTriggered: root.changedElsewhere = false }
   Timer { id: keyboardCommit; interval:400; onTriggered: root.commitDraft() }
