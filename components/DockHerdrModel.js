@@ -377,6 +377,31 @@ function serverFocusAgentSupported(server) {
     && !serverNeedsFocusUpgrade(server))
 }
 
+function serverSource(server) {
+  if (server && typeof server === "object" && server.source === "t3")
+    return "t3"
+  return "herdr"
+}
+
+function serverProduct(server) {
+  if (serverSource(server) === "t3") {
+    var product = server && typeof server === "object"
+      ? cleanDisplayText(server.product) : ""
+    return product || "T3 Code"
+  }
+  return "Herdr"
+}
+
+function agentNoun(server) {
+  return serverSource(server) === "t3" ? "thread" : "agent"
+}
+
+function focusHint(server) {
+  return serverSource(server) === "t3"
+    ? "Click a row to open T3 Code."
+    : "Click a row to focus its pane."
+}
+
 function serverDisplayLabel(server) {
   var source = server && typeof server === "object" ? server : ({})
   if (serverTransport(source) !== "remote") {
