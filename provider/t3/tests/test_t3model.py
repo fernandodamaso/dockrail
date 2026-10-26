@@ -151,6 +151,27 @@ class ClassifyTests(unittest.TestCase):
             )
         )
 
+    def test_unread_respects_visit_and_settlement_timestamps(self) -> None:
+        before = "2026-10-23T14:00:00Z"
+        completed = "2026-10-23T15:00:00Z"
+        after = "2026-10-23T16:00:00Z"
+        for visited, settled, expected in (
+            (None, completed, False),
+            (before, after, False),
+            ("invalid", completed, False),
+            (after, before, False),
+            (completed, "invalid", False),
+            (None, "2026-10-23T12:00:00-03:00", False),
+            (before, before, True),
+            (None, "invalid", True),
+            (None, None, True),
+        ):
+            with self.subTest(visited=visited, settled=settled):
+                self.assertEqual(unread(thread(
+                    latestRunCompletedAt=completed,
+                    lastVisitedAt=visited, settledAt=settled,
+                )), expected)
+
 
 class VisibilityTests(unittest.TestCase):
     def store_with(self, *threads: dict[str, object]) -> ShellStore:
@@ -452,6 +473,57 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(counts["agents"], 2)
         self.assertEqual(counts["servers"], 1)
         self.assertEqual(counts["unknown"], 0)
+
+    def test_failure_attention_tracks_settlement(self) -> None:
+        for lineage in (None, {"relationshipToParent": "subagent"}):
+            for settled, expected in (
+                ("2026-10-23T15:00:00Z", {}),
+                ("2026-10-23T16:00:00Z", {}),
+                ("2026-10-23T14:00:00Z", {"failure": "blocked"}),
+                ("invalid", {"failure": "blocked"}),
+                (None, {"failure": "blocked"}),
+            ):
+                with self.subTest(lineage=lineage, settled=settled):
+                    store = ShellStore()
+                    store.threads["failure"] = thread(
+                        id="failure", status="failed", lineage=lineage,
+                        latestRunCompletedAt="2026-10-23T15:00:00Z",
+                        settledAt=settled,
+                    )
+                    snapshot = live_snapshot(store)
+                    for key in ("agents", "attention"):
+                        self.assertEqual(
+                            {row["paneId"]: row["status"] for row in snapshot[key]},
+                            expected,
+                        )
+                    self.assertEqual(snapshot["liveCounts"]["blocked"], len(expected))
+                    self.assertEqual(snapshot["liveCounts"]["agents"], len(expected))
+
+    def test_settlement_does_not_hide_active_subagent_work(self) -> None:
+        for active, status in (
+            ({"pendingRuntimeRequest": {"kind": "approval"}}, "blocked"),
+            ({"hasActionableProposedPlan": True}, "blocked"),
+            ({"status": "running"}, "working"),
+            ({"activityRunStatus": "running"}, "working"),
+            ({"pendingBackgroundTasks": [{"kind": "task"}]}, "working"),
+        ):
+            with self.subTest(active=active):
+                store = ShellStore()
+                t = thread(
+                    id="active", status="failed",
+                    latestRunCompletedAt="2026-10-23T15:00:00Z",
+                    settledAt="2026-10-23T16:00:00Z",
+                    lineage={"relationshipToParent": "subagent"},
+                )
+                t.update(active)
+                store.threads["active"] = t
+                snapshot = live_snapshot(store)
+                self.assertEqual(
+                    [(row["paneId"], row["status"]) for row in snapshot["agents"]],
+                    [("active", status)],
+                )
+                self.assertEqual(snapshot["liveCounts"][status], 1)
+                self.assertEqual(len(snapshot["attention"]), int(status == "blocked"))
 
     def test_state_change_seq_stable_until_status_changes(self) -> None:
         store = ShellStore()

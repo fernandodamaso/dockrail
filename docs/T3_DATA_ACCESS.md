@@ -67,12 +67,14 @@ Thread states map to the shared agent states as follows:
 | approval or input requested, actionable plan waiting | blocked |
 | preparing, starting, running or waiting (run or status) | working |
 | background tasks pending | working |
-| failed run you have not opened | blocked |
-| completed run you have not opened | done |
+| failed run you have not opened or settled | blocked |
+| completed run you have not opened or settled | done |
 | everything else (usage-limited, stopped, read) | idle |
 
-Subagent threads appear only while blocked or working; settled or snoozed
-threads are hidden. Clicking a thread raises the T3 Code window; there is no
+Subagent threads appear only while blocked or working. Settlement acknowledges
+runs completed at or before that timestamp; a later failure, active request or
+ongoing work can still appear. Settled inactive threads and snoozed threads are
+hidden. Clicking a thread raises the T3 Code window; there is no
 per-thread deep link and no thread actions.
 
 ## Limits
