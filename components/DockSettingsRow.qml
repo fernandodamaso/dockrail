@@ -188,7 +188,7 @@ Column {
     width: parent.width
     visible: !root.dependency.enabled || JSON.stringify(root.current) !== JSON.stringify(root.shown)
     text: !root.dependency.enabled ? root.dependency.reason + "; your choice is kept."
-      : String(root.current) + (root.ui.unit || "") + " → shows " + String(root.shown) + (root.ui.unit || "")
+      : Registry.displayValue(root.ui, root.current) + " → shows " + Registry.displayValue(root.ui, root.shown)
     wrapMode: Text.WordWrap
     font.italic: true
     font.family: Style.font.family
@@ -292,6 +292,16 @@ Column {
     onDraggingChanged: if (dragging) root.beginEdit()
     onMoved: value => { root.beginEdit(); root.draft = value }
     onReleased: value => { root.beginEdit(); root.draft = value; root.commitDraft() }
+  }
+  Text {
+    visible: root.ui.control === "slider"
+    width: parent.width
+    text: Registry.displayValue(root.ui, Number(root.editing ? root.draft : root.current))
+    color: Color.foreground
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    Accessible.role: Accessible.StaticText
+    Accessible.name: root.ui.label + ": " + text
   }
   Text {
     visible: root.changedElsewhere || root.feedback !== "" || root.writerBusy
