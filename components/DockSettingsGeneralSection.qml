@@ -131,7 +131,7 @@ Item {
               required property var modelData
               readonly property bool paired: modelData.ui.pairedWith !== undefined
               property alias normalControl:normal
-              property alias pairedControl:paired
+              property alias pairedControl:pairedEditor
               width:cardBody.width
               spacing:Style.space(5)
               DockSettingsRow {
@@ -149,7 +149,7 @@ Item {
                 function command(){return Registry.cliCommand(key,current)}
               }
               DockSettingsPairedRow {
-                id:paired
+                id:pairedEditor
                 visible:entry.paired
                 width:parent.width
                 row:entry.modelData
@@ -171,7 +171,7 @@ Item {
                     required property var modelData
                     spacing:Style.space(8)
                     Text {
-                      text:JSON.stringify(parent.modelData)
+                      text: parent.modelData.desktopId + " · " + parent.modelData.workspace
                       width:cardBody.width-Style.space(110)
                       elide:Text.ElideRight
                       color:Color.foreground
@@ -182,7 +182,7 @@ Item {
                       onClicked: {
                         var pair=parent.modelData
                         var result=Registry.writeOutcome(root.host.ungroupWorkspaceApplication(
-                          pair.desktopId || pair.appId, pair.workspace))
+                          pair.desktopId, pair.workspace))
                         if(result.accepted) root.changed()
                       }
                     }
