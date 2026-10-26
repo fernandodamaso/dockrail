@@ -26,6 +26,9 @@ Item {
   property int savedRevision: 0
   property string focusPane: "sections"
   readonly property alias layoutView: layoutSection
+  readonly property var activeSectionView: selectedSection === "layout" ? layoutSection
+    : selectedSection === "appearance" ? appearanceSection
+    : selectedSection === "behavior" ? behaviorSection : null
   readonly property alias keyCatcher: keyboard
   TextEdit { id: clipboard; visible: false }
 
@@ -61,7 +64,9 @@ Item {
   }
   function close() {
     if (!panelOpen) return
-    if (layoutSection && layoutSection.cancelPending) layoutSection.cancelPending()
+    if (layoutSection) layoutSection.cancelPending()
+    if (appearanceSection) appearanceSection.cancelPending()
+    if (behaviorSection) behaviorSection.cancelPending()
     panelOpen = false
     showHelp = false
     if (root.host && root.host.releaseSettingsPanel)
@@ -116,13 +121,13 @@ Item {
     focusTarget: keyboard
     Ui.PanelKeyCatcher {
       id: keyboard
-      Shortcut { sequence: "Alt+Up"; enabled: root.panelOpen && root.selectedSection === "layout" && root.focusPane === "settings"; onActivated: layoutSection.reorderSelected(-1) }
-      Shortcut { sequence: "Alt+Down"; enabled: root.panelOpen && root.selectedSection === "layout" && root.focusPane === "settings"; onActivated: layoutSection.reorderSelected(1) }
+      Shortcut { sequence: "Alt+Up"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(-1) }
+      Shortcut { sequence: "Alt+Down"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(1) }
       width: panel.contentWidth
       height: panel.contentHeight
-      blocked: layoutSection.popupOpen || layoutSection.editorFocused
+      blocked: !!root.activeSectionView && (root.activeSectionView.popupOpen || root.activeSectionView.editorFocused)
       onCloseRequested: {
-        if (layoutSection.dismissEditor()) return
+        if (root.activeSectionView && root.activeSectionView.dismissEditor()) return
         if (root.showHelp) {root.showHelp=false;return}
         root.close()
       }
@@ -132,20 +137,21 @@ Item {
             var next = Registry.order.indexOf(root.selectedSection) + dy
             root.selectSection(Registry.order[Math.max(0,Math.min(Registry.order.length-1,next))])
           }
-        } else if (root.selectedSection === "layout") {
-          if (dy) layoutSection.moveCursor(dy)
-          else layoutSection.adjust(dx)
+        } else if (root.activeSectionView) {
+          if (dy) root.activeSectionView.moveCursor(dy)
+          else root.activeSectionView.adjust(dx)
         }
       }
-      onActivateRequested: if (root.focusPane === "settings" && root.selectedSection === "layout") layoutSection.activate()
+      onActivateRequested: if (root.focusPane === "settings" && root.activeSectionView) root.activeSectionView.activate()
       onTabRequested: function(direction) {
         root.focusPane = root.focusPane === "sections" ? "settings" : "sections"
-        if(root.focusPane === "settings") layoutSection.focusTarget(layoutSection.cursor)
+        if(root.focusPane === "settings" && root.activeSectionView)
+          root.activeSectionView.focusTarget(root.activeSectionView.cursor)
       }
       onTextKey: function(key) {
         if (key === "?") root.showHelp = !root.showHelp
-        else if (key === "c" && root.focusPane === "settings" && root.selectedSection === "layout") {
-          clipboard.text = layoutSection.copyCommand()
+        else if (key === "c" && root.focusPane === "settings" && root.activeSectionView) {
+          clipboard.text = root.activeSectionView.copyCommand()
           clipboard.selectAll(); clipboard.copy()
         } else if (key === "/") root.rowFeedback = "Search will be available in SET-08."
       }
@@ -268,8 +274,45 @@ Item {
                     settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
                 }
               }
+              DockSettingsGeneralSection {
+                id: appearanceSection
+                section: "appearance"
+                panelActive: root.panelOpen
+                width: parent.width
+                visible: root.selectedSection === "appearance"
+                host: root.host
+                metadata: root.metadata
+                onFocusSettings: root.focusPane = "settings"
+                onFocusSections: { root.focusPane = "sections"; keyboard.forceActiveFocus() }
+                onChanged: root.rowFeedback = ""
+                onReveal: function(item) {
+                  var point = item.mapToItem(layoutHost,0,0)
+                  if (point.y < settingsScroll.contentY) settingsScroll.contentY = point.y
+                  else if (point.y + item.height > settingsScroll.contentY + settingsScroll.height)
+                    settingsScroll.contentY = Math.max(0, point.y + item.height - settingsScroll.height)
+                }
+              }
+              DockSettingsGeneralSection {
+                id: behaviorSection
+                section: "behavior"
+                panelActive: root.panelOpen
+                width: parent.width
+                visible: root.selectedSection === "behavior"
+                host: root.host
+                metadata: root.metadata
+                onFocusSettings: root.focusPane = "settings"
+                onFocusSections: { root.focusPane = "sections"; keyboard.forceActiveFocus() }
+                onChanged: root.rowFeedback = ""
+                onReveal: function(item) {
+                  var point = item.mapToItem(layoutHost,0,0)
+                  if (point.y < settingsScroll.contentY) settingsScroll.contentY = point.y
+                  else if (point.y + item.height > settingsScroll.contentY + settingsScroll.height)
+                    settingsScroll.contentY = Math.max(0, point.y + item.height - settingsScroll.height)
+                }
+              }
               Text {
-                visible: root.selectedSection !== "layout"
+                visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
+                  && root.selectedSection !== "behavior"
                 width: parent.width
                 text: root.selectedSection === "sidebar-widgets"
                   ? "Sidebar & Widgets controls will be added in SET-05. Layout is available now."
@@ -279,7 +322,8 @@ Item {
                 color: Color.foreground
               }
               Ui.Button {
-                visible: root.selectedSection !== "layout"
+                visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
+                  && root.selectedSection !== "behavior"
                 text: "Open Layout"
                 onClicked: root.selectSection("layout")
               }
