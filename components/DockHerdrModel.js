@@ -398,7 +398,7 @@ function agentNoun(server) {
 
 function focusHint(server) {
   return serverSource(server) === "t3"
-    ? "Click a row to open T3 Code."
+    ? "Click a row to open this thread in T3 Code."
     : "Click a row to focus its pane."
 }
 

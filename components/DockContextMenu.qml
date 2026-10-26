@@ -1358,7 +1358,7 @@ PopupWindow {
               Accessible.name: String(parent.modelData.title || "")
               Accessible.description: parent.modelData.enabled !== false
                 ? (String(parent.modelData.product || "Herdr") === "T3 Code"
-                  ? "Open T3 Code" : "Focus this Herdr agent pane") : "Remote Herdr agent"
+                  ? "Open this T3 thread" : "Focus this Herdr agent pane") : "Remote Herdr agent"
               Accessible.onPressAction: if (parent.modelData.enabled !== false)
                 root.dispatchAction(parent.modelData, parent.index)
 
