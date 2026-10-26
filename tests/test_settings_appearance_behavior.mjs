@@ -82,4 +82,11 @@ assert.match(section,/opacity:0\.9/, 'semantic classic chip hint is readable in 
 assert.match(pairQml,/Ui\.TextField/, 'paired color hex uses native Omarchy text control')
 assert.match(pairQml,/Ui\.SearchableDropdown/, 'theme color choices use native searchable dropdown')
 
+
+assert.equal(registry.displayValue(metadata.settings.hoverGlowOpacity.ui,0.72),'72%')
+assert.equal(registry.displayValue(metadata.settings.hoverGlowOpacity.ui,0.7),'70%')
+assert.equal(registry.displayValue(metadata.settings.magnification.ui,1.2),'1.20×')
+assert.equal(registry.displayValue(metadata.settings.hoverGlowRadius.ui,25),'25px')
+assert.match(read('components/DockSettingsRow.qml'),/Registry\.displayValue\(root\.ui, root\.shown\)/,
+  'requested versus rendered help reflects schema displayScale')
 console.log('SET-04 schema sections, dependencies and stale-safe atomic paired writes passed')
