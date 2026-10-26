@@ -18,6 +18,108 @@ Item {
 
   required property string configPath
   required property string runtimeMode
+  property var settingsAnchors: []
+  property Item settingsAnchor: null
+  property string settingsConnector: ""
+  readonly property alias settingsPanel: settingsSurface
+  DockSettingsPanel {
+    id: settingsSurface
+    host: root
+    metadata: dockControl.metadata
+  }
+  function registerSettingsAnchor(item, connector, mode) {
+    if (!item) return false
+    unregisterSettingsAnchor(item)
+    settingsAnchors = settingsAnchors.concat([{item:item, connector:String(connector || ""), mode:mode}])
+    if (settingsPanel.panelOpen) Qt.callLater(refreshSettingsAnchor)
+    return true
+  }
+  function unregisterSettingsAnchor(item) {
+    settingsAnchors = settingsAnchors.filter(function(entry) {return entry.item !== item})
+    if (settingsAnchor === item) settingsAnchor = null
+    if (settingsPanel && settingsPanel.panelOpen) Qt.callLater(refreshSettingsAnchor)
+  }
+  function usableSettingsAnchor(entry) {
+    var item = entry && entry.item
+    if (!item || !item.visible || item.width <= 0 || item.height <= 0) return false
+    var window = item.QsWindow.window
+    if (!window || !window.screen) return false
+    var connector = entry.connector || window.screen.name
+    var screen = ScreenPresentationModel.entryFor(currentPresentation(),connector)
+    return !!screen && (!entry.mode || screen.mode === entry.mode)
+  }
+  // Focused output for keyboard/CLI/IPC summon. Hyprland monitor names match
+  // Quickshell screen connectors; fall back to the remembered connector.
+  function focusedSettingsConnector() {
+    var monitors = hyprMonitors || []
+    for (var i = 0; i < monitors.length; ++i) {
+      var monitor = monitors[i]
+      if (!monitor) continue
+      var focused = monitor.focused !== undefined ? monitor.focused === true
+        : ((monitor.lastIpcObject || {}).focused === true)
+      if (!focused) continue
+      var ipc = monitor.lastIpcObject || monitor
+      var name = String(ipc.name !== undefined ? ipc.name : monitor.name || "").trim()
+      if (name) return name
+    }
+    return settingsConnector || ""
+  }
+  function defaultSetting(key) {
+    return dockControl.defaults[key]
+  }
+  function resetSettingIntent(key, expectedValue) {
+    return saveSettingIntent(key, defaultSetting(key), expectedValue)
+  }
+  function openSettings(anchor, connector, section) {
+    var candidates = settingsAnchors.filter(function(entry) { return usableSettingsAnchor(entry) })
+    var chosen = null
+    if (anchor) {
+      chosen = candidates.filter(function(entry) {return entry.item === anchor})[0]
+    } else {
+      var focused = focusedSettingsConnector()
+      var wanted = [connector, focused, settingsConnector]
+      for (var w = 0; w < wanted.length && !chosen; ++w) {
+        var name = String(wanted[w] || "")
+        if (!name) continue
+        chosen = candidates.filter(function(entry) {return entry.connector === name})[0]
+      }
+      if (!chosen) chosen = candidates[0]
+    }
+    if (!chosen) return false
+    var candidate = chosen.item
+    var previous = activeIconDialog
+    if (previous && previous.dialogActive) previous.closeDialog()
+    settingsAnchor = candidate
+    settingsConnector = chosen.connector || candidate.QsWindow.window.screen.name
+    var onScreen = ScreenPresentationModel.entryFor(currentPresentation(), settingsConnector)
+    var edge = onScreen && onScreen.mode === "sidebar"
+      ? DockModel.normalizeSetting("sidebarEdge", settings.sidebarEdge) : "bottom"
+    return settingsPanel.openFor(candidate, edge, section)
+  }
+  function refreshSettingsAnchor() {
+    if (!settingsPanel.panelOpen) return
+    if (!openSettings(null,settingsConnector)) closeSettings()
+  }
+  function shownSetting(key) {
+    if (key === "sidebarExpandedWidth" && sidebarController) {
+      var sidebarScreens = currentPresentation().sidebarScreens || []
+      var screen = sidebarScreens.filter(function(screen) {return screen.name === root.settingsConnector})[0]
+        || sidebarScreens[0]
+      if (screen) return sidebarController.geometryFor(screen).expandedWidth
+    }
+    return dockControl.effectiveSettings(settings)[key]
+  }
+  function closeSettings() { settingsSurface.close() }
+  function toggleSettings() {
+    if (settingsSurface.panelOpen) { closeSettings(); return false }
+    return openSettings(null, focusedSettingsConnector() || settingsConnector)
+  }
+  function openSettingsForFocused(section) {
+    return openSettings(null, focusedSettingsConnector() || settingsConnector, section)
+  }
+  function releaseSettingsPanel(panel) {
+    if (panel === settingsSurface) settingsSurface.panelOpen = false
+  }
   readonly property alias settingsActions: settingsActionBroker
   DockSettingsActions {
     id: settingsActionBroker
@@ -46,6 +148,7 @@ Item {
     var previous = root.activeIconDialog
     // Publish the new owner first: cleanup by the previous owner cannot release it.
     root.activeIconDialog = dialog
+    if (root.settingsPanel && root.settingsPanel.panelOpen) root.settingsPanel.close()
     if (previous && previous !== dialog && previous.dialogActive === true)
       previous.closeDialog()
     return true
@@ -130,6 +233,8 @@ Item {
     })
   }
   readonly property var presentation: currentPresentation()
+  onPresentationChanged: if (settingsPanel && settingsPanel.panelOpen) Qt.callLater(refreshSettingsAnchor)
+  onSettingsChanged: if (settingsPanel && settingsPanel.panelOpen) Qt.callLater(refreshSettingsAnchor)
 
   property int trashItemCount: 0
   property bool trashStateKnown: false
@@ -453,7 +558,7 @@ Item {
 
   function monitorModeIntent(connector, destination, capturedState) {
     var name = String(connector || "")
-    var mode = destination === "sidebar" || destination === "classic" ? destination : ""
+    var mode = ["sidebar", "classic", "default"].indexOf(destination) >= 0 ? destination : ""
     if (!name || !mode)
       return { accepted: false, pending: false,
         reply: dockControl.failure("E_VALIDATION",
@@ -476,7 +581,8 @@ Item {
     var expected = settings.presentationModeByMonitor
     var nextMap = Object.assign({},
       DockModel.normalizeSetting("presentationModeByMonitor", expected))
-    nextMap[name] = mode
+    if (mode === "default") delete nextMap[name]
+    else nextMap[name] = mode
     return saveSettingIntent("presentationModeByMonitor", nextMap, expected)
   }
 
@@ -928,6 +1034,7 @@ Item {
       property var owner: null
       readonly property var panels: []
       Dock {
+        host: root
         screen: classicRoot.owner ? classicRoot.owner.screenObject : null
         settings: root.settings
         iconOverrides: root.settings.iconOverrides || ({})
@@ -956,6 +1063,8 @@ Item {
         onHideRequested: desktopId => root.hideApplication(desktopId)
         onBrowserActivityMuteToggled: serviceId => root.toggleBrowserActivityMute(serviceId)
         onAutoHideRequested: enabled => root.saveSetting("autoHide", enabled)
+        onSettingsRequested: anchor => root.openSettings(anchor,
+          classicRoot.owner ? classicRoot.owner.connector : "")
         onPositionRequested: (position, expectedPosition, gestureToken) =>
           root.handlePositionRequest(classicRoot.owner ? classicRoot.owner.connector : "",
             position, expectedPosition, gestureToken)

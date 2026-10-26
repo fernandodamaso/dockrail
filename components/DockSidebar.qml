@@ -387,6 +387,11 @@ PanelWindow {
           focusable: true
           enabled: !root.controller.interactionBusy
           onClicked: root.controller.requestCollapse(root.screen)
+          // Summon anchor for keyboard/IPC/CLI Settings in both expanded and
+          // rail modes; the header menu button covers expanded only.
+          Component.onCompleted: if (root.host)
+            root.host.registerSettingsAnchor(collapseButton,root.screen ? root.screen.name : "", "sidebar")
+          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(collapseButton)
           DockLucideIcon {
             anchors.centerIn: parent
             width: 14
@@ -436,6 +441,10 @@ PanelWindow {
           focusable: visible
           enabled: !root.controller.interactionBusy
           onClicked: root.openHeaderMenu()
+          // Sidebar summon anchor for keyboard/IPC/CLI Settings while expanded.
+          Component.onCompleted: if (root.host)
+            root.host.registerSettingsAnchor(headerMenuButton,root.screen ? root.screen.name : "", "sidebar")
+          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(headerMenuButton)
           DockLucideIcon {
             anchors.centerIn: parent
             width: 14
@@ -737,6 +746,8 @@ PanelWindow {
     }
     onVisibleChanged: root.syncInteractionBusy()
     onIconDialogOpenChanged: root.syncInteractionBusy()
+    onSettingsRequested: if (root.host) root.host.openSettings(headerMenuButton,
+      root.screen ? root.screen.name : "")
     onKeyboardDismissed: root.controller.releaseNavigationFocus()
     onSwitchPresentationRequested: (destination, token) => {
       if (destination === "classic" && root.screen)

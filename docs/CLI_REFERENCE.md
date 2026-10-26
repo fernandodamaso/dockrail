@@ -346,3 +346,9 @@ The runtime registry is host-owned. `dock.json` and `sidebarWidgets` continue
 to contain stable Widget IDs only; they never contain QML paths or package source
 locations. Package schema, trust boundaries, development workflow, and source
 location rules are specified in `docs/WIDGET_PACKAGES.md`.
+
+### Open Settings
+
+The `settings` command is the host-owned Settings entry point; it is not a configuration writer.
+
+Use `dockrail settings` to open the same host-owned Settings panel from the CLI. It selects the running host through the existing bounded transport and sends `dockrail-settings open` to its IPC target. It does not edit configuration, execute `controlCommand`, or create a separate preferences writer. A connected dock/sidebar anchor is required.

@@ -46,6 +46,8 @@ PanelWindow {
   signal hideRequested(string desktopId)
   signal browserActivityMuteToggled(string serviceId)
   signal autoHideRequested(bool enabled)
+  signal settingsRequested(var anchor)
+  property var host: null
   signal positionRequested(string position, var expectedPosition, var gestureToken)
   signal menuModeSwitchRequested(var token)
   signal openTrashRequested()
@@ -1308,6 +1310,9 @@ PanelWindow {
         interfaceAnimationsEnabled: root.interfaceAnimationsEnabled
         modeGestureToken: root.modeGestureToken
         onAddApplicationRequested: root.openAppPicker(controlItem)
+        onSettingsRequested: anchor => root.settingsRequested(anchor)
+        Component.onCompleted: if (root.host) root.host.registerSettingsAnchor(controlItem, root.screen ? root.screen.name : "", "classic")
+        Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(controlItem)
         onAutoHideToggled: enabled => root.autoHideRequested(enabled)
         onSwitchToSidebarRequested: token =>
           root.menuModeSwitchRequested(token)
