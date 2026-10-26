@@ -181,6 +181,26 @@ dockrail config set dockHerdrIndicators true --json
 `dockHerdrIndicators` controls classic dock indicators; it does not enable the
 sidebar Herdr agents widget.
 
+### T3 Code threads (pairing)
+
+Dockrail can show local T3 Code threads through a read-only pairing with the
+T3 server on this machine. Pairing stores a bearer session token in a `0600`
+file under the Dockrail data root; the token never appears in settings, logs
+or on a command line.
+
+```bash
+dockrail t3 pair --json
+dockrail t3 status --json
+dockrail t3 unpair --json
+```
+
+`pair` needs the `t3` CLI and a running T3 Code server. `status` exits 0 while
+paired and unexpired. `unpair` removes the local pairing; revoke the
+server-side session separately with `t3 auth session list` /
+`t3 auth session revoke <id>` when needed. Only loopback T3 servers are
+supported, and clicking a thread raises the T3 Code window (no thread
+deep link).
+
 ### Launcher badge count provider
 
 Numeric counts are optional and provider-owned. Omarchy plugin installation

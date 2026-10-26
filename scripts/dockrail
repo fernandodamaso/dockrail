@@ -46,6 +46,10 @@ case "${1:-}" in
               shift
               exec python3 -B "$(dirname -- "$adapter")/smartdock_widget.py" "$@"
               ;;
+            t3)
+              shift
+              exec python3 -B "$(dirname -- "$adapter")/dockrail_t3.py" "$@"
+              ;;
           esac
           exec python3 -B "$adapter" "$@"
         fi
