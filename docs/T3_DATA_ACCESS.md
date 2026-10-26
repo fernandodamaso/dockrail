@@ -82,8 +82,13 @@ Thread states map to the shared agent states as follows:
 Subagent threads appear only while blocked or working. Settlement acknowledges
 runs completed at or before that timestamp; a later failure, active request or
 ongoing work can still appear. Settled inactive threads and snoozed threads are
-hidden. Clicking a thread raises the T3 Code window; there is no
-per-thread deep link and no thread actions.
+hidden. Clicking an actionable thread raises the T3 Code window, revalidates
+the thread, then opens that exact thread in the existing T3 Code desktop
+through a native `t3code://threads/<environmentId>/<threadId>` link. A normal
+visit may mark the thread read; Dockrail never sends messages and performs no
+settle, snooze, approval or run commands. Navigation requires the paired build
+to own the `t3code` scheme; a conflicting handler is an unsupported routing
+configuration, not a successful dispatch.
 
 ## Limits
 

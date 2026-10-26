@@ -151,7 +151,7 @@ TestCase {
     var dock = facade(true, true, value.bridge)
     compare(dock.herdrPreviewProductFor([{ serverId: "t3:env-1" }]), "T3 Code")
     compare(dock.herdrPreviewFocusHintFor([{ serverId: "t3:env-1" }]),
-      "Click a row to open T3 Code.")
+      "Click a row to open this thread in T3 Code.")
     compare(dock.herdrPreviewProductFor([{ serverId: "local-h" }]), "Herdr")
     compare(dock.herdrPreviewFocusHintFor([{ serverId: "local-h" }]),
       "Click a row to focus its pane.")

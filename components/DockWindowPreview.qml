@@ -874,7 +874,7 @@ PopupWindow {
                 + ", " + HerdrModel.displayAgentTabSecondary(modelData)
                 + ", " + HerdrModel.statusLabel(modelData.status)
               Accessible.description: actionable
-                ? (root.herdrProduct === "T3 Code" ? "Open T3 Code" : "Focus this Herdr agent pane") : "Remote Herdr agent"
+                ? (root.herdrProduct === "T3 Code" ? "Open this T3 thread" : "Focus this Herdr agent pane") : "Remote Herdr agent"
               Accessible.onPressAction: if (actionable)
                 root.activateAgentTarget(capturedTarget)
 

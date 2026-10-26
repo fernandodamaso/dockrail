@@ -18,7 +18,7 @@ for (const candidate of [t3Server, t3Bare]) {
   assert.equal(Model.serverSource(candidate), 't3')
   assert.equal(Model.serverProduct(candidate), 'T3 Code')
   assert.equal(Model.agentNoun(candidate), 'thread')
-  assert.equal(Model.focusHint(candidate), 'Click a row to open T3 Code.')
+  assert.equal(Model.focusHint(candidate), 'Click a row to open this thread in T3 Code.')
 }
 
 assert.equal(Model.serverProduct({ source: 't3', product: '  ' }), 'T3 Code')
