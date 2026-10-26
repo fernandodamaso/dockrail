@@ -57,4 +57,29 @@ assert.match(pairQml,/interval: 400/, 'keyboard slider edits debounce')
 assert.match(shell,/id: appearanceSection/)
 assert.match(shell,/id: behaviorSection/)
 assert.match(section,/Color\.foreground/, 'help text uses semantic foreground in light and dark themes')
+
+function rgb(hex) {return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255)}
+function luminance(rgbValue) {
+  const c=rgbValue.map(x=>x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4)
+  return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]
+}
+function contrastRatio(fg,bg,opacity) {
+  const a=rgb(fg),b=rgb(bg)
+  const blended=a.map((x,i)=>opacity*x+(1-opacity)*b[i])
+  const levels=[luminance(blended),luminance(b)]
+  return (Math.max(...levels)+0.05)/(Math.min(...levels)+0.05)
+}
+// Omarchy quattro 4601078 (themes/*/colors.toml), using the dimmest
+// 90%-opacity hint foreground on the Settings card background.
+for (const theme of [
+  {name:'Catppuccin Latte',foreground:'#4c4f69',background:'#eff1f5'},
+  {name:'Catppuccin',foreground:'#cdd6f4',background:'#1e1e2e'}
+]) {
+  assert.ok(contrastRatio(theme.foreground,theme.background,0.9)>=4.5,
+    theme.name+': hint text must meet 4.5:1 contrast')
+}
+assert.match(section,/opacity:0\.9/, 'semantic classic chip hint is readable in light/dark palettes')
+assert.match(pairQml,/Ui\.TextField/, 'paired color hex uses native Omarchy text control')
+assert.match(pairQml,/Ui\.SearchableDropdown/, 'theme color choices use native searchable dropdown')
+
 console.log('SET-04 schema sections, dependencies and stale-safe atomic paired writes passed')
