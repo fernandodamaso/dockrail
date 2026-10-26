@@ -48,10 +48,43 @@ Item {
     var screen = ScreenPresentationModel.entryFor(currentPresentation(),connector)
     return !!screen && (!entry.mode || screen.mode === entry.mode)
   }
+  // Focused output for keyboard/CLI/IPC summon. Hyprland monitor names match
+  // Quickshell screen connectors; fall back to the remembered connector.
+  function focusedSettingsConnector() {
+    var monitors = hyprMonitors || []
+    for (var i = 0; i < monitors.length; ++i) {
+      var monitor = monitors[i]
+      if (!monitor) continue
+      var focused = monitor.focused !== undefined ? monitor.focused === true
+        : ((monitor.lastIpcObject || {}).focused === true)
+      if (!focused) continue
+      var ipc = monitor.lastIpcObject || monitor
+      var name = String(ipc.name !== undefined ? ipc.name : monitor.name || "").trim()
+      if (name) return name
+    }
+    return settingsConnector || ""
+  }
+  function defaultSetting(key) {
+    return dockControl.defaults[key]
+  }
+  function resetSettingIntent(key, expectedValue) {
+    return saveSettingIntent(key, defaultSetting(key), expectedValue)
+  }
   function openSettings(anchor, connector, section) {
     var candidates = settingsAnchors.filter(function(entry) { return usableSettingsAnchor(entry) })
-    var chosen = candidates.filter(function(entry) {return anchor ? entry.item === anchor : entry.item === settingsAnchor})[0]
-    if (!chosen) chosen = candidates.filter(function(entry) {return entry.connector === connector})[0] || candidates[0]
+    var chosen = null
+    if (anchor) {
+      chosen = candidates.filter(function(entry) {return entry.item === anchor})[0]
+    } else {
+      var focused = focusedSettingsConnector()
+      var wanted = [connector, focused, settingsConnector]
+      for (var w = 0; w < wanted.length && !chosen; ++w) {
+        var name = String(wanted[w] || "")
+        if (!name) continue
+        chosen = candidates.filter(function(entry) {return entry.connector === name})[0]
+      }
+      if (!chosen) chosen = candidates[0]
+    }
     if (!chosen) return false
     var candidate = chosen.item
     var previous = activeIconDialog
@@ -79,7 +112,10 @@ Item {
   function closeSettings() { settingsSurface.close() }
   function toggleSettings() {
     if (settingsSurface.panelOpen) { closeSettings(); return false }
-    return openSettings(null, settingsConnector)
+    return openSettings(null, focusedSettingsConnector() || settingsConnector)
+  }
+  function openSettingsForFocused(section) {
+    return openSettings(null, focusedSettingsConnector() || settingsConnector, section)
   }
   function releaseSettingsPanel(panel) {
     if (panel === settingsSurface) settingsSurface.panelOpen = false

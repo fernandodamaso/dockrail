@@ -19,6 +19,8 @@ Item {
   })
   readonly property var layoutCards: Registry.layoutCards(metadata)
   readonly property bool classicUsed: (presentation.classicScreens || []).length > 0
+  readonly property bool writerBusy: host.settingsWriteState === "saving"
+    || host.settingsReloadPending === true || host.settingsLoaded === false
   property bool panelActive: false
   property int cursor: 0
   property bool cursorActive: false
@@ -44,19 +46,23 @@ Item {
     return outcome.accepted
   }
   function chooseMonitor(connector, mode, token) {
+    if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
     return report(host.monitorModeIntent(connector,mode,token))
   }
   function toggleIconRail(connector) {
+    if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
     var screen = host.connectedScreens.filter(function(screen) {return screen.name === connector})[0]
     return report(host.sidebarController.requestCollapse(screen))
   }
   function chooseAutomaticOrder() {
+    if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
     var current = host.settings.workspaceMonitorOrder || []
     if (current.length) previousMonitorOrder = current.slice()
     var next = current.length ? [] : Registry.manualMonitorOrder(previousMonitorOrder, screens.map(function(entry) {return entry.connector}))
     return report(host.saveSettingIntent("workspaceMonitorOrder",next,current))
   }
   function reorder(connector, delta, expected) {
+    if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
     var next = Registry.moveMonitor(expected,connector,delta)
     return report(host.saveSettingIntent("workspaceMonitorOrder",next,expected))
   }
@@ -99,6 +105,14 @@ Item {
   }
   function reorderSelected(delta) {
     if (selectedTarget && selectedTarget.reorderBy) selectedTarget.reorderBy(delta)
+  }
+  function cancelPending() {
+    for (var i = 0; i < targets.length; ++i) {
+      var item = targets[i]
+      if (item && item.cancelPending) item.cancelPending()
+      if (item && item.editToken !== undefined) item.editToken = null
+    }
+    feedback = ""
   }
   function hovered(item) {var index=targets.indexOf(item); if(index>=0) {focusTarget(index); focusSettings()}}
   Column {
@@ -172,7 +186,7 @@ Item {
               Ui.ButtonGroup {
                 value:root.monitorCount===1?monitor.entry.mode:Registry.monitorChoice(root.host.settings,monitor.entry.connector)
                 options:root.monitorCount===1?[{value:"classic",label:"Classic dock"},{value:"sidebar",label:"Sidebar"}]:[{value:"default",label:"Default"},{value:"classic",label:"Classic dock"},{value:"sidebar",label:"Sidebar"}]
-                enabled:root.host.settingsLoadState!=="invalid"
+                enabled:root.host.settingsLoadState!=="invalid" && !root.writerBusy
                 onHovered: (index,on) => {if(on){monitor.beginEdit();root.hovered(monitor)}else monitor.editToken=null}
                 onActiveFocusChanged: if(activeFocus) monitor.beginEdit()
                 onChanged: mode => monitor.choose(mode)
@@ -184,7 +198,7 @@ Item {
                 visible:root.monitorCount>=2&&monitor.entry.mode==="sidebar"
                 label:"Icon rail"
                 checked:(root.host.settings.sidebarCollapsedByMonitor || {})[monitor.entry.connector]===undefined?root.host.settings.sidebarCollapsed:(root.host.settings.sidebarCollapsedByMonitor || {})[monitor.entry.connector]
-                enabled:root.host.settingsLoadState!=="invalid"
+                enabled:root.host.settingsLoadState!=="invalid" && !root.writerBusy
                 function activate(){root.toggleIconRail(monitor.entry.connector)}
                 function adjust(delta){activate()}
                 function command(){return Registry.cliCommand("sidebarCollapsedByMonitor",root.host.settings.sidebarCollapsedByMonitor)}
@@ -225,7 +239,7 @@ Item {
             visible:card.isSidebar&&root.monitorCount===1&&root.screens[0].mode==="sidebar"
             label:"Icon rail"
             checked:visible&&((root.host.settings.sidebarCollapsedByMonitor || {})[root.screens[0].connector]===undefined?root.host.settings.sidebarCollapsed:(root.host.settings.sidebarCollapsedByMonitor || {})[root.screens[0].connector])
-            enabled:root.host.settingsLoadState!=="invalid"
+            enabled:root.host.settingsLoadState!=="invalid" && !root.writerBusy
             function activate(){if(visible)root.toggleIconRail(root.screens[0].connector)}
             function adjust(delta){activate()}
             function command(){return Registry.cliCommand("sidebarCollapsedByMonitor",root.host.settings.sidebarCollapsedByMonitor)}
@@ -239,7 +253,7 @@ Item {
             label:"Automatic monitor order"
             description:"Turn off to drag your own order. Alt+↑/↓ also reorders."
             checked:(root.host.settings.workspaceMonitorOrder || []).length===0
-            enabled:root.host.settingsLoadState!=="invalid"
+            enabled:root.host.settingsLoadState!=="invalid" && !root.writerBusy
             function activate(){root.chooseAutomaticOrder()}
             function adjust(delta){activate()}
             function command(){return Registry.cliCommand("workspaceMonitorOrder",root.host.settings.workspaceMonitorOrder)}
@@ -260,7 +274,7 @@ Item {
               height:Style.space(36)
               text:modelData + (root.screens.some(function(s){return s.connector===orderRow.modelData})?"":" · disconnected")
               focusable:true
-              enabled:root.host.settingsLoadState!=="invalid"
+              enabled:root.host.settingsLoadState!=="invalid" && !root.writerBusy
               Accessible.name:text+", position "+(index+1)+". Alt Up or Down to reorder."
               function reorderBy(delta){root.reorder(modelData,delta,root.host.settings.workspaceMonitorOrder.slice())}
               function activate(){root.hovered(orderRow)}

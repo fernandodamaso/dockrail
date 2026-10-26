@@ -69,6 +69,28 @@ Final local failing/error test names:
 - `FAIL: test_sigterm_cleans_up_during_guest_boot (test_dev_session_review.SignalCleanupTests.test_sigterm_cleans_up_during_guest_boot)`
 - `FAIL: test_sigterm_cleans_up_ready_session (test_dev_session_review.SignalCleanupTests.test_sigterm_cleans_up_ready_session)`
 
+## Continuation (2026-10-26, exec branch)
+
+Rebased onto merged `main@c0ed274` (SET-00/SET-02/INF-1/INF-2/INF-3 merged). Continuation head adds three contract fixes on top of PR #142 `8126255`:
+
+- Focused-monitor summon: `DockHost.focusedSettingsConnector()` resolves the Hyprland focused monitor (names match Quickshell connectors) with remembered-connector fallback. `openSettings()` prefers explicit anchor, then requested/focused/remembered connector, then first usable anchor. IPC `dockrail-settings open/toggle` and `toggleSettings()` use `openSettingsForFocused()`. Menu/gear/widget-manager routes still pass their explicit anchor/connector.
+- Saving-state locking: rows and Layout custom controls disable while `settingsWriteState==="saving"`, reload pending, or settings not loaded. Commits during saving return `Saving… wait for readback` instead of stacking a second write; `E_BUSY` remains the host truth.
+- Per-row reset: `host.defaultSetting()`/`resetSettingIntent()` write the default through the same writer with the expected starting value. Rows show Reset + `Default: X` when the current value differs; reset participates in stale/busy handling like any commit.
+- Delayed-commit cancellation: `DockSettingsRow.cancelPending()` stops the keyboard-settle timer and discards the editing draft. `DockSettingsLayout.cancelPending()` cancels all rows and clears stale monitor edit tokens. `DockSettingsPanel.close()` cancels before closing, so Change Icon handoff and panel close cannot leave a delayed write running. Reanchoring while open preserves drafts and focus pane.
+
+### Native primitive maintenance check (continuation)
+
+Installed host (read-only inspection, no edits): `omarchy 4.0.6-1`, `hyprland 0.56.2-4`, `quickshell 0.3.2.r7.g2b4501a-1`, `/usr/share/omarchy/version` = `4.0.0.alpha`. Re-inspected `shell/Ui/KeyboardPanel.qml` (focus prime, dismissal twins, `fittedContentHeight`), `PanelKeyCatcher.qml` (blocked forwarding, j/k/h/l/Tab/Esc), `NumberField.qml` (SpinBox `onValueModified`), `PanelSlider.qml` (drag `moved`/`released`, wheel commits), and `shell/plugins/panels/monitor/Panel.qml` (cursor sections, IPC open/close/toggle). No new focus timer, second writer, or command runner added. Installed-revision physical session still required (see gates below).
+
+### Verification (continuation)
+
+- QML: full `tst_settings_writer` passes including 4 new cases (focused connector, saving lock, per-row reset, close cancels pending keyboard commit). `tst_settings_review` still passes.
+- JS: `test_settings_registry.mjs` passes; `test_settings_review.mjs` extended with focused summon, anchor lifecycle, and per-key reset (all pass). All other `test_*.mjs` model tests pass.
+- CLI: `test_cli_settings.py` (2 tests) passes; `settings` still issues the fixed no-arg IPC `open` and treats `no-anchor` as `E_RUNTIME_NOT_FOUND`.
+- Headless QML suite on this tree: 504 passed, 9 failed — the same 9 failures reproduce on clean `origin/main` (478 passed, 9 failed) in `DockWidgetCard`, `HerdrRemoteFallback`, `WidgetKit`; no new failure introduced.
+- `bash -n`, `py_compile`, `git diff --check`, `qmllint` (warnings only), `omarchy plugin validate .`, and `timeout 6s ./scripts/run` all pass.
+- KVM guest check not run: no verified base image at `~/.local/state/smartdock/dev-sessions/_kvm-feasibility/images/` in this environment. Native Omarchy smoke (four entries, focus/keyboard, CLI round trips, themes/monitors, error states) remains the required gate before merge.
+
 ## Remaining acceptance gates
 
 Keep PR #142 Draft. Do not merge/deploy or mark FDM-1025 Done until dependencies are integrated and the native smoke is recorded at the final SHA:

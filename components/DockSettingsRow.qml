@@ -17,7 +17,14 @@ Column {
   readonly property var ui: row.ui
   readonly property var current: host.settings[key]
   readonly property var dependency: Registry.editability(ui, host.settings, monitorCount)
-  readonly property bool editable: host.settingsLoadState !== "invalid" && dependency.enabled
+  readonly property bool writerBusy: host.settingsWriteState === "saving"
+    || host.settingsReloadPending === true || host.settingsLoaded === false
+  readonly property bool editable: host.settingsLoadState !== "invalid" && dependency.enabled && !writerBusy
+  readonly property bool resettable: host.settingsLoadState !== "invalid" && !writerBusy
+    && host.defaultSetting !== undefined
+  readonly property var defaultValue: host.defaultSetting ? host.defaultSetting(key) : undefined
+  readonly property bool needsReset: resettable && defaultValue !== undefined
+    && JSON.stringify(current) !== JSON.stringify(defaultValue)
   readonly property var shown: host.shownSetting(key)
   readonly property bool popupOpen: dropdown.popupOpen
   readonly property bool textFocused: number.visible && number.field.activeFocus
@@ -68,7 +75,8 @@ Column {
     feedback = ""
   }
   function commitDraft() {
-    if (!editable) return false
+    if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
+    if (!editable && !conflict) return false
     if (!editing) beginEdit()
     if (conflict) { feedback = "Changed while editing. Reload or keep editing."; return false }
     localWrite = true
@@ -86,9 +94,39 @@ Column {
     }
     return outcome.accepted
   }
-  function commitValue(value) { beginEdit(); draft = value; return commitDraft() }
+  function commitValue(value) {
+    if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
+    beginEdit(); draft = value; return commitDraft()
+  }
+  function resetToDefault() {
+    if (!resettable || defaultValue === undefined) return false
+    if (!editing) beginEdit()
+    if (conflict) { feedback = "Changed while editing. Reload or keep editing."; return false }
+    if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
+    var resetIntent = host.resetSettingIntent
+      ? host.resetSettingIntent(key, expected)
+      : host.saveSettingIntent(key, defaultValue, expected)
+    localWrite = true
+    var outcome = Registry.writeOutcome(resetIntent)
+    localWrite = false
+    if (outcome.accepted) {
+      editing = false
+      conflict = false
+      feedback = ""
+      edited()
+    } else {
+      var resetError = outcome.reply && outcome.reply.error
+      feedback = resetError ? resetError.code + ": " + resetError.message : "Could not save"
+      if (resetError && resetError.code === "E_STALE") conflict = true
+    }
+    return outcome.accepted
+  }
+  function cancelPending() {
+    keyboardCommit.stop()
+    if (editing) reloadDraft()
+  }
   function adjust(delta) {
-    if (!editable) return
+    if (!editable || writerBusy) return
     beginEdit()
     if (ui.control === "toggle") { draft = delta > 0; commitDraft(); return }
     if (spec.enum) {
@@ -103,7 +141,7 @@ Column {
     }
   }
   function activate() {
-    if (!editable) return
+    if (!editable || writerBusy) return
     if (conflict) return
     if (ui.control === "toggle") commitValue(!current)
     else if (ui.control === "dropdown") { beginEdit(); dropdown.open() }
@@ -255,15 +293,35 @@ Column {
     onReleased: value => { root.beginEdit(); root.draft = value; root.commitDraft() }
   }
   Text {
-    visible: root.changedElsewhere || root.feedback !== ""
+    visible: root.changedElsewhere || root.feedback !== "" || root.writerBusy
     width: parent.width
-    text: root.feedback || "Changed elsewhere"
+    text: root.feedback || (root.writerBusy ? "Saving…" : "Changed elsewhere")
     wrapMode: Text.WordWrap
     color: Color.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     Accessible.role: Accessible.StaticText
     Accessible.name: text
+  }
+  Row {
+    visible: root.needsReset
+    spacing: Style.space(8)
+    Ui.Button {
+      text: "Reset"
+      tooltipText: "Reset to default"
+      focusable: true
+      enabled: root.resettable
+      onClicked: root.resetToDefault()
+    }
+    Text {
+      text: "Default: " + String(root.defaultValue)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      color: Color.foreground
+      wrapMode: Text.WordWrap
+      width: Math.max(0, root.width - Style.space(80))
+      anchors.verticalCenter: parent.verticalCenter
+    }
   }
   Row {
     visible: root.conflict

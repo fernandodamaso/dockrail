@@ -34,3 +34,25 @@ assert.equal(h.host.openSettings(null,''),true)
 assert.equal(h.host.settingsPanel.anchor,visible)
 h.host.unregisterSettingsAnchor(visible)
 assert.equal(h.host.openSettings(null,''),false)
+// Focused-monitor summon: IPC/CLI opening prefers the focused output.
+h.host.settingsAnchors=[]
+h.host.settingsAnchor=null
+h.host.settingsConnector='DP-1'
+h.host.connectedScreens=[{name:'DP-1',width:1920,height:1080},{name:'DP-2',width:1920,height:1080}]
+h.host.hyprMonitors=[{name:'DP-1',focused:false},{name:'DP-2',focused:true}]
+const vis1={visible:true,width:30,height:30,QsWindow:{window:{screen:{name:'DP-1'}}}}
+const vis2={visible:true,width:30,height:30,QsWindow:{window:{screen:{name:'DP-2'}}}}
+h.host.registerSettingsAnchor(vis1,'DP-1','classic')
+h.host.registerSettingsAnchor(vis2,'DP-2','classic')
+h.host.settingsPanel={panelOpen:false,openFor(anchor,edge,section){this.anchor=anchor;this.section=section;this.panelOpen=true;return true},close(){this.panelOpen=false}}
+assert.equal(h.host.focusedSettingsConnector(),'DP-2')
+assert.equal(h.host.openSettingsForFocused(),true)
+assert.equal(h.host.settingsPanel.anchor,vis2)
+assert.equal(h.host.settingsConnector,'DP-2')
+// Per-key reset uses the same writer with the default value.
+assert.equal(typeof h.host.resetSettingIntent,'function')
+const before=h.host.settings.margin
+const reset=h.host.resetSettingIntent('margin',before)
+assert.equal(reset.accepted,true)
+assert.equal(h.host.settings.margin,h.defaults.margin)
+console.log('Settings focused summon, anchor lifecycle and per-row reset passed')

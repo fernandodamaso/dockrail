@@ -397,7 +397,7 @@ Item {
   IpcHandler {
     target: "dockrail-settings"
     function open(): string {
-      return root.host.openSettings(null, root.host.settingsConnector) ? "opened" : "no-anchor"
+      return root.host.openSettingsForFocused() ? "opened" : "no-anchor"
     }
     function close(): string {
       root.host.closeSettings()

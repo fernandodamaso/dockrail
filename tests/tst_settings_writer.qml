@@ -123,4 +123,68 @@ TestCase {
     compare(host.activeIconDialog,dialog)
     host.releaseIconDialog(dialog)
   }
+  function test_focused_connector_prefers_hyprland_focus() {
+    host.hyprMonitors=[{name:"DP-1",focused:false},{name:"DP-2",focused:true}]
+    host.settingsConnector="DP-1"
+    compare(host.focusedSettingsConnector(),"DP-2")
+    host.hyprMonitors=[{name:"DP-1",focused:false}]
+    compare(host.focusedSettingsConnector(),"DP-1")
+    host.hyprMonitors=[]
+    host.settingsConnector="DP-1"
+    compare(host.focusedSettingsConnector(),"DP-1")
+  }
+  function test_saving_locks_row_edits_until_readback() {
+    host.connectedScreens=[{name:"DP-1",width:1920,height:1080}]
+    host.settingsPanel.openFor(testCase,"bottom","layout")
+    var layout=host.settingsPanel.layoutView
+    tryVerify(function(){return layout.targets.some(function(item){return item.key==="margin"})})
+    var row=layout.targets.filter(function(item){return item.key==="margin"})[0]
+    host.file.defer=true
+    verify(host.saveSettingIntent("autoHide",true,host.settings.autoHide).accepted)
+    compare(host.settingsWriteState,"saving")
+    verify(row.writerBusy)
+    verify(!row.editable)
+    row.beginEdit(); row.draft=22
+    verify(!row.commitDraft())
+    verify(row.feedback.indexOf("Saving")>=0)
+    host.file.defer=false
+    host.settingsSaved()
+    compare(host.settingsWriteState,"saved")
+    verify(!row.writerBusy)
+    verify(row.editable)
+    row.cancelPending()
+  }
+  function test_per_row_reset_restores_default() {
+    host.connectedScreens=[{name:"DP-1",width:1920,height:1080}]
+    verify(host.saveSettingIntent("margin",22,host.settings.margin).accepted)
+    compare(host.settings.margin,22)
+    host.settingsPanel.openFor(testCase,"bottom","layout")
+    var layout=host.settingsPanel.layoutView
+    tryVerify(function(){return layout.targets.some(function(item){return item.key==="margin"})})
+    var row=layout.targets.filter(function(item){return item.key==="margin"})[0]
+    compare(row.defaultValue,10)
+    verify(row.needsReset)
+    verify(row.resetToDefault())
+    compare(host.settings.margin,10)
+    verify(!row.needsReset)
+  }
+  function test_close_cancels_pending_keyboard_commit() {
+    host.connectedScreens=[{name:"DP-1",width:1920,height:1080}]
+    host.settingsPanel.openFor(testCase,"bottom","layout")
+    var layout=host.settingsPanel.layoutView
+    tryVerify(function(){return layout.targets.some(function(item){return item.key==="margin"})})
+    var row=layout.targets.filter(function(item){return item.key==="margin"})[0]
+    var before=host.settings.margin
+    row.adjust(1)
+    verify(row.editing)
+    host.settingsPanel.close()
+    verify(!host.settingsPanel.panelOpen)
+    compare(host.settings.margin,before)
+    // Reopen must show a clean row, not a stale editing draft.
+    host.settingsPanel.openFor(testCase,"bottom","layout")
+    var reopened=host.settingsPanel.layoutView
+    tryVerify(function(){return reopened.targets.some(function(item){return item.key==="margin"})})
+    var fresh=reopened.targets.filter(function(item){return item.key==="margin"})[0]
+    verify(!fresh.editing)
+  }
 }

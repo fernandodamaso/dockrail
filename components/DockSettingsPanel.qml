@@ -61,6 +61,7 @@ Item {
   }
   function close() {
     if (!panelOpen) return
+    if (layoutSection && layoutSection.cancelPending) layoutSection.cancelPending()
     panelOpen = false
     showHelp = false
     if (root.host && root.host.releaseSettingsPanel)
