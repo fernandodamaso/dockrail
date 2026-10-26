@@ -9,7 +9,9 @@ as navigation evidence.
 
 ```text
 base: 774fc8e548177af27a9bd0585d377c7301617a69 (origin/feat/t3-project-branding)
-head: <filled on commit; see git log feat/t3-thread-activation>
+head: 720c1d59df6f2f93a80431b65d884c12ffda1993 (product + tests;
+  this evidence file finalized in a docs-only commit on top, no product
+  delta — fast suites re-verified at the final checkout)
 ```
 
 Stack parent is `feat/t3-project-branding` (local main checkout is stale for
