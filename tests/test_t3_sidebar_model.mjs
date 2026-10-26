@@ -108,6 +108,7 @@ function windowKeyFor(f, toplevelId) {
   const snapshot = mergedSnapshot(
     [t3Server(), herdrServer()],
     [t3Agent('thread-1', 'working'), t3Agent('thread-2', 'blocked')])
+  snapshot.agents[0].projectIcon = { kind: 'emoji', emoji: '🎨' }
   const projected = projectWith(desktop, f, key, snapshot, 't3:env-1',
     { herdr: true, t3: true, t3Present: true })
   const parent = projected.rows.find(row => row.key === key)
@@ -120,6 +121,8 @@ function windowKeyFor(f, toplevelId) {
   assert.ok(nested.every(row => row.treeDepth === parent.treeDepth + 1))
   assert.ok(nested.every(row => row.actionable === true))
   assert.deepEqual(nested.map(row => row.paneId).sort(), ['thread-1', 'thread-2'])
+  assert.deepEqual(nested.find(row => row.paneId === 'thread-1').projectIcon,
+    { kind: 'emoji', emoji: '🎨' })
 }
 
 // Unverified T3 shows the pending child, never thread rows.

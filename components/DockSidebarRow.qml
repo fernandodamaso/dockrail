@@ -1170,22 +1170,36 @@ Item {
         renderType: Text.NativeRendering
         verticalAlignment: Text.AlignVCenter
       }
-      Text {
-        objectName: "sidebar-herdr-agent-subtitle"
+      Row {
         visible: root.herdrAgentSubtitle.length > 0
         width: parent.width
-        height: Math.ceil(font.pixelSize * 1.1)
-        text: root.herdrAgentSubtitle
-        textFormat: Text.PlainText
-        elide: Text.ElideRight
-        wrapMode: Text.NoWrap
-        maximumLineCount: 1
-        // Brighter than muted, still quieter than the title.
-        color: Qt.tint(Color.muted, Util.alpha(Color.foreground, 0.45))
-        font.family: Style.font.family
-        font.pixelSize: Style.font.caption
-        renderType: Text.NativeRendering
-        verticalAlignment: Text.AlignVCenter
+        height: Math.max(Math.ceil(Style.font.caption * 1.1), projectIcon.visible ? projectIcon.height : 0)
+        spacing: projectIcon.visible ? Style.space(4) : 0
+
+        DockT3ProjectIcon {
+          id: projectIcon
+          objectName: "sidebar-t3-project-icon"
+          icon: root.row.projectIcon || null
+          visible: icon !== null && parent.width >= width
+          anchors.verticalCenter: parent.verticalCenter
+        }
+
+        Text {
+          objectName: "sidebar-herdr-agent-subtitle"
+          width: Math.max(0, parent.width - (projectIcon.visible ? projectIcon.width + parent.spacing : 0))
+          height: parent.height
+          text: root.herdrAgentSubtitle
+          textFormat: Text.PlainText
+          elide: Text.ElideRight
+          wrapMode: Text.NoWrap
+          maximumLineCount: 1
+          // Brighter than muted, still quieter than the title.
+          color: Qt.tint(Color.muted, Util.alpha(Color.foreground, 0.45))
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          renderType: Text.NativeRendering
+          verticalAlignment: Text.AlignVCenter
+        }
       }
     }
 

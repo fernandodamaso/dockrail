@@ -13,6 +13,8 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+from t3icons import project_icon
+
 SCHEMA_VERSION = 1
 SHELL_SCHEMA_VERSION = 2
 MAX_VISIBLE_THREADS = 64
@@ -369,6 +371,7 @@ def build_snapshot(
                     "live": True,
                     "workspaceId": project_id if isinstance(project_id, str) else "",
                     "workspaceLabel": project_title,
+                    "projectIcon": project_icon(project),
                     "tabId": project_id if isinstance(project_id, str) else "",
                     "tabTitle": project_title,
                     "title": title,

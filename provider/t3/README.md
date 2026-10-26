@@ -17,6 +17,7 @@ provider contract (schema v1) so the existing `DockHerdrService` /
 | `t3rpc.py` | Effect-RPC framing (`Request`/`Ack`/`Ping`/`Chunk`/`Exit`) |
 | `t3procfs.py` | `/proc` listener ownership, identities and ancestry |
 | `t3model.py` | `ShellStore`, thread classification, Herdr-schema snapshot builder |
+| `t3icons.py` | Bounded project icon metadata, local Lucide catalog and T3-compatible initials |
 | `tools/capture_ws.py` | Protocol capture tooling (not runtime code) |
 | `tests/fake_t3.py` | In-process fake T3 server (HTTP + WS) replaying sanitized fixtures |
 | `tests/fixtures/` | Sanitized captures: descriptor, HTTP shell, WS session + resume |
@@ -28,6 +29,10 @@ The provider emits exactly one server (`t3:<environmentId>`, `source: "t3"`,
 agents only while the stream is synchronized, and empty inventory with
 `completeness: unknown` during any gap. Thread states map to Herdr's
 `blocked`/`working`/`done`/`idle` enum; see `t3model.classify`.
+T3 agent rows also carry optional presentation metadata in `projectIcon`:
+emoji, monogram text/color, or a bundled Lucide SVG data URI and color. This
+metadata is derived from projects in the same shell snapshot, never from a
+provider-controlled image URL or file path.
 
 ## Security rules
 
