@@ -10,3 +10,5 @@ PanelSlider 1.0 PanelSlider.qml
 PanelSeparator 1.0 PanelSeparator.qml
 KeyboardPanel 1.0 KeyboardPanel.qml
 PanelKeyCatcher 1.0 PanelKeyCatcher.qml
+SearchableDropdown 1.0 SearchableDropdown.qml
+TextField 1.0 TextField.qml
