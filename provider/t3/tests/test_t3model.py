@@ -379,6 +379,23 @@ class StoreTests(unittest.TestCase):
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_project_icon_tracks_project_updates(self) -> None:
+        store = ShellStore()
+        store.threads["a"] = thread(id="a", projectId="p", status="running")
+        store.projects["p"] = {"id": "p", "title": "ComfyUI",
+                               "projectIcon": {"kind": "emoji", "emoji": "🎨"}}
+        first = live_snapshot(store)
+        self.assertEqual(first["agents"][0].get("projectIcon"),
+                         {"kind": "emoji", "emoji": "🎨"})
+        store.apply({"kind": "project.updated", "sequence": 1, "project": {
+            "id": "p", "title": "ComfyUI",
+            "projectIcon": {"kind": "monogram", "text": "CU", "color": "blue"},
+        }})
+        second = live_snapshot(store)
+        self.assertEqual(second["agents"][0]["projectIcon"],
+                         {"kind": "monogram", "text": "CU", "color": "blue"})
+        self.assertNotEqual(snapshot_fingerprint(first), snapshot_fingerprint(second))
+
     def test_schema_key_sets(self) -> None:
         store = ShellStore()
         body = json.loads((FIXTURES / "shell-snapshot.json").read_text())
@@ -410,7 +427,7 @@ class SnapshotTests(unittest.TestCase):
             self.assertEqual(
                 sorted(agent.keys()),
                 ["agent", "connectionGeneration", "host", "id", "live",
-                 "observedAgeMs", "paneId", "serverId", "session", "stateChangeSeq",
+                 "observedAgeMs", "paneId", "projectIcon", "serverId", "session", "stateChangeSeq",
                  "status", "tabId", "tabTitle", "title", "transport",
                  "workspaceId", "workspaceLabel"],
             )

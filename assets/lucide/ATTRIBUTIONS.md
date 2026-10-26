@@ -17,3 +17,11 @@ Bundled icons include:
   `cloud-off`, `inbox`, `loader-circle`, `clock-3`, `image`
 
 They are bundled locally so the dock does not need a network connection at runtime.
+
+`catalog.json.gz` contains the Lucide SVG shapes and name aliases used for T3
+project icons. The shapes were extracted from the installed T3 Code
+`0.1.3-nightly.20261024.3617` frontend (commit `27e0c684c585`), including its
+Lucide name aliases. The deterministic gzip contains a JSON name-to-SVG map;
+no JavaScript executes at runtime. The SVGs use a neutral stroke for the
+existing WidgetIcon tint renderer. See the bundled `LICENSE` for Lucide's ISC
+and inherited Feather MIT notices. Unknown names fall back to project initials.

@@ -126,6 +126,7 @@ Item {
           key: String(agent.id || id + ":agent"),
           title: HerdrModel.displayAgentTitle(agent),
           detail: secondary || (String(agent.agent || "agent") + " · " + String(agent.status || "unknown")),
+          projectIcon: root.sourceFilter === "t3" ? agent.projectIcon || null : null,
           status: String(agent.status || "unknown")
         })
       })
@@ -319,16 +320,32 @@ Item {
               elide: Text.ElideRight
             }
 
-            Text {
+            Row {
               visible: modelData.detail.length > 0
               width: parent.width
-              text: modelData.detail
-              textFormat: Text.PlainText
-              color: Color.foreground
-              opacity: 0.6
-              font.family: Style.font.family
-              font.pixelSize: Math.max(10, Style.font.body - 2)
-              elide: Text.ElideRight
+              height: Math.max(fallbackDetailLabel.implicitHeight, fallbackProjectIcon.visible ? fallbackProjectIcon.height : 0)
+              spacing: fallbackProjectIcon.visible ? Style.space(4) : 0
+
+              DockT3ProjectIcon {
+                id: fallbackProjectIcon
+                icon: modelData.projectIcon || null
+                visible: icon !== null && parent.width >= width
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                id: fallbackDetailLabel
+                width: Math.max(0, parent.width - (fallbackProjectIcon.visible ? fallbackProjectIcon.width + parent.spacing : 0))
+                height: parent.height
+                text: modelData.detail
+                textFormat: Text.PlainText
+                color: Color.foreground
+                opacity: 0.6
+                font.family: Style.font.family
+                font.pixelSize: Math.max(10, Style.font.body - 2)
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+              }
             }
           }
         }

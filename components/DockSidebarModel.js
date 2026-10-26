@@ -955,6 +955,7 @@ function project(input) {
           subtitle: HerdrModel.displayAgentSecondary(agentPayload),
           agentKind: agentKind,
           workspaceLabel: agentPayload.workspaceLabel,
+          projectIcon: displaySource === "t3" ? agent.projectIcon || null : null,
           tabTitle: tab.title || agent.tabTitle || "",
           status: HerdrModel.normalizeStatus(agent.status),
           nested: true,

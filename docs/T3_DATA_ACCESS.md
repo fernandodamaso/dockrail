@@ -42,6 +42,14 @@ descriptor. No file contents, no terminal output, no message bodies. The
 `orchestration:read` scope cannot operate, settle, snooze or approve
 anything.
 
+Project icons from this same stream appear beside the project name on sidebar
+thread rows, including the unattached-thread fallback. Emoji, colored Lucide
+icons and colored custom monograms follow T3's project branding.
+Projects without a custom icon use T3's generated initials and color. Project
+updates refresh the icon through the existing provider; no extra subscription
+or settings writer is created. Missing/invalid/future icon names fall back to
+initials. Project favicon paths and provider-supplied image URLs are not loaded.
+
 ## States and error codes
 
 The provider reports one `t3:<environmentId>` server with health `live`,
