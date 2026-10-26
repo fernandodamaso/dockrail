@@ -16,6 +16,9 @@ TestCase {
   width: 760; height: 780
   property var areas: []
   property bool innerEnabled: false
+  property var activeHerdrService: null
+  property var activeHerdrWindows: []
+  property var activeHerdrHandles: []
   QtObject {
     id: writer
     property int writes: 0
@@ -23,7 +26,95 @@ TestCase {
     function saveSetting(key,value) { writes++; lastValue=value; return {ok:true,data:{applied:true}} }
   }
   Component { id: controllerFactory; DockSidebarController { host:writer } }
+  Component {
+    id: herdrServiceFactory
+    QtObject {
+      id: service
+      property string sourceEpoch: "epoch-1"
+      property int sourceRevision: 0
+      property bool running: false
+      property int activeCount: 0
+      property int acquireCount: 0
+      property int releaseCount: 0
+      property int starts: 0
+      property int stops: 0
+      property int suspensions: 0
+      property var publish: null
+      property var windowWrites: []
+      function acquire(owner) {
+        service.acquireCount++
+        var lease={active:false,released:false,
+          setActive:function(active,callback) {
+            active=active===true
+            if(active===lease.active) { if(active)service.publish=callback;return }
+            lease.active=active
+            service.publish=active?callback:null
+            if(active) {
+              service.activeCount++;service.starts++;service.running=true
+              callback({status:"loading",revision:1,data:null})
+            } else {
+              service.activeCount=Math.max(0,service.activeCount-1)
+              service.suspensions++
+              if(service.activeCount===0) {service.running=false;service.stops++}
+            }
+          },
+          release:function() {
+            if(lease.released)return
+            if(lease.active) {
+              lease.active=false;service.activeCount=Math.max(0,service.activeCount-1)
+              if(service.activeCount===0) {service.running=false;service.stops++}
+            }
+            service.publish=null;lease.released=true;service.releaseCount++
+          }}
+        return lease
+      }
+      function setWindowProcesses(revision,pids) {
+        service.windowWrites=service.windowWrites.concat([{revision:revision,pids:pids.slice()}])
+        return true
+      }
+      function publishSnapshot(value) {
+        service.sourceEpoch=value.providerEpoch
+        service.sourceRevision=value.revision
+        if(service.publish)service.publish({status:"ready",revision:value.revision+1,data:value})
+      }
+    }
+  }
+  Component {
+    id: herdrBridgeFactory
+    DockHerdrWindowAgents {
+      herdrService: testCase.activeHerdrService
+      toplevels: testCase.activeHerdrWindows
+      hyprToplevels: testCase.activeHerdrHandles
+    }
+  }
   Component { id: providerFactory; SidebarWidgetFixture {} }
+  Component { id: windowFactory; QtObject { property string appId: "foot"; property string title: "Herdr terminal" } }
+  Component {
+    id: registryRefreshFactory
+    Timer {
+      property var registryHost
+      property var manager
+      property var backend
+      property var acquireFunction
+      property int refreshes: 0
+      interval: 900
+      repeat: true
+      onTriggered: {
+        registryHost.externalDescriptors=({})
+        testCase.compare(manager.diagnostics().counters.acquisitions,1)
+        testCase.compare(manager.diagnostics().counters.releases,0)
+        testCase.verify(registryHost.sidebarWidgetRegistry["herdr.agents"].acquire===acquireFunction)
+        testCase.compare(backend.starts,1)
+        testCase.compare(backend.stops,0)
+        testCase.compare(backend.activeCount,1)
+        testCase.compare(backend.suspensions,0)
+        testCase.compare(backend.acquireCount,1)
+        testCase.compare(backend.releaseCount,0)
+        refreshes++
+        if(refreshes>=5)stop()
+      }
+    }
+  }
   Component {
     id: bodyFactory
     Item {
@@ -189,6 +280,139 @@ TestCase {
     var f=build(0,["herdr.agents"]);wait(50)
     compare(f.area.presentedWidgetCount,0);compare(f.area.height,0)
     compare(f.controller.widgetIds.length,1);compare(f.provider.acquisitions,1);compare(f.provider.releases,0)
+  }
+  function test_herdr_registry_refresh_keeps_matched_lease() {
+    var provider=createTemporaryObject(herdrServiceFactory,testCase)
+    var terminal=createTemporaryObject(windowFactory,testCase)
+    var handle={wayland:terminal,address:"0x40",
+      lastIpcObject:{workspace:{id:1},monitor:0,pid:40}}
+    activeHerdrService=provider
+    activeHerdrWindows=[terminal]
+    activeHerdrHandles=[handle]
+    var bridge=createTemporaryObject(herdrBridgeFactory,testCase)
+    var host=SplitHarness.makeHostRegistry(testCase,bridge,provider)
+    var acquire=host.sidebarWidgetRegistry["herdr.agents"].acquire
+    var c=createTemporaryObject(controllerFactory,testCase,{
+      host:host,
+      settings:{presentationMode:"sidebar",sidebarWidgets:["herdr.agents"],pinned:[],interfaceAnimationsEnabled:false},
+      screens:[{name:"TEST",width:1920,height:1080}],
+      monitors:[{id:0,name:"TEST",activeWorkspace:{id:1}}],workspaces:[{id:1,monitorID:0}],
+      toplevels:[terminal],hyprToplevels:[handle]
+    })
+    c.widgetRegistry=Qt.binding(function(){return host.sidebarWidgetRegistry})
+    c.refresh()
+    var panel=createTemporaryObject(panelFactory,testCase,{controller:c})
+    var area=SplitHarness.makeArea(panel,{width:panel.width})
+    areas.push(area)
+    panel.widgetArea=area
+    area.height=Qt.binding(function(){return panel.split.widgetHeight})
+    wait(40)
+    function snapshot(revision,matched) {
+      var ancestorPid=matched?40:99
+      return {schemaVersion:1,providerEpoch:"epoch-1",revision:revision,
+        servers:[{id:"srv",health:"live",capabilities:{focusAgent:true},clients:[{
+          pid:41,startTime:41,ancestors:[{pid:ancestorPid,startTime:ancestorPid}]}]}],
+        agents:[{id:"agent-1",serverId:"srv",workspaceId:"w1",workspaceLabel:"Main",
+          tabId:"t1",tabTitle:"Agent",status:"working",connectionGeneration:1,
+          paneId:"pane-a",terminalId:"term-a"}],
+        windowProcesses:{revision:bridge.windowProcessRevision,
+          identities:[{pid:40,startTime:40}]}}
+    }
+    var value=snapshot(1,true)
+    provider.publishSnapshot(value)
+    tryCompare(bridge,"snapshotReady",true)
+    c.refresh();wait(30)
+    compare(c.widgetManager.diagnostics().counters.acquisitions,1)
+    compare(c.widgetManager.diagnostics().counters.releases,0)
+    compare(provider.starts,1)
+    compare(provider.acquireCount,1)
+    compare(provider.releaseCount,0)
+    compare(provider.activeCount,1)
+    compare(provider.windowWrites.length,1)
+    compare(provider.windowWrites[0].pids[0],40)
+    compare(c.widgetView("herdr.agents").status,"ready")
+    compare(c.widgetView("herdr.agents").active,true)
+    compare(area.presentedWidgetCount,0)
+    compare(area.height,0)
+    verify(c.projection.rows.some(function(row){return row.kind==="herdr-agent"&&row.agentId==="agent-1"}),
+      "the matched agent remains nested under its terminal window")
+    for(var transition=0;transition<3;transition++) {
+      value=snapshot(value.revision+1,false)
+      provider.publishSnapshot(value);c.refresh();wait(25)
+      compare(area.presentedWidgetCount,1,"an unmatched server exposes the fallback card")
+      verify(!c.projection.rows.some(function(row){return row.kind==="herdr-agent"}))
+      value=snapshot(value.revision+1,true)
+      provider.publishSnapshot(value);c.refresh();wait(25)
+      compare(area.presentedWidgetCount,0,"matching hides the fallback card again")
+      verify(c.projection.rows.some(function(row){return row.kind==="herdr-agent"&&row.agentId==="agent-1"}))
+      compare(c.widgetManager.diagnostics().counters.acquisitions,1)
+      compare(c.widgetManager.diagnostics().counters.releases,0)
+      compare(provider.starts,1)
+      compare(provider.stops,0)
+      compare(provider.activeCount,1)
+      compare(provider.suspensions,0)
+    }
+    for(var i=0;i<4;i++) {
+      host.externalDescriptors=({})
+      wait(20)
+      var counters=c.widgetManager.diagnostics().counters
+      verify(counters.acquisitions===1&&counters.releases===0,
+        "registry refresh keeps one acquisition and zero releases; actual acquisitions="+
+          counters.acquisitions+" releases="+counters.releases)
+      verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire,
+        "host registry refresh must retain the Herdr acquisition function")
+      compare(provider.starts,1)
+      compare(provider.stops,0)
+    }
+    var refreshTimer=createTemporaryObject(registryRefreshFactory,testCase,{
+      registryHost:host,manager:c.widgetManager,backend:provider,acquireFunction:acquire
+    })
+    refreshTimer.start()
+    tryCompare(refreshTimer,"refreshes",5,6000)
+    host.externalDescriptors=({"fixture.unrelated":{
+      id:"fixture.unrelated",label:"Unrelated",manageable:true,
+      available:true,status:"ready",revision:1,
+      expandedView:null,compactView:null,popupView:null,
+      acquire:function(owner){return {setActive:function(){},release:function(){}}}
+    }})
+    wait(20)
+    compare(c.widgetManager.diagnostics().counters.acquisitions,1)
+    compare(c.widgetManager.diagnostics().counters.releases,0)
+    verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire)
+    host.externalDescriptors=({})
+    wait(20)
+    compare(c.widgetManager.diagnostics().counters.acquisitions,1)
+    compare(c.widgetManager.diagnostics().counters.releases,0)
+    verify(host.sidebarWidgetRegistry["herdr.agents"].acquire===acquire)
+
+    panel.visible=false; panel.visible=true
+    panel.panelCollapsed=true; panel.panelCollapsed=false
+    compare(c.widgetManager.diagnostics().counters.acquisitions,1)
+    compare(c.widgetManager.diagnostics().counters.releases,0)
+    c.screens=[]; c.refresh()
+    compare(provider.stops,1)
+    compare(provider.suspensions,1)
+    compare(provider.releaseCount,0)
+    compare(c.widgetManager.diagnostics().counters.releases,0)
+    c.screens=[{name:"TEST",width:1920,height:1080}]; c.refresh()
+    compare(provider.starts,2)
+    compare(provider.suspensions,1)
+    compare(c.widgetManager.diagnostics().counters.acquisitions,1)
+    compare(c.widgetManager.diagnostics().counters.releases,0)
+    bridge.dockConsumerActive=true
+    c.settings=Object.assign({},c.settings,{sidebarWidgets:[]}); c.refresh()
+    compare(c.widgetManager.diagnostics().counters.releases,1)
+    compare(provider.activeCount,1,"the classic Herdr consumer keeps the shared provider active")
+    compare(provider.stops,1)
+    compare(provider.suspensions,1)
+    compare(provider.releaseCount,0)
+    bridge.dockConsumerActive=false
+    compare(provider.activeCount,0)
+    compare(provider.stops,2)
+    compare(provider.suspensions,2)
+    compare(provider.acquireCount,1)
+    compare(provider.releaseCount,0,"the bridge retains its inactive service lease until destruction")
+    activeHerdrService=null;activeHerdrWindows=[];activeHerdrHandles=[]
   }
   function test_mirrors_have_independent_anchors_and_no_new_leases() {
     var f=build(),g=build(340,null,f.controller,f.provider);settle(f);settle(g)

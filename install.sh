@@ -89,6 +89,8 @@ install_client_bundle() {
     install -m 0644 "$source_dir/scripts/smartdock_cli.py" "$destination/scripts/smartdock_cli.py"
     install -m 0644 "$source_dir/scripts/smartdock_dev.py" "$destination/scripts/smartdock_dev.py"
     install -m 0644 "$source_dir/scripts/smartdock_widget.py" "$destination/scripts/smartdock_widget.py"
+    install -m 0644 "$source_dir/scripts/dockrail_t3.py" "$destination/scripts/dockrail_t3.py"
+    install -m 0644 "$source_dir/scripts/smartdock_settings_actions.py" "$destination/scripts/smartdock_settings_actions.py"
     install -m 0644 "$source_dir/scripts/dockrail_paths.py" "$destination/scripts/dockrail_paths.py"
     install -m 0644 "$source_dir/scripts/dockrail_migrate.py" "$destination/scripts/dockrail_migrate.py"
     install -m 0755 "$source_dir/scripts/smartdock_seed_demo_widgets.py" "$destination/scripts/smartdock_seed_demo_widgets.py"
@@ -106,11 +108,24 @@ install_client_bundle() {
 
 if $cli_only; then
   command -v python3 >/dev/null 2>&1 || { echo 'Python 3 is required for the CLI.' >&2; exit 1; }
-  install_client_bundle "$client_dir"
-  printf '%s\n' "$source_dir" >"$client_dir/.source-dir"
+  plugin_dir="$HOME/.config/omarchy/plugins/io.github.fernandodamaso.dockrail"
+  xdg_plugin_dir="$config_home/omarchy/plugins/io.github.fernandodamaso.dockrail"
+  if [[ "$source_dir" == "$plugin_dir" || "$source_dir" == "$xdg_plugin_dir" ]]; then
+    rm -rf -- "$client_dir"
+    install -d "$client_dir" "$bin_home"
+    printf '%s\n' "$source_dir" >"$client_dir/.plugin-dir"
+    install -m 0755 "$source_dir/uninstall.sh" "$client_dir/uninstall.sh"
+    install -m 0755 "$source_dir/scripts/dockrail" "$bin_home/dockrail"
+    install -m 0755 "$source_dir/scripts/smartdock" "$bin_home/smartdock"
+  else
+    rm -f -- "$client_dir/.plugin-dir"
+    install_client_bundle "$client_dir"
+    printf '%s\n' "$source_dir" >"$client_dir/.source-dir"
+  fi
   echo "Installed Dockrail client: $bin_home/dockrail"
   echo "Installed SmartDock compatibility command: $bin_home/smartdock"
   echo 'No dock, configuration, autostart or terminal-agent assets were installed.'
+  echo "Next: $bin_home/dockrail setup"
   exit
 fi
 
@@ -133,7 +148,15 @@ install_agent_assets() {
 
 if $agent_assets_only; then
   install_agent_assets
-  echo 'Installed Dockrail terminal-agent launchers and icons.'
+  cat <<'EOF'
+Installed Dockrail terminal-agent launchers and icons.
+
+Plugin-folder invocation:
+  bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh" --agent-assets-only
+
+Next: reload the dock with `omarchy restart shell`.
+Then verify with `dockrail doctor`.
+EOF
   exit
 fi
 
@@ -160,14 +183,17 @@ if [[ "$source_dir" != "$app_dir" ]]; then
   rm -rf -- "$app_dir/Dockrail"
   rm -rf -- "$app_dir/assets"
   rm -rf -- "$app_dir/provider/herdr"
+  rm -rf -- "$app_dir/provider/t3"
   install -d "$app_dir/provider"
   cp -R -- "$source_dir/components" "$app_dir/components"
   cp -R -- "$source_dir/SmartDock" "$app_dir/SmartDock"
   cp -R -- "$source_dir/Dockrail" "$app_dir/Dockrail"
   cp -R -- "$source_dir/assets" "$app_dir/assets"
   cp -R -- "$source_dir/provider/herdr" "$app_dir/provider/herdr"
+  cp -R -- "$source_dir/provider/t3" "$app_dir/provider/t3"
   chmod 0755 "$app_dir/provider/herdr/bin/smartdock-herdr-helper" \
     "$app_dir/provider/herdr/bin/smartdock-herdr-provider"
+  chmod 0755 "$app_dir/provider/t3/bin/dockrail-t3-provider"
   install -m 0644 "$source_dir/shell.qml" "$app_dir/shell.qml"
   install -m 0644 "$source_dir/DockHost.qml" "$app_dir/DockHost.qml"
   install -m 0644 "$source_dir/LICENSE" "$app_dir/LICENSE"

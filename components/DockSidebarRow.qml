@@ -1644,7 +1644,7 @@ Item {
     id: newWorkspaceFooter
     visible: root.showNewWorkspaceFooter
     x: root.workspaceCardInset
-    y: root.computedHeight - root.footerTargetHeight
+    y: root.computedHeight - root.footerTargetHeight - root.workspaceCardInset
     width: Math.max(0, root.width - root.workspaceCardInset * 2)
     height: root.footerTargetHeight
     z: 3

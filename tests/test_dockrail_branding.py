@@ -37,6 +37,11 @@ class DockrailBrandingTests(unittest.TestCase):
         self.assertNotIn("SmartDock for Omarchy installed successfully.", install)
         self.assertIn("Remove standalone Dockrail", uninstall)
 
+    def test_sidebar_uses_dockrail_brand(self):
+        sidebar = self.read("components/DockSidebar.qml")
+        self.assertIn('Accessible.name: "Dockrail"', sidebar)
+        self.assertNotIn('Accessible.name: "SmartDock"', sidebar)
+
     def test_current_docs_use_canonical_product_and_cli(self):
         current_docs = [
             "README.md", "AGENTS.md",

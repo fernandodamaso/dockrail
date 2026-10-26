@@ -1,10 +1,5 @@
 # Dockrail
 
-Want to try an unmerged version on your desktop? Use
-`dockrail dev use <worktree-path-or-local-branch>`, then `dockrail dev reset`
-to return to the installed copy. See [local version switching](docs/DEV_SWITCH.md)
-for setup, reload, and recovery commands.
-
 > Local Omarchy variant: pinned applications remain first, while grouped
 > running applications from every workspace are appended automatically.
 
@@ -45,12 +40,20 @@ A developer-focused workspace rail for Hyprland — apps, windows, workspaces, w
 
 ## Requirements
 
-- Hyprland
-- Quickshell 0.3 or newer
+- Omarchy 4.x with the Quattro plugin host for the plugin installation below
+- Hyprland and Quickshell 0.3 or newer
 - Python 3 for the configuration CLI (standard library only)
-- GLib's `gio` command for optional Trash integration
 - A working freedesktop icon theme
-- Optional numeric launcher counts: CMake, a C++20 compiler, and Qt 6.6+ Core/DBus development files to build the native provider
+- Git for a standalone source checkout
+
+Optional features have additional requirements:
+
+| Feature | Requirement |
+| --- | --- |
+| Herdr agents | Herdr 0.9.1+ for click-to-focus; older versions cannot jump to agents. See [Herdr setup](docs/HERDR_DATA_ACCESS.md). |
+| Chrome profiles, unread counts and tabs | Chrome with remote debugging explicitly enabled, a separate user-data directory, and the browser-profile provider. Omarchy does not enable remote debugging by default. See the [setup and security notes](docs/browser-activity.md#enable-chrome-profiles-and-tabs). |
+| Numeric launcher counts | CMake, a C++20 compiler, and Qt 6.6+ Core/DBus development files to build the optional provider. |
+| Trash | GLib's `gio` command. |
 
 ## Install
 
@@ -58,7 +61,15 @@ Install the Git-managed Omarchy plugin:
 
 ```bash
 omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes
+bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
+dockrail setup
 ```
+
+Omarchy does not run install hooks. The installed plugin directory is the
+checkout for this CLI command; its launchers read the current plugin files, so
+`omarchy plugin update` also refreshes CLI metadata. `dockrail setup` starts
+with the same feature-readiness checks and guides optional setup through the running host. If `${XDG_BIN_HOME:-$HOME/.local/bin}` is not on `PATH`, add it to your
+shell's `PATH` to use `dockrail` by name.
 
 Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
 Dockrail 3.0.0 uses a new plugin ID, so reinstall once. Your settings in
@@ -83,11 +94,11 @@ through Git push followed by `omarchy plugin update`.
 
 ### Standalone installation
 
-Standalone use is a secondary mode. From a source checkout, make sure
-Quickshell is installed and run:
+Standalone use is a secondary mode. After installing the requirements above,
+clone the source and run the installer:
 
 ```bash
-./install.sh
+git clone https://github.com/fernandodamaso/dockrail.git && cd dockrail && ./install.sh
 ```
 
 The installer uses only user directories, requires no `sudo`, and creates an
@@ -152,22 +163,63 @@ The plugin uses `~/.config/dockrail/dock.json`, shared with the standalone
 version. Do not run the standalone and plugin versions together, or two docks
 will appear.
 
+### Herdr agents
+
+Herdr agents requires Herdr 0.9.1+ for click-to-focus. With the `herdr` binary
+installed, open the sidebar **Add/Manage** picker and enable **Herdr agents**.
+Dockrail checks picker readiness without starting the Herdr provider; the existing
+provider still starts only while a Herdr consumer is active. A connected older
+server stays visible but cannot jump to an agent and shows
+`Update Herdr to 0.9.1+ to jump to agents`.
+
+Classic-dock Herdr indicators are a separate option:
+
+```bash
+dockrail config set dockHerdrIndicators true --json
+```
+
+`dockHerdrIndicators` controls classic dock indicators; it does not enable the
+sidebar Herdr agents widget.
+
+### T3 Code threads (pairing)
+
+Dockrail can show local T3 Code threads through a read-only pairing with the
+T3 server on this machine. Pairing stores a bearer session token in a `0600`
+file under the Dockrail data root; the token never appears in settings, logs
+or on a command line.
+
+```bash
+dockrail t3 pair --json
+dockrail t3 status --json
+dockrail t3 unpair --json
+```
+
+`pair` needs the `t3` CLI and a running T3 Code server. `status` exits 0 while
+paired and unexpired. `unpair` removes the local pairing; revoke the
+server-side session separately with `t3 auth session list` /
+`t3 auth session revoke <id>` when needed. Only loopback T3 servers are
+supported, and clicking a thread raises the T3 Code window (no thread
+deep link).
+
 ### Launcher badge count provider
 
 Numeric counts are optional and provider-owned. Omarchy plugin installation
-never compiles or executes an install hook. Build the small QtDBus provider from
-a trusted source checkout when you want application-provided counts:
+never compiles or executes an install hook. Build the small QtDBus provider
+directly from the installed plugin folder when you want application-provided
+counts:
 
 ```bash
-bash ./scripts/build-launcher-badge-provider
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/build-launcher-badge-provider"
 ```
 
-The script builds outside the Git checkout, runs the provider tests, and
-installs only the resulting executable under
-`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Reload or restart
-the Dockrail plugin afterwards. If the binary, Qt runtime, D-Bus service, or an
+The script builds outside the installed plugin tree, runs the provider tests,
+and installs only the resulting executable under
+`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Then reload the
+dock with `omarchy restart shell` and verify with `dockrail doctor`. From a
+separate source checkout, `bash ./scripts/build-launcher-badge-provider`
+remains supported. If the binary, Qt runtime, D-Bus service, or an
 application's launcher-count support is unavailable, Dockrail keeps the
-FDM-809 attention dots; it does not poll or scrape another source for a number.
+attention dots; it does not poll or scrape another source for a number.
 
 The provider listens to the established
 `com.canonical.Unity.LauncherEntry.Update` session-bus protocol and accepts only
@@ -229,15 +281,19 @@ optional browser-profile provider reads Chrome's DevTools endpoint (one CDP
 browser context per profile) and publishes which profile owns each window:
 
 ```bash
-bash ./scripts/install-browser-profile-provider
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/install-browser-profile-provider"
 ```
 
-The script byte-compiles the Python helper and installs it under
-`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Reload or restart
-the Dockrail plugin afterwards. The browser must run with
-`--remote-debugging-port` (Omarchy's Chrome defaults enable it); without a
-reachable endpoint the dock simply keeps the plain application icon, exactly
-like an unavailable launcher-count provider.
+The script stages its bytecode check outside the installed plugin tree and
+installs the Python helper under
+`${XDG_DATA_HOME:-$HOME/.local/share}/dockrail/providers/`. Then reload the
+dock with `omarchy restart shell` and verify with `dockrail doctor`. From a
+separate source checkout, `bash ./scripts/install-browser-profile-provider`
+remains supported. Chrome remote debugging is optional and must
+be enabled explicitly with a separate user data directory. Follow
+**[Enable Chrome profiles and tabs](docs/browser-activity.md#enable-chrome-profiles-and-tabs)**
+for setup, verification, and the security implications. Without a reachable
+endpoint the dock keeps the plain application icon.
 
 Detected profiles render as a small corner badge over the app icon: the
 profile's own photo when one exists, otherwise an initial circle in a
@@ -294,12 +350,16 @@ in separate Ghostty windows:
 Each launcher runs `ghostty --gtk-single-instance=false` with a unique, valid
 GTK/Wayland application ID. Standalone users get these entries from the
 normal `./install.sh`. Plugin users can install only the launchers and icons
-from a Dockrail source checkout, without requiring Quickshell, installing a
-second dock, enabling autostart, or changing the dock configuration:
+directly from the installed plugin folder, without requiring Quickshell,
+installing a second dock, enabling autostart, or changing the dock configuration:
 
 ```bash
-./install.sh --agent-assets-only
+bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh" --agent-assets-only
 ```
+
+Then reload the dock with `omarchy restart shell` and verify with
+`dockrail doctor`. From a separate source checkout,
+`./install.sh --agent-assets-only` remains supported.
 
 The plugin itself is installed with:
 
@@ -320,7 +380,13 @@ tmux. An agent running over SSH or inside a container may expose only the local
 shell/terminal title, so it can remain grouped under Ghostty instead of its
 agent launcher. These entries still provide direct launches even when runtime
 grouping cannot identify a session.
-### Development
+
+## Contributing
+
+Want to try an unmerged version on your desktop? Use
+`dockrail dev use <worktree-path-or-local-branch>`, then `dockrail dev reset`
+to return to the installed copy. See [local version switching](docs/DEV_SWITCH.md)
+for setup, reload, and recovery commands.
 
 Development happens in the canonical source checkout or in your own clone,
 never in the installed Omarchy checkout:
@@ -344,13 +410,14 @@ preserved in this repository.
 The [CLI reference](docs/CLI_REFERENCE.md) describes commands, JSON fields and
 errors; the [configuration inventory](docs/CONFIGURATION.md) lists all 58
 settings, declared defaults and dependencies. Both ship beside the offline
-[agent guide](docs/AGENT_CONFIGURATION.md). Its recipes are executed against
-the real CLI parser and production host/model harness in the existing CI;
-that is not real Omarchy rendering or IPC qualification.
+[agent guide](docs/AGENT_CONFIGURATION.md). It explains safe changes, backups,
+readback and recovery. A successful CLI response confirms only the reported
+configuration and persistence state, not the visible result on your desktop.
 
 Use the selected running host through the CLI rather than editing a live
-`dock.json`. Install just the client from a source checkout without starting a
-second dock:
+`dock.json`. The plugin installation command above installs the CLI from the
+installed plugin directory. For a separate source checkout, install a copied
+CLI bundle without starting a second dock:
 
 ```bash
 bash ./install.sh --cli-only
@@ -370,9 +437,10 @@ for atomic patches, dry runs, persistence errors, reset scope and safe exports.
 [`config/dock.json`](config/dock.json) contains bundled defaults, not necessarily
 the running configuration.
 
-Configuration is CLI-first: there is no settings window or live preference preview.
-Icon artwork is the one exception: right-click an app, window or pinned app and
-choose **Change Icon…** to edit its app-wide, browser-profile or window-title icon
+The CLI is the configuration interface for AI coding agents and automation.
+The accepted [Settings 3.1 design](docs/SETTINGS.md) is not shipped yet; there is
+no live preference preview. **Change Icon** remains the sole icon editor:
+right-click an app, window or pinned app and choose **Change Icon…** to edit its app-wide, browser-profile or window-title icon
 through the same host writer. The dock, ordinary window previews, application picker,
 context menus, drag reordering, workspace controls and Trash remain available.
 The first sliders icon opens the existing launcher/add-application/auto-hide menu.
@@ -451,7 +519,7 @@ apply. Read the running host's schema/defaults and preserve the user's values:
   "workspaceLayout": "flat",
   "workspaceMonitorScope": "all",
   "workspaceMonitorOrder": [],
-  "groupWindows": true,
+  "groupWindows": false,
   "interfaceAnimationsEnabled": true,
   "attentionBadgesEnabled": true,
   "urgentWindowAnimationEnabled": true,
@@ -496,9 +564,9 @@ apply. Read the running host's schema/defaults and preserve the user's values:
 | `borderWidthEnabled` | When `true`, use `borderWidth` instead of the theme border width |
 | `borderWidth` | Custom dock border width from `0` to `8` pixels |
 | `presentationMode` | Global default presentation: `classic` bottom dock (default) or `sidebar`; a connector listed in `presentationModeByMonitor` ignores this default |
-| `presentationModeByMonitor` | Per-connector presentation overrides such as `{"DP-1":"classic"}`; listed connectors ignore `presentationMode` and `sidebarMonitor`, missing connectors inherit the default, disconnected names stay saved, and the mode-switch drag writes one entry for the dragged monitor only |
+| `presentationModeByMonitor` | Per-connector presentation overrides such as `{"DP-1":"classic"}`; listed connectors ignore `presentationMode` and `sidebarMonitor`, missing connectors inherit the default, disconnected names stay saved, and a menu or background-drag switch writes one entry for its monitor only |
 | `position` | Classic dock edge; new writes accept only `bottom` because the vertical presentation is `presentationMode: sidebar`, and legacy `left`, `right` and `top` read as bottom |
-| `fullLength` | Fill the screen width, or height for a vertical dock |
+| `fullLength` | Fill the classic dock screen width |
 | `workspaceLayout` | `flat` (default) or `grouped` workspace cards; grouped applies to the bottom dock and scrolls when crowded |
 | `workspaceMonitorScope` | Grouped cards: `all` (default) mirrors workspaces across docks; `current-monitor` shows only each dock’s monitor |
 | `workspaceMonitorOrder` | Grouped/all monitor section order by exact connector name. `[]` uses automatic physical x/y order; saved disconnected connectors remain stored for reconnect. |
@@ -509,13 +577,13 @@ apply. Read the running host's schema/defaults and preserve the user's values:
 | `scrollAction` | Vertical scroll action; `cycle-windows` cycles grouped live windows, while `none` preserves pass-through |
 | `controlCommand` | Shell command run by **Open App Launcher** in the first icon's controls menu; defaults to the stock `SUPER + ALT + SPACE` apps menu |
 | `sortByWorkspace` | When `true`, group open apps by workspace number; closed pinned apps stay first |
-| `groupWindows` | When `true`, combine an app's open windows into one dock icon; when `false`, show one icon per window |
+| `groupWindows` | Deprecated; new writes accept only `false`. Use `workspaceGroups` for grouping in classic workspace cards. |
 | `interfaceAnimationsEnabled` | Animate workspace focus, card/icon insertion and removal, window moves, and context-menu opening; defaults to `true` |
 | `windowScope` | Running-window visibility: `all`, `workspace`, `monitor`, or `workspace-monitor`; invalid/missing values use `all` |
 | `showUrgentOutsideScope` | When enabled, a true Hyprland-urgent window may bypass a non-`all` scope; notification/SNI attention does not |
-| `attentionBadgesEnabled` | Show application attention badges. FDM-809 dot severity remains the fallback; in automatic mode an authoritative positive visible launcher count may replace that dot. |
+| `attentionBadgesEnabled` | Show application attention badges. Dot severity remains the fallback; in automatic mode an authoritative positive visible launcher count may replace that dot. |
 | `urgentWindowAnimationEnabled` | When `true`, active SNI, critical local-notification, or Hyprland urgent attention may nudge the owning application icon, no more than once every 3000 ms while attention remains. A launcher count alone never animates; a count with attention still does. Motion is effective only while `attentionBadgesEnabled` is also enabled; disabling it leaves the static badge intact. |
-| `launcherBadgeMode` | `automatic` shows authoritative application-provided counts when available; `dots-only` ignores numeric provider state and preserves FDM-809 dots only. |
+| `launcherBadgeMode` | `automatic` shows authoritative application-provided counts when available; `dots-only` ignores numeric provider state and preserves dots only. |
 | `browserProfileBadgesEnabled` | Show per-window browser profile badges when the browser-profile provider is installed and the browser exposes a DevTools endpoint; no provider is installed or started by this setting. |
 | `dockHerdrIndicators` | Show Herdr agent state on terminal icons, in hover previews and in the context menu. Uses the existing Herdr provider; enabling it starts that provider while a classic dock is active, including when it is auto-hidden. |
 | `browserActivityMutedServices` | Service IDs muted from Chrome activity header and badge totals (`gmail`, `whatsapp`, …); rows stay visible/dimmed and openable; retained by preference reset |
@@ -577,8 +645,8 @@ global artwork revision without writing settings, and other mapped icons may
 refresh too. Setting an equivalent source also requests a reload without a
 redundant save. Every successful icon response
 reports `renderVerified: false`: persistence and reload requests do not prove
-image decoding or a visible redraw. Real rendering/cache behavior is reserved
-for local Omarchy qualification, not claimed by headless tests.
+image decoding or a visible redraw. Check the visible result on your Omarchy
+desktop; headless tests cannot confirm image decoding or cache behavior there.
 
 ### Application pointer actions
 
@@ -649,10 +717,10 @@ unknown or transient location data fails open so the only restore affordance is
 not lost. Scope refresh is debounced once in `DockHost.qml` for all monitor
 Docks, with no per-Dock `hyprctl` polling.
 
-### Grouped-window wheel cycling
+### Application attention badges
 
 Attention dots deliberately represent **attention state**, not inferred unread
-counts. Dockrail reduces three FDM-809 sources when they are available:
+counts. Dockrail reduces three sources when they are available:
 StatusNotifierItem `NeedsAttention`, Hyprland's live urgent state/events, and
 the Omarchy notification service. Notification events are never counted.
 Identity matching is exact after case-folding and an optional `.desktop` suffix
@@ -662,7 +730,7 @@ not. Grouped applications render one badge; ungrouped applications assign the
 badge to the first visible item for that app. Hidden applications do not render
 a badge.
 
-FDM-814 motion follows active badge severity: SNI `NeedsAttention`, critical
+Attention motion follows active badge severity: SNI `NeedsAttention`, critical
 local-notification attention, and Hyprland urgent window state can trigger the
 nudge. A previously absent Hyprland urgent **window address** still creates a
 motion revision, while duplicate urgency for an address that remains urgent
@@ -682,7 +750,7 @@ semantics.
 When the optional launcher provider is available and `launcherBadgeMode` is
 `automatic`, a positive count with `count-visible=true` takes precedence over
 the attention dot. Counts above 99 render as `99+`. Explicit zero or
-`count-visible=false` hides the number and allows any current FDM-809 attention
+`count-visible=false` hides the number and allows any current attention
 dot to remain visible. `dots-only` ignores numeric state entirely. The count is
 authoritative application state: focusing a window does **not** clear it.
 Provider sender disconnects clear sender-owned state, and reconnects start from
@@ -693,12 +761,13 @@ notification attention expires after 24 hours and clears only after the matched
 application remains focused for about 800 ms. Live SNI state and authoritative
 launcher counts are never cleared by Dockrail focus handling. Standalone mode,
 or an Omarchy host without either optional service, simply omits the unavailable
-source while the remaining FDM-809 sources continue to work.
+source while the remaining sources continue to work.
 
 The first dock icon is always the dock controls icon and is not part of
 `pinned`. Clicking it opens the controls menu; **Open App Launcher** runs
-`controlCommand`, while the menu also exposes Add Pinned Application and the auto-hide
-toggle. Application context menus contain only application and window actions.
+`controlCommand`, while the menu also exposes Add Pinned Application,
+**Switch to sidebar**, and the auto-hide toggle. The sidebar header menu offers
+**Switch to dock**. Application context menus contain only application and window actions.
 For example, with the Omarchy app-launcher plugin already installed:
 
 ```bash
@@ -727,17 +796,21 @@ to clear hidden membership. Restoring an application returns it to its existing
 pinned position without pinning or unpinning anything. `config reset --preferences`
 intentionally preserves `hiddenApplications` and the other application collections.
 
-The configuration file is watched and updates automatically. Drag a dock icon to another slot to reorder it; the new `pinned` order is written back to this file. Dragging genuinely empty background switches that monitor's presentation: drag the bottom dock's background left (48 px or more) to switch that monitor to the sidebar, or drag empty sidebar background downward to return it to the bottom dock. The hint pill, the destination silhouette and the result stay on the monitor where the drag started; other monitors keep their own modes, so a mixed layout with a classic dock beside a sidebar is normal. While you drag, a direction hint pill appears and, once the threshold is crossed, a silhouette of the destination edge previews where it will render; releasing past the threshold commits one `presentationModeByMonitor` entry for that connector once, and releasing earlier, pressing Escape, or an interrupted drag (open menu, popup, resize or row drag) cancels with no settings write. Only background is eligible — rows, widgets, headers, pinned strips and controls keep their own input. The existing settings writer persists the mode only after release. Feedback for a rejected or failed commit appears only on the monitor that produced the gesture. Reserved space follows visibility: while auto-hide is off, the `reserveSpace` option decides whether tiled windows keep a clear dock-sized area; while auto-hide is on, the hidden dock never reserves space.
+The configuration file is watched and updates automatically. Drag a dock icon to another slot to reorder it; the new `pinned` order is written back to this file. Switch presentation from **Switch to sidebar** in Dock Controls or **Switch to dock** in the sidebar header menu. You can also drag genuinely empty background: drag the bottom dock's background left (48 px or more) to switch that monitor to the sidebar, or drag empty sidebar background downward to return it to the bottom dock. The hint pill, the destination silhouette and the result stay on the monitor where the drag started; other monitors keep their own modes, so a mixed layout with a classic dock beside a sidebar is normal. While you drag, a direction hint pill appears and, once the threshold is crossed, a silhouette of the destination edge previews where it will render; releasing past the threshold commits one `presentationModeByMonitor` entry for that connector once, and releasing earlier, pressing Escape, or an interrupted drag (open menu, popup, resize or row drag) cancels with no settings write. Only background is eligible — rows, widgets, headers, pinned strips and controls keep their own input. The existing settings writer persists the mode only after release. Feedback for a rejected or failed commit appears only on the monitor that produced the gesture. Reserved space follows visibility: while auto-hide is off, the `reserveSpace` option decides whether tiled windows keep a clear dock-sized area; while auto-hide is on, the hidden dock never reserves space.
 
 Surface override settings are independent. Leave an `*Enabled` flag set to
 `false` to follow the active Omarchy theme; enable it to use the matching
 custom color or width. Custom background alpha is multiplied by
 `backgroundOpacity` just like the theme background.
 
-For a full-height vertical dock on the left, use one related patch:
+For a left sidebar as the default presentation, use one related patch. Existing
+per-monitor choices in `presentationModeByMonitor` take precedence and are kept;
+use **Switch to sidebar** on that monitor's Dock Controls menu to change only
+that monitor. The classic dock remains bottom-only.
 
+<!-- recipe: sidebar-default -->
 ```bash
-printf '%s\n' '{"position":"left","fullLength":true}' | dockrail config apply --stdin --json
+printf '%s\n' '{"presentationMode":"sidebar","sidebarEdge":"left"}' | dockrail config apply --stdin --json
 ```
 
 ### Disable cursor warping
@@ -776,9 +849,10 @@ This disables cursor warping for all workspace changes, not only dock clicks.
 Use `dockrail config set workspaceLayout grouped --json` to enable horizontal
 workspace cards. Use `dockrail config set workspaceLayout flat --json` to roll
 back. Missing/invalid values and `config reset workspaceLayout` use flat.
-The left position renders flat without changing the saved preference. Window
-scope, workspace sorting and urgent-outside-scope affect the flat layout; their
-saved values are preserved. `groupWindows` remains effective in either layout.
+Workspace cards are a classic-dock layout; the sidebar keeps its own hierarchy.
+Window scope, workspace sorting and urgent-outside-scope affect the flat layout;
+their saved values are preserved. Use `workspaceGroups` to group applications in
+workspace cards; the legacy `groupWindows` setting is deprecated.
 
 By default, `workspaceMonitorScope: all` shows the same ordered monitor sections,
 workspaces and applications on every monitor dock. When more than one monitor is
@@ -922,12 +996,12 @@ flicking and active-card auto-reveal pause. Card replacement is deferred, but
 live window/destination validation continues. Release rechecks the final pointer
 and live destination; lost grabs, invalid releases or incompatible layout changes
 clear the feedback without moving windows. See the
-[implementation plan and remote/local handoff](docs/superpowers/plans/2026-09-09-smartdock-workspace-drag.md)
-for test coverage and the separate real-pointer Omarchy qualification gate.
+[developer test notes](docs/superpowers/plans/2026-09-09-smartdock-workspace-drag.md)
+for automated coverage and the pointer checks that need an Omarchy desktop.
 
-### Global sidebar source foundation (FDM-964 / SB-02)
+### Global sidebar
 
-The unreleased sidebar candidate adds `presentationMode` (default `classic`),
+The sidebar is configured with `presentationMode` (default `classic`),
 `presentationModeByMonitor` (empty = every connector follows the effective
 default, so one output can run the bottom dock while another runs the sidebar),
 `sidebarEdge` (`left`), `sidebarMonitor` (empty = all connected monitors), `sidebarExpandedWidth` (320),
@@ -938,12 +1012,12 @@ default, so one output can run the bottom dock while another runs the sidebar),
 monitor/workspace/application/window hierarchy or every individual window icon
 in a rail; app groups fold, and Chrome windows can expand open tabs when the
 provider is available (see [`docs/browser-tabs.md`](docs/browser-tabs.md)).
-Classic preferences remain unchanged. This source slice is Draft, not a deployed
-or fully interactive sidebar release. [Implementation and qualification](docs/SIDEBAR.md).
+Classic preferences remain unchanged. Check the selected host with
+`dockrail config schema --json` for the settings supported by your installation.
+See the [sidebar developer reference](docs/SIDEBAR.md) for implementation details.
 
-The [Widget foundation](docs/SIDEBAR_WIDGETS.md) keeps the FDM-967 host-owned
-provider leases while FDM-999 lays out independently scrollable hierarchy and
-Widget body panes. The Widget header, PINNED and Applications remain fixed.
+The [Widget system](docs/SIDEBAR_WIDGETS.md) shares host-owned provider leases
+across independently scrollable hierarchy and Widget body panes. The Widget header, PINNED and Applications remain fixed.
 A content-aware 55% hierarchy cap returns unused space; constrained height
 preserves the full Widget header when possible and otherwise hides the section
 without removing the main-header Add/Manage entry. Hidden Herdr fallback cards
@@ -952,4 +1026,4 @@ footer or a configurable splitter.
 `sidebarWidgets` stores enabled order and `sidebarWidgetCollapsed` stores card
 body state. Empty configuration adds no Widget-section height/work; unknown imported
 IDs are unavailable and never executed. Test providers exist only in fixtures.
-Real compositor qualification remains a local follow-up.
+Scrolling, focus and pointer behavior must be checked in the actual desktop session.

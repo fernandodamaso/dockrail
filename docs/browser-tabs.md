@@ -3,6 +3,8 @@
 Dockrail can nest open Chrome **page tabs** under each matched Hyprland Chrome
 window row in sidebar mode. This is a separate snapshot channel from unread
 [`activities`](browser-activity.md); it does not overload activity rows.
+Enable the optional Chrome endpoint and install the provider using
+**[Enable Chrome profiles and tabs](browser-activity.md#enable-chrome-profiles-and-tabs)**.
 
 ## Snapshot contract
 

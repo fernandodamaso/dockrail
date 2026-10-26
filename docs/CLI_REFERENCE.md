@@ -1,8 +1,12 @@
 # Dockrail CLI reference
 
-**Unreleased CLI-first candidate — Draft PR #44, `feat/fdm-914-cli-first`.** This describes implemented source, not an available release, permission to deploy, or completed Omarchy runtime qualification. Older installed builds may not implement this interface. Discover the selected host's schema instead of assuming this document describes that installation.
+**CLI interface.** Older installed builds may not implement every command in this reference. Discover the selected host's schema before changing settings, and use `dockrail doctor` to check the current installation.
 
-Start with [the agent guide](AGENT_CONFIGURATION.md). [Configuration inventory](CONFIGURATION.md) records every declared default and dependency. Source qualification belongs to [CLI_RUNTIME_CHECKS.md](CLI_RUNTIME_CHECKS.md); historical delivery evidence is not evidence for a newer SHA.
+Start with [the agent guide](AGENT_CONFIGURATION.md). [Configuration inventory](CONFIGURATION.md) records every declared default and dependency. Desktop verification steps are in [CLI_RUNTIME_CHECKS.md](CLI_RUNTIME_CHECKS.md). Results from another version do not confirm behavior on your installation.
+
+## Settings and the CLI
+
+Dockrail 3.1 has an accepted Settings-panel design for people, recorded in `docs/SETTINGS.md`. That record describes the planned panel; it does **not** ship the Settings UI or a new `dockrail settings` command. AI coding agents and automation continue to use this CLI as the complete configuration interface. The future Settings surface must send the same host intents through the single host writer and expose the same requested/effective, applied, persisted and retry semantics; it is not an alternate configuration backend. **Change Icon** remains the sole icon editor.
 
 ## Selection and transport
 
@@ -20,7 +24,7 @@ All commands below are prefixed with `dockrail`. Control options work before or 
 
 The host's `data.configPath` is authoritative. The canonical configuration is `${XDG_CONFIG_HOME:-$HOME/.config}/dockrail/dock.json`; `DOCKRAIL_CONFIG` is the canonical explicit override and `SMARTDOCK_CONFIG` remains accepted for compatibility. A managed legacy `${XDG_CONFIG_HOME:-$HOME/.config}/smartdock` path may resolve to the canonical state after migration. Changing the client's environment does **not** redirect an already-running host. No configuration command launches, restarts or installs a host.
 
-The standard-library Python adapter currently uses `qs list --all --json` and `qs ipc --pid PID call -- smartdock request PAYLOAD`, with argv arrays, no shell evaluation, a 2-second subprocess timeout and an 8-second discovery/IPC deadline. Requests are bounded to 64 KiB and response stdout to 1 MiB. Diagnostics remain separate. The Omarchy wrapper's newest-instance selection cannot provide the exact selection required here; no guessed wrapper flags or raw socket protocol are used. Compatibility with the installed Quickshell build and real scheduling is a local gate.
+The standard-library Python adapter currently uses `qs list --all --json` and `qs ipc --pid PID call -- smartdock request PAYLOAD`, with argv arrays, no shell evaluation, a 2-second subprocess timeout and an 8-second discovery/IPC deadline. After host discovery, guided `setup` gives each IPC call its own 2-second timeout, so prompts and installer execution do not consume the discovery deadline. Requests are bounded to 64 KiB and response stdout to 1 MiB. Diagnostics remain separate. The Omarchy wrapper's newest-instance selection cannot provide the exact selection required here; no guessed wrapper flags or raw socket protocol are used. Verify compatibility and timing with the Quickshell build running on your desktop.
 
 ## Discovery commands
 
@@ -29,7 +33,7 @@ The standard-library Python adapter currently uses `qs list --all --json` and `q
 | `help` | Prints full help; bare `dockrail` does the same. No host or directories required. |
 | `agent-guide` | Prints the installed `docs/AGENT_CONFIGURATION.md`; works without the source checkout or a host. With JSON, text is `data.text`. |
 | `status` | Selected host identity, config path, load/write state and revision. Not a settings mutation. |
-| `doctor` | Read-only status plus `data.checks`: `python`, `quickshell`, `omarchyShell`, `liveRuntime`. Missing runtime, invalid configuration or failed persistence exits nonzero. |
+| `doctor` | Read-only status plus `data.checks` and stable `data.features` readiness. Optional `missing`/`degraded` features still exit 0; missing runtime, invalid configuration or failed persistence exits nonzero. |
 | `config schema` | Optional `KEY`; keyed `data.settings`, `schemaVersion: 1`, implemented `data.commands`, `source: runtime` or `bundled`. Defaults are loaded from `config/dock.json`, not duplicated in metadata. |
 | `config get` | Optional `KEY` and `--effective`; keyed `data.settings` even for one key, `source`/`view: requested` or `effective`. Includes unknown retained keys on a full read. |
 
@@ -38,6 +42,77 @@ Only `config schema` may fall back to bundled metadata, and only after genuinely
 Status fields: `runtime`, `configPath`, `loadState` (`missing`, `loaded`, `invalid`), `loadError`, `loadPending`, `revision`, `writeState` (`idle`, `saving`, `saved`, `error`), `writeError`, `persisted`, `defaultsInUse`. A missing file is not a saved defaults file. Invalid disk configuration retains last-good live values and blocks ordinary writes; repair explicitly rather than replacing it with defaults. Revision is scoped to the host lifetime, not a compare-and-swap token. Pending readback makes persistence unconfirmed.
 
 Requested values retain intent. Effective output projects current normalization and layout dependencies, not fully resolved rendering. Theme-owned/token colors and theme-owned border width are `null`, with `themeResolution: not-reported` and a warning on effective reads. Do not erase a token because its renderer-resolved value is unknown.
+
+### Doctor feature readiness
+
+Doctor keeps its legacy `status`, `reason` and `nextStep` fields for existing CLI agents. Each feature also exposes additive `configuration` (`off`, `partly-on`, `on`), `installation` (`missing`, `installed`), `runtime` (`unavailable`, `limited`, `ready`), and `nextAction` with `kind` and `text`. A disabled Chrome or Herdr preference does not by itself mean its provider is uninstalled. The Settings bridge reads `dockrail doctor --json` asynchronously, caches the last good result, and never runs installers.
+
+
+`dockrail doctor --json` keeps `apiVersion: 1` and adds a stable
+`data.features` object. Its keys are `sidebar`, `herdrAgents`,
+`chromeProfilesTabs`, `launcherCounts`, `agentLaunchers`, and
+`cliFreshness`. Every feature has exactly these readiness fields:
+
+```json
+{
+  "status": "ready | missing | degraded",
+  "reason": "human-readable current fact",
+  "nextStep": "one human-readable next action"
+}
+```
+
+`ready` means the requested runtime prerequisites are currently observable;
+`missing` means a required optional component or enablement is absent; and
+`degraded` means the feature is configured or partly present but cannot provide
+its complete behavior. Optional readiness does not change doctor exit status.
+Core runtime discovery, invalid configuration, persistence failure, transport
+and protocol failures keep their existing nonzero behavior.
+
+The detector is strictly read-only. It reads effective per-monitor presentation
+from status, requested feature flags through `config.get`, local executable and
+desktop-entry presence, Herdr's bounded `--version` output, current
+`herdr.agents` Widget lease diagnostics, and installed provider processes.
+The Chrome check makes one bounded HTTP request to
+`127.0.0.1:<configured-port>/json/version`; it never follows redirects or
+contacts a non-loopback host. Doctor never starts a provider or host, writes
+configuration, runs migration, installs anything, or changes the desktop.
+
+Herdr below 0.9.1 is `degraded` because click-to-focus is unavailable. Chrome
+profiles/tabs require an installed and running browser-profile provider, a
+reachable local DevTools endpoint, and at least one of
+`browserProfileBadgesEnabled` or `sidebarBrowserTabsEnabled`. Launcher counts
+check only the provider binary as specified by that feature's install contract.
+CLI freshness compares the client source revision and bundled client surface with
+the running plugin/standalone installation; a plugin-linked client is
+inherently `ready`.
+
+Human `dockrail doctor` renders the same feature status, reason and single next
+step without changing the JSON contract.
+
+
+## Guided setup
+
+The `setup` command is the human, interactive onboarding path for optional features. Run it as `dockrail setup`. It first renders the same readiness projection as `dockrail doctor`; it does not implement a second detector. Interactive setup requires a TTY. Scripting and agent use is explicit and limited to the final feature names:
+
+```sh
+dockrail setup --feature chrome --yes
+dockrail setup --feature herdr --yes
+dockrail setup --feature launcher-counts --yes
+dockrail setup --feature agent-launchers --yes
+```
+
+There is no scripted `sidebar` feature flag because Sidebar setup must choose a connected monitor. Interactive setup can add exactly one `presentationModeByMonitor` entry for the selected connector, preserving every other entry.
+
+Every configuration mutation goes through the selected running host. Setup sends a minimal `config.apply` dry run, applies only when the dry run is not a no-op, then reads the requested value and host persistence state back. It never edits `dock.json` directly. A missing or ambiguous host fails before installers or mutations run. Collection edits preserve existing order: Herdr appends `herdr.agents` only when absent. Unrelated and unknown settings are never sent back as a replacement snapshot. Running the same setup again is a no-op for settings already selected.
+
+Feature behavior is intentionally bounded:
+
+- **Herdr:** `--feature herdr --yes` requires `herdr` on `PATH`, appends `herdr.agents` through the host writer, and warns when the detected version is below 0.9.1 because click-to-focus is unavailable. If Herdr is absent, it prints the 0.9.1+ install prerequisite and changes nothing. Setup does not start, stop, or alter the Herdr provider lifecycle.
+- **Chrome:** `--feature chrome --yes` installs the browser-profile provider from the selected running Dockrail tree when missing. It prints, but never writes, the required `chrome-flags.conf` lines: a separate absolute `--user-data-dir=...` and `--remote-debugging-port=9222`. That is a fresh Chrome profile. While the localhost DevTools port is open, any local process can control that profile and read its pages and cookies. Setup never edits Chrome flags or restarts Chrome. Existing Dockrail Chrome display preferences are preserved rather than silently re-enabled.
+- **Agent launchers:** `--feature agent-launchers --yes` runs the existing `install.sh --agent-assets-only` path from the selected running Dockrail tree. It does not launch an agent.
+- **Launcher counts:** `--feature launcher-counts --yes` is guidance-only. It prints the installed-plugin-tree `scripts/build-launcher-badge-provider` command and the CMake/C++20/Qt 6.6+ requirements; setup never builds the optional native provider automatically.
+
+Setup never runs `controlCommand`, starts a host, changes Chrome flags, restarts Chrome, restarts the Omarchy shell, or performs an automatic launcher-count build. Installer failures return `E_SETUP` (exit 5). Human output ends with a fresh doctor summary and, only when newly installed assets require it, one `omarchy restart shell` instruction. Chrome restart remains a separate manual step after the user edits Chrome flags.
 
 ## Configuration commands
 
@@ -126,21 +201,56 @@ Every response uses `apiVersion: 1`, Boolean `ok`, object `data`, array `warning
 
 ## Installation and lifecycle boundary
 
-From the intended source checkout, `bash ./install.sh --cli-only` installs the canonical `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` command plus the `${XDG_BIN_HOME:-$HOME/.local/bin}/smartdock` compatibility command, with the adapter, defaults, schema, agent guide, reference and inventory under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`. `bash ./uninstall.sh --cli-only` removes this bundle while preserving settings, plugin and standalone ownership. Both installation orders retain the launchers while another bundle owns them. Help and guide use the installed bundle, not `.source-dir`. When canonical and legacy bundles coexist, the canonical client bundle takes precedence; update that bundle explicitly from the intended source.
+After `omarchy plugin add`, install the CLI from the installed plugin checkout:
 
-Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Use client-only reinstall for client updates and the normal, separately authorized Omarchy deployment path for a released plugin. No merge/deploy is authorized by this candidate reference.
+```sh
+bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cli-only
+dockrail doctor
+```
+
+This installs `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` and the `smartdock` compatibility command. The client record under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli` points at the plugin directory; the launchers read its adapter, defaults, schema and offline docs at invocation time. `omarchy plugin update` therefore refreshes those files without another CLI install. If the plugin is removed, the launchers report the reinstall commands. `bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/uninstall.sh --cli-only` removes the client record and its launchers while preserving settings and the plugin.
+
+From a separate source checkout, `bash ./install.sh --cli-only` retains the copied client bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`; refresh that bundle explicitly from the intended checkout. Full standalone installation retains its own bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail`. Client-only and standalone installation can coexist in either order, and removing one retains the launchers while the other owns them. The canonical client takes precedence over standalone and legacy bundles. Help and guide follow the selected bundle, not `.source-dir`.
+
+Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Updating or restarting an installed plugin is a separate, explicit operation; configuration commands never do it automatically.
+
+## T3 Code pairing (`dockrail t3`)
+
+`dockrail t3 pair` pairs the local machine with the local T3 Code server over
+a read-only bearer session, so Dockrail can show T3 Code threads. The token is
+written to a `0600` file under the Dockrail data root and is never printed,
+logged, or placed on a command line. Pairing is local-only; remote T3
+environments are out of scope.
+
+```sh
+dockrail t3 pair [--url http://127.0.0.1:3773] [--json]
+dockrail t3 status [--json]
+dockrail t3 unpair [--json]
+```
+
+`pair` checks the T3 listener ownership, issues a read-only pairing credential
+through the `t3` CLI, exchanges it for a bearer session, verifies the session,
+and writes the connection file atomically. `status` reports paired state,
+environment id, label, expiry and days left, and whether the server answers;
+it exits 0 when paired and unexpired, 1 otherwise. `unpair` deletes the local
+connection file; the running provider withdraws T3 threads within seconds.
+Local unpairing does not revoke the server-side session: revoke it separately
+with `t3 auth session list` / `t3 auth session revoke <id>` when needed.
+Errors exit 2 with a one-line message, or `{"ok":false,...}` with `--json`.
 
 ## Sidebar configuration and diagnostics
 
-The SB-02 candidate adds `presentationMode`, `presentationModeByMonitor`,
+Sidebar settings include `presentationMode`, `presentationModeByMonitor`,
 `sidebarEdge`, `sidebarMonitor`,
 `sidebarExpandedWidth`, `sidebarCollapsed`, `sidebarCollapsedByMonitor`,
 `sidebarBrowserTabsEnabled`, `sidebarWidgets` and `sidebarWidgetCollapsed`.
 Discover these keys on the selected
-host; do not assume an installed release implements this candidate.
+host; older installations may not expose every setting.
 
-In an isolated candidate session only:
+Examples below replace the named map or value. Read current values first and
+preserve other connectors' entries when applying a per-monitor change:
 
+<!-- recipe: sidebar-settings -->
 ```sh
 dockrail config set presentationMode sidebar --json
 dockrail config set presentationModeByMonitor '{"DP-1":"classic"}' --json
@@ -148,7 +258,7 @@ dockrail config set sidebarEdge right --json
 dockrail config set sidebarMonitor DP-1 --json
 dockrail config set sidebarExpandedWidth 320 --json
 dockrail config set sidebarCollapsed true --json
-dockrail config apply --json '{"sidebarCollapsedByMonitor":{"DP-1":true,"HDMI-A-1":false}}'
+printf '%s\n' '{"sidebarCollapsedByMonitor":{"DP-1":true,"HDMI-A-1":false}}' | dockrail config apply --stdin --json
 dockrail config get --effective --json
 dockrail config set presentationMode classic --json
 dockrail config reset presentationModeByMonitor --json
@@ -182,10 +292,10 @@ A successful model projection is not live rendering evidence. Existing persisten
 flags remain authoritative: accepted-but-saving (`data.applied: true`) must not be
 replayed as though rejected. `config retry` uses the latest host snapshot.
 
-These controls do not install widgets or alter the stock topbar. This Draft slice
-is not an integrated release; see `docs/SIDEBAR.md` in the source checkout.
+These controls do not install widgets or alter the stock topbar. See
+`docs/SIDEBAR.md` in the source checkout for the sidebar implementation details.
 
-### Internal Widgets (FDM-967 / FDM-973)
+### Built-in sidebar widgets
 
 ```sh
 dockrail config schema sidebarWidgets --json

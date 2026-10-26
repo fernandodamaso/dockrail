@@ -82,13 +82,18 @@ function registeredRows(registry) {
       id: id,
       label: descriptor && descriptor.label ? String(descriptor.label) : id,
       iconName: descriptor && descriptor.iconName ? String(descriptor.iconName) : "layout-grid",
+      description: descriptor && descriptor.description ? String(descriptor.description) : "",
+      feature: descriptor && descriptor.feature ? String(descriptor.feature) : "",
       available: descriptor && descriptor.available !== false,
       manageable: !descriptor || descriptor.manageable !== false
     }
   })
 }
-function manageableRows(registry) {
-  return registeredRows(registry).filter(function(row) { return row.manageable })
+function manageableRows(registry, enabledIds) {
+  var enabled = requestedIds(enabledIds)
+  return registeredRows(registry).filter(function(row) {
+    return row.manageable || enabled.indexOf(row.id) >= 0
+  })
 }
 function effectiveIds(value, registry) {
   return requestedIds(value).filter(function(id) { return descriptorFor(registry, id) !== null })

@@ -1,76 +1,1204 @@
 {
   "schemaVersion": 1,
-  "commands": ["help", "agent-guide", "status", "doctor", "config.schema", "config.get", "config.set", "config.apply", "config.reset", "config.retry", "config.export", "apps.list", "apps.pin", "apps.unpin", "apps.hide", "apps.show", "apps.move", "icons.list", "icons.set", "icons.reset", "icons.reload"],
+  "commands": [
+    "help",
+    "agent-guide",
+    "status",
+    "doctor",
+    "setup",
+    "config.schema",
+    "config.get",
+    "config.set",
+    "config.apply",
+    "config.reset",
+    "config.retry",
+    "config.export",
+    "apps.list",
+    "apps.pin",
+    "apps.unpin",
+    "apps.hide",
+    "apps.show",
+    "apps.move",
+    "icons.list",
+    "icons.set",
+    "icons.reset",
+    "icons.reload"
+  ],
   "settings": {
-    "iconOverrides": {"type":"object","format":"icon-overrides","resetWithPreferences":false,"description":"SmartDock-only local PNG/SVG artwork by desktop ID. Prefer icons set/reset for single-app edits; no rendering verification is implied."},
-    "windowIconOverrides": {"type":"array","format":"window-icon-overrides","resetWithPreferences":false,"description":"Ordered per-window artwork rules keyed by normalized raw Wayland appId plus a case-insensitive titlePattern. Only * is a wildcard; first match wins. Sources must be local PNG/SVG files."},
-    "iconSize": {"type":"integer","minimum":24,"maximum":96,"description":"Base application icon size in logical pixels."},
-    "magnification": {"type":"number","minimum":1,"maximum":2,"effectiveStep":0.05,"description":"Hover icon scale; requested fractions are retained."},
-    "magnificationRadius": {"type":"number","minimum":40,"maximum":240,"effectiveStep":5,"description":"Hover influence radius in logical pixels."},
-    "hoverGlowEnabled": {"type":"boolean","description":"Enable glow behind hovered application icons."},
-    "hoverGlowOpacity": {"type":"number","minimum":0,"maximum":1,"effectiveStep":0.05,"description":"Glow opacity. Requested 0.72 renders as 0.70."},
-    "hoverGlowRadius": {"type":"number","minimum":0,"maximum":100,"effectiveStep":5,"description":"Glow radius; active when hoverGlowEnabled is true."},
-    "showPreviews": {"type":"boolean","description":"Allow grouped-window previews."},
-    "showTrash": {"type":"boolean","description":"Show Trash and enable its existing polling; does not empty Trash."},
-    "margin": {"type":"integer","minimum":0,"resetWithPreferences":false,"description":"Edge margin; retained by preference reset."},
-    "backgroundOpacity": {"type":"number","minimum":0,"maximum":1,"effectiveStep":0.05,"description":"Multiplier of the effective background color alpha."},
-    "backgroundColorEnabled": {"type":"boolean","description":"Enable the configured background color override."},
-    "backgroundColor": {"type":"string","format":"color","description":"Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; active only with backgroundColorEnabled."},
-    "borderColorEnabled": {"type":"boolean","description":"Enable the configured border color override."},
-    "borderColor": {"type":"string","format":"color","description":"Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; active only with borderColorEnabled."},
-    "workspaceBadgeBackgroundColorEnabled": {"type":"boolean","description":"Enable the workspace badge background override."},
-    "workspaceBadgeBackgroundColor": {"type":"string","format":"color","description":"Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; requires its paired Enabled flag."},
-    "workspaceBadgeTextColorEnabled": {"type":"boolean","description":"Enable the workspace badge text override."},
-    "workspaceBadgeTextColor": {"type":"string","format":"color","description":"Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; requires its paired Enabled flag."},
-    "borderWidthEnabled": {"type":"boolean","description":"Enable a fixed width instead of the theme's border widths."},
-    "borderWidth": {"type":"integer","minimum":0,"maximum":8,"description":"Fixed logical-pixel border width; theme-owned while borderWidthEnabled is false."},
-    "presentationMode": {"type":"string","enum":["classic","sidebar"],"description":"Classic bottom dock or mirrored sidebar panels (the dock's vertical presentation). Drag empty dock background left to switch to the sidebar, or empty sidebar background down to return."},
-    "presentationModeByMonitor": {"type":"object","format":"presentation-mode-by-monitor","description":"Per-connector presentation overrides keyed by exact monitor connector with values classic or sidebar. A connector listed here ignores presentationMode and sidebarMonitor. Missing connectors follow the inherited mode. Disconnected names are retained; control characters and non-mode values are rejected."},
-    "sidebarEdge": {"type":"string","enum":["left","right"],"description":"Sidebar panel edge; leaves classic position unchanged."},
-    "sidebarMonitor": {"type":"string","format":"monitor-connector","description":"Empty maps a mirrored panel on every connected screen. A connected connector maps only that output. Disconnected preferences are retained and fall back to all connected screens; control characters are rejected."},
-    "sidebarExpandedWidth": {"type":"integer","minimum":240,"maximum":480,"description":"Requested expanded width in logical pixels. Runtime screen clamping never overwrites this preference."},
+    "iconOverrides": {
+      "type": "object",
+      "format": "icon-overrides",
+      "resetWithPreferences": false,
+      "description": "SmartDock-only local PNG/SVG artwork by desktop ID. Prefer icons set/reset for single-app edits; no rendering verification is implied.",
+      "ui": {
+        "section": "apps",
+        "group": "custom-icons",
+        "order": 520,
+        "label": "App and profile icons",
+        "help": "SmartDock-only local PNG/SVG artwork by desktop ID. Prefer icons set/reset for single-app edits; no rendering verification is implied.",
+        "control": "icon-list",
+        "surface": "all",
+        "visibility": "normal",
+        "intents": [
+          "icons.set",
+          "icons.reset"
+        ],
+        "commit": "change"
+      }
+    },
+    "windowIconOverrides": {
+      "type": "array",
+      "format": "window-icon-overrides",
+      "resetWithPreferences": false,
+      "description": "Ordered per-window artwork rules keyed by normalized raw Wayland appId plus a case-insensitive titlePattern. Only * is a wildcard; first match wins. Sources must be local PNG/SVG files.",
+      "ui": {
+        "section": "apps",
+        "group": "custom-icons",
+        "order": 530,
+        "label": "Window-title rules",
+        "help": "Ordered per-window artwork rules keyed by normalized raw Wayland appId plus a case-insensitive titlePattern. Only * is a wildcard; first match wins. Sources must be local PNG/SVG files.",
+        "control": "icon-list",
+        "surface": "all",
+        "visibility": "normal",
+        "intents": [
+          "icons.set",
+          "icons.reset"
+        ],
+        "commit": "change"
+      }
+    },
+    "iconSize": {
+      "type": "integer",
+      "minimum": 24,
+      "maximum": 96,
+      "description": "Base application icon size in logical pixels.",
+      "ui": {
+        "section": "appearance",
+        "group": "icons",
+        "order": 10,
+        "label": "Icon size",
+        "help": "Base application icon size in logical pixels.",
+        "control": "slider",
+        "surface": "classic",
+        "visibility": "normal",
+        "unit": "px",
+        "commit": "release"
+      }
+    },
+    "magnification": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 2,
+      "effectiveStep": 0.05,
+      "description": "Hover icon scale; requested fractions are retained.",
+      "ui": {
+        "section": "appearance",
+        "group": "icons",
+        "order": 20,
+        "label": "Hover magnification",
+        "help": "Hover icon scale; requested fractions are retained.",
+        "control": "slider",
+        "surface": "classic",
+        "visibility": "normal",
+        "unit": "×",
+        "displayScale": 1,
+        "commit": "release"
+      }
+    },
+    "magnificationRadius": {
+      "type": "number",
+      "minimum": 40,
+      "maximum": 240,
+      "effectiveStep": 5,
+      "description": "Hover influence radius in logical pixels.",
+      "ui": {
+        "section": "appearance",
+        "group": "icons",
+        "order": 30,
+        "label": "Magnification reach",
+        "help": "Hover influence radius in logical pixels.",
+        "control": "slider",
+        "surface": "classic",
+        "visibility": "normal",
+        "unit": "px",
+        "commit": "release"
+      }
+    },
+    "hoverGlowEnabled": {
+      "type": "boolean",
+      "description": "Enable glow behind hovered application icons.",
+      "ui": {
+        "section": "appearance",
+        "group": "hover-glow",
+        "order": 40,
+        "label": "Hover glow",
+        "help": "Enable glow behind hovered application icons.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "hoverGlowOpacity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "effectiveStep": 0.05,
+      "description": "Glow opacity. Requested 0.72 renders as 0.70.",
+      "ui": {
+        "section": "appearance",
+        "group": "hover-glow",
+        "order": 50,
+        "label": "Glow strength",
+        "help": "Glow opacity. Requested 0.72 renders as 0.70.",
+        "control": "slider",
+        "surface": "classic",
+        "visibility": "normal",
+        "requires": {
+          "hoverGlowEnabled": true
+        },
+        "unit": "%",
+        "displayScale": 100,
+        "commit": "release"
+      }
+    },
+    "hoverGlowRadius": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "effectiveStep": 5,
+      "description": "Glow radius; active when hoverGlowEnabled is true.",
+      "ui": {
+        "section": "appearance",
+        "group": "hover-glow",
+        "order": 60,
+        "label": "Glow radius",
+        "help": "Glow radius; active when hoverGlowEnabled is true.",
+        "control": "slider",
+        "surface": "classic",
+        "visibility": "normal",
+        "requires": {
+          "hoverGlowEnabled": true
+        },
+        "unit": "px",
+        "commit": "release"
+      }
+    },
+    "showPreviews": {
+      "type": "boolean",
+      "description": "Allow grouped-window previews.",
+      "ui": {
+        "section": "behavior",
+        "group": "windows",
+        "order": 410,
+        "label": "Window previews",
+        "help": "Allow grouped-window previews.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "showTrash": {
+      "type": "boolean",
+      "description": "Show Trash and enable its existing polling; does not empty Trash.",
+      "ui": {
+        "section": "apps",
+        "group": "dock-items",
+        "order": 570,
+        "label": "Show Trash",
+        "help": "Show Trash and enable its existing polling; does not empty Trash.",
+        "control": "toggle",
+        "surface": "all",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "margin": {
+      "type": "integer",
+      "minimum": 0,
+      "resetWithPreferences": false,
+      "description": "Edge margin; retained by preference reset.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-size-position",
+        "order": 320,
+        "label": "Edge margin",
+        "help": "Edge margin; retained by preference reset.",
+        "control": "number",
+        "surface": "classic",
+        "visibility": "normal",
+        "unit": "px",
+        "uiMaximum": 64,
+        "commit": "change"
+      }
+    },
+    "backgroundOpacity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "effectiveStep": 0.05,
+      "description": "Multiplier of the effective background color alpha.",
+      "ui": {
+        "section": "appearance",
+        "group": "dock-surface",
+        "order": 70,
+        "label": "Background opacity",
+        "help": "Multiplier of the effective background color alpha.",
+        "control": "slider",
+        "surface": "classic",
+        "visibility": "normal",
+        "unit": "%",
+        "displayScale": 100,
+        "commit": "release"
+      }
+    },
+    "backgroundColorEnabled": {
+      "type": "boolean",
+      "description": "Enable the configured background color override.",
+      "ui": {
+        "section": "appearance",
+        "group": "dock-surface",
+        "order": 90,
+        "label": "backgroundColor override",
+        "help": "Enable the configured background color override.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "in-place",
+        "reason": "Changed by the paired primary control; never edited independently.",
+        "pairedWith": "backgroundColor",
+        "commit": "change"
+      }
+    },
+    "backgroundColor": {
+      "type": "string",
+      "format": "color",
+      "description": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; active only with backgroundColorEnabled.",
+      "ui": {
+        "section": "appearance",
+        "group": "dock-surface",
+        "order": 80,
+        "label": "Background color",
+        "help": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; active only with backgroundColorEnabled.",
+        "control": "color",
+        "surface": "classic",
+        "visibility": "normal",
+        "pairedWith": "backgroundColorEnabled",
+        "commit": "change"
+      }
+    },
+    "borderColorEnabled": {
+      "type": "boolean",
+      "description": "Enable the configured border color override.",
+      "ui": {
+        "section": "appearance",
+        "group": "dock-surface",
+        "order": 110,
+        "label": "borderColor override",
+        "help": "Enable the configured border color override.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "in-place",
+        "reason": "Changed by the paired primary control; never edited independently.",
+        "pairedWith": "borderColor",
+        "commit": "change"
+      }
+    },
+    "borderColor": {
+      "type": "string",
+      "format": "color",
+      "description": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; active only with borderColorEnabled.",
+      "ui": {
+        "section": "appearance",
+        "group": "dock-surface",
+        "order": 100,
+        "label": "Border color",
+        "help": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; active only with borderColorEnabled.",
+        "control": "color",
+        "surface": "classic",
+        "visibility": "normal",
+        "pairedWith": "borderColorEnabled",
+        "commit": "change"
+      }
+    },
+    "workspaceBadgeBackgroundColorEnabled": {
+      "type": "boolean",
+      "description": "Enable the workspace badge background override.",
+      "ui": {
+        "section": "appearance",
+        "group": "workspace-badges",
+        "order": 150,
+        "label": "workspaceBadgeBackgroundColor override",
+        "help": "Enable the workspace badge background override.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "in-place",
+        "reason": "Changed by the paired primary control; never edited independently.",
+        "pairedWith": "workspaceBadgeBackgroundColor",
+        "commit": "change"
+      }
+    },
+    "workspaceBadgeBackgroundColor": {
+      "type": "string",
+      "format": "color",
+      "description": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; requires its paired Enabled flag.",
+      "ui": {
+        "section": "appearance",
+        "group": "workspace-badges",
+        "order": 140,
+        "label": "Badge background",
+        "help": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; requires its paired Enabled flag.",
+        "control": "color",
+        "surface": "classic",
+        "visibility": "normal",
+        "pairedWith": "workspaceBadgeBackgroundColorEnabled",
+        "commit": "change"
+      }
+    },
+    "workspaceBadgeTextColorEnabled": {
+      "type": "boolean",
+      "description": "Enable the workspace badge text override.",
+      "ui": {
+        "section": "appearance",
+        "group": "workspace-badges",
+        "order": 170,
+        "label": "workspaceBadgeTextColor override",
+        "help": "Enable the workspace badge text override.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "in-place",
+        "reason": "Changed by the paired primary control; never edited independently.",
+        "pairedWith": "workspaceBadgeTextColor",
+        "commit": "change"
+      }
+    },
+    "workspaceBadgeTextColor": {
+      "type": "string",
+      "format": "color",
+      "description": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; requires its paired Enabled flag.",
+      "ui": {
+        "section": "appearance",
+        "group": "workspace-badges",
+        "order": 160,
+        "label": "Badge text color",
+        "help": "Empty, #RRGGBB, Qt #AARRGGBB or @theme.token; requires its paired Enabled flag.",
+        "control": "color",
+        "surface": "classic",
+        "visibility": "normal",
+        "pairedWith": "workspaceBadgeTextColorEnabled",
+        "commit": "change"
+      }
+    },
+    "borderWidthEnabled": {
+      "type": "boolean",
+      "description": "Enable a fixed width instead of the theme's border widths.",
+      "ui": {
+        "section": "appearance",
+        "group": "dock-surface",
+        "order": 130,
+        "label": "borderWidth override",
+        "help": "Enable a fixed width instead of the theme's border widths.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "in-place",
+        "reason": "Changed by the paired primary control; never edited independently.",
+        "pairedWith": "borderWidth",
+        "commit": "change"
+      }
+    },
+    "borderWidth": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "description": "Fixed logical-pixel border width; theme-owned while borderWidthEnabled is false.",
+      "ui": {
+        "section": "appearance",
+        "group": "dock-surface",
+        "order": 120,
+        "label": "Border width",
+        "help": "Fixed logical-pixel border width; theme-owned while borderWidthEnabled is false.",
+        "control": "slider",
+        "surface": "classic",
+        "visibility": "normal",
+        "pairedWith": "borderWidthEnabled",
+        "unit": "px",
+        "commit": "release"
+      }
+    },
+    "presentationMode": {
+      "type": "string",
+      "enum": [
+        "classic",
+        "sidebar"
+      ],
+      "description": "Classic bottom dock or mirrored sidebar panels (the dock's vertical presentation). Drag empty dock background left to switch to the sidebar, or empty sidebar background down to return.",
+      "ui": {
+        "section": "layout",
+        "group": "displays",
+        "order": 210,
+        "label": "Other monitors",
+        "help": "Classic bottom dock or mirrored sidebar panels (the dock's vertical presentation). Drag empty dock background left to switch to the sidebar, or empty sidebar background down to return.",
+        "control": "segmented",
+        "surface": "all",
+        "visibility": "normal",
+        "optionLabels": {
+          "classic": "Classic dock",
+          "sidebar": "Sidebar"
+        },
+        "commit": "change"
+      }
+    },
+    "presentationModeByMonitor": {
+      "type": "object",
+      "format": "presentation-mode-by-monitor",
+      "description": "Per-connector presentation overrides keyed by exact monitor connector with values classic or sidebar. A connector listed here ignores presentationMode and sidebarMonitor. Missing connectors follow the inherited mode. Disconnected names are retained; control characters and non-mode values are rejected.",
+      "ui": {
+        "section": "layout",
+        "group": "displays",
+        "order": 190,
+        "label": "Monitor choice",
+        "help": "Per-connector presentation overrides keyed by exact monitor connector with values classic or sidebar. A connector listed here ignores presentationMode and sidebarMonitor. Missing connectors follow the inherited mode. Disconnected names are retained; control characters and non-mode values are rejected.",
+        "control": "monitor-map",
+        "surface": "all",
+        "visibility": "normal",
+        "intents": [
+          "monitorModeIntent"
+        ],
+        "commit": "change"
+      }
+    },
+    "sidebarEdge": {
+      "type": "string",
+      "enum": [
+        "left",
+        "right"
+      ],
+      "description": "Sidebar panel edge; leaves classic position unchanged.",
+      "ui": {
+        "section": "layout",
+        "group": "sidebar",
+        "order": 250,
+        "label": "Edge",
+        "help": "Sidebar panel edge; leaves classic position unchanged.",
+        "control": "segmented",
+        "surface": "sidebar",
+        "visibility": "normal",
+        "optionLabels": {
+          "left": "left",
+          "right": "right"
+        },
+        "commit": "change"
+      }
+    },
+    "sidebarMonitor": {
+      "type": "string",
+      "format": "monitor-connector",
+      "description": "Empty maps a mirrored panel on every connected screen. A connected connector maps only that output. Disconnected preferences are retained and fall back to all connected screens; control characters are rejected.",
+      "ui": {
+        "section": "layout",
+        "group": "displays",
+        "order": 230,
+        "label": "Legacy banner",
+        "help": "Empty maps a mirrored panel on every connected screen. A connected connector maps only that output. Disconnected preferences are retained and fall back to all connected screens; control characters are rejected.",
+        "control": "monitor-map",
+        "surface": "all",
+        "visibility": "hidden",
+        "reason": "Legacy selection is converted by the one-click banner.",
+        "commit": "change"
+      }
+    },
+    "sidebarExpandedWidth": {
+      "type": "integer",
+      "minimum": 240,
+      "maximum": 480,
+      "description": "Requested expanded width in logical pixels. Runtime screen clamping never overwrites this preference.",
+      "ui": {
+        "section": "layout",
+        "group": "sidebar",
+        "order": 260,
+        "label": "Width",
+        "help": "Requested expanded width in logical pixels. Runtime screen clamping never overwrites this preference.",
+        "control": "slider",
+        "surface": "sidebar",
+        "visibility": "normal",
+        "unit": "px",
+        "commit": "release"
+      }
+    },
     "sidebarWidgets": {
       "type": "array",
       "format": "sidebar-widget-ids",
-      "registeredIds": ["herdr.agents"],
+      "registeredIds": [
+        "herdr.agents"
+      ],
       "uniqueItems": true,
       "resetWithPreferences": true,
-      "description": "Ordered internal widget IDs. SmartDock registers herdr.agents; unknown imported IDs are retained but unavailable and explicit writes require registered IDs."
+      "description": "Ordered internal widget IDs. SmartDock registers herdr.agents; unknown imported IDs are retained but unavailable and explicit writes require registered IDs.",
+      "ui": {
+        "section": "sidebar-widgets",
+        "group": "widgets",
+        "order": 480,
+        "label": "Widgets list",
+        "help": "Ordered internal widget IDs. SmartDock registers herdr.agents; unknown imported IDs are retained but unavailable and explicit writes require registered IDs.",
+        "control": "widget-list",
+        "surface": "sidebar",
+        "visibility": "normal",
+        "intents": [
+          "widget.add",
+          "widget.remove",
+          "widget.move"
+        ],
+        "commit": "change",
+        "featureId": "coding-agents",
+        "feature": {
+          "id": "coding-agents",
+          "keys": [
+            "sidebarWidgets",
+            "dockHerdrIndicators"
+          ],
+          "widgetId": "herdr.agents",
+          "on": {
+            "dockHerdrIndicators": true
+          },
+          "off": {
+            "dockHerdrIndicators": false
+          },
+          "membership": "append-or-remove-id"
+        }
+      }
     },
     "sidebarWidgetCollapsed": {
       "type": "object",
       "format": "sidebar-widget-collapsed",
       "resetWithPreferences": true,
-      "description": "Per-widget collapsed body preferences keyed by valid internal widget ID. Missing keys mean expanded; removing a widget retains its preference."
+      "description": "Per-widget collapsed body preferences keyed by valid internal widget ID. Missing keys mean expanded; removing a widget retains its preference.",
+      "ui": {
+        "section": "sidebar-widgets",
+        "group": "widgets",
+        "order": 490,
+        "label": "Not shown",
+        "help": "Per-widget collapsed body preferences keyed by valid internal widget ID. Missing keys mean expanded; removing a widget retains its preference.",
+        "control": "widget-list",
+        "surface": "sidebar",
+        "visibility": "in-place",
+        "reason": "Edited in place on each widget card.",
+        "commit": "change"
+      }
     },
-    "sidebarCollapsed": {"type":"boolean","description":"Default icon rail for monitors without a sidebarCollapsedByMonitor override. Every eligible window remains represented; expanded width and session app folds are retained."},
-    "sidebarCollapsedByMonitor": {"type":"object","format":"sidebar-collapsed-by-monitor","description":"Per-connector sidebar collapse overrides. Missing connectors follow sidebarCollapsed. Disconnected names are retained; control characters and non-boolean values are rejected."},
-    "sidebarInlineSoloWorkspace": {"type":"boolean","description":"When true, populated workspace names share the first application/window row instead of emitting a separate workspace row. Empty workspaces remain dedicated rows."},
-    "sidebarBrowserTabsEnabled": {"type":"boolean","description":"When true and the browser-profile provider is available, sidebar Chrome window rows can expand to list open page tabs (titles only, no URLs). Independent of browserActivityMutedServices."},
-    "position": {"type":"string","enum":["bottom"],"description":"Classic dock edge; the classic dock renders on the bottom only and the left vertical presentation is the sidebar mode. Drag empty dock background left to switch to the sidebar. Legacy left, right and top read as bottom."},
-    "fullLength": {"type":"boolean","description":"Extend the dock along its available screen edge."},
-    "reserveSpace": {"type":"boolean","description":"Reserve an exclusive zone; effective false while autoHide is enabled."},
-    "autoHide": {"type":"boolean","description":"Auto-hide the dock without changing the requested reserveSpace value."},
-    "clickAction": {"type":"string","enum":["none","minimize-restore","previews","close","focus-or-launch"],"legacyReadAliases":{"focus":"focus-or-launch","launch":"focus-or-launch"},"description":"Left-click action. close may close application windows when used."},
-    "middleClickAction": {"type":"string","enum":["none","minimize-restore","previews","close","focus-or-launch"],"legacyReadAliases":{"focus":"focus-or-launch","launch":"focus-or-launch"},"description":"Middle-click action. New writes use canonical action names."},
-    "scrollAction": {"type":"string","enum":["none","cycle-windows"],"description":"Scroll behavior for applications with multiple windows."},
-    "controlCommand": {"type":"string","minLength":1,"risk":"executes-on-use","description":"Launcher command executed only by the existing launcher action, never by validation or discovery."},
-    "sortByWorkspace": {"type":"boolean","description":"Sort flat-layout applications by their lowest occupied workspace."},
-    "workspaceLayout": {"type":"string","enum":["flat","grouped"],"description":"Grouped cards are supported on top/bottom. Requested grouped survives a move to left/right."},
-    "workspaceMonitorScope": {"type":"string","enum":["all","current-monitor"],"description":"Workspace-card monitor scope; inactive in flat layout."},
-    "workspaceMonitorOrder": {"type":"array","format":"monitor-connectors","description":"Case-sensitive connector order for grouped/all monitor sections. Empty means automatic physical x/y order; disconnected names remain saved for reconnect."},
-    "groupWindows": {"type":"boolean","deprecated":true,"inactive":true,"replacement":"workspaceGroups","description":"Deprecated stored compatibility value. It no longer changes presentation; use workspaceGroups or the local Group Windows action. New attempts to enable global grouping are rejected."},
-    "workspaceGroups": {"type":"array","format":"workspace-groups","description":"Opt-in application/workspace group pairs using canonical desktop IDs and id:N or name:N workspace identities."},
-    "interfaceAnimationsEnabled": {"type":"boolean","description":"Enable interface transitions; separate from urgent-window attention motion."},
-    "windowScope": {"type":"string","enum":["all","workspace","monitor","workspace-monitor"],"description":"Running-window scope, independent of pinned launchers and hidden applications."},
-    "showUrgentOutsideScope": {"type":"boolean","description":"Allow genuinely urgent windows outside the selected scope; hidden applications remain hidden."},
-    "attentionBadgesEnabled": {"type":"boolean","description":"Enable attention indicators without starting a notification daemon."},
-    "urgentWindowAnimationEnabled": {"type":"boolean","description":"Enable the existing urgent-window attention motion."},
-    "launcherBadgeMode": {"type":"string","enum":["automatic","dots-only"],"description":"Use available provider counts or existing dot fallback; does not install or start a provider."},
-    "browserProfileBadgesEnabled": {"type":"boolean","description":"Show per-window browser profile badges when the browser-profile provider is installed and the browser exposes a DevTools endpoint; no provider is installed or started by this setting."},
-    "dockHerdrIndicators": {"type":"boolean","description":"Show Herdr agent state on terminal icons, in hover previews and in the context menu. Uses the existing Herdr provider; enabling it starts that provider while a classic dock is active, including when it is auto-hidden."},
-    "browserActivityMutedServices": {"type":"array","format":"browser-activity-service-ids","resetWithPreferences":false,"description":"Muted Chrome activity service IDs (for example gmail or whatsapp). Muted rows stay visible but are excluded from the popup header and dock badge totals. Retained by preference reset."},
-    "hiddenApplications": {"type":"array","format":"application-ids","resetWithPreferences":false,"description":"Hidden desktop IDs; independent of pins. Retained by preference reset."},
-    "pinned": {"type":"array","format":"application-ids","resetWithPreferences":false,"description":"Ordered desktop IDs, including unavailable/hidden apps. Retained by preference reset."}
+    "sidebarCollapsed": {
+      "type": "boolean",
+      "description": "Default icon rail for monitors without a sidebarCollapsedByMonitor override. Every eligible window remains represented; expanded width and session app folds are retained.",
+      "ui": {
+        "section": "layout",
+        "group": "displays",
+        "order": 220,
+        "label": "Icon rail (other monitors)",
+        "help": "Default icon rail for monitors without a sidebarCollapsedByMonitor override. Every eligible window remains represented; expanded width and session app folds are retained.",
+        "control": "toggle",
+        "surface": "sidebar",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "sidebarCollapsedByMonitor": {
+      "type": "object",
+      "format": "sidebar-collapsed-by-monitor",
+      "description": "Per-connector sidebar collapse overrides. Missing connectors follow sidebarCollapsed. Disconnected names are retained; control characters and non-boolean values are rejected.",
+      "ui": {
+        "section": "layout",
+        "group": "displays",
+        "order": 200,
+        "label": "Icon rail",
+        "help": "Per-connector sidebar collapse overrides. Missing connectors follow sidebarCollapsed. Disconnected names are retained; control characters and non-boolean values are rejected.",
+        "control": "monitor-map",
+        "surface": "sidebar",
+        "visibility": "normal",
+        "intents": [
+          "config.apply"
+        ],
+        "commit": "change"
+      }
+    },
+    "sidebarInlineSoloWorkspace": {
+      "type": "boolean",
+      "description": "When true, populated workspace names share the first application/window row instead of emitting a separate workspace row. Empty workspaces remain dedicated rows.",
+      "ui": {
+        "section": "layout",
+        "group": "sidebar",
+        "order": 270,
+        "label": "Compact workspace rows",
+        "help": "When true, populated workspace names share the first application/window row instead of emitting a separate workspace row. Empty workspaces remain dedicated rows.",
+        "control": "toggle",
+        "surface": "sidebar",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "sidebarBrowserTabsEnabled": {
+      "type": "boolean",
+      "description": "When true and the browser-profile provider is available, sidebar Chrome window rows can expand to list open page tabs (titles only, no URLs). Independent of browserActivityMutedServices.",
+      "ui": {
+        "section": "apps",
+        "group": "apps-chrome",
+        "order": 550,
+        "label": "Chrome tabs under windows",
+        "help": "When true and the browser-profile provider is available, sidebar Chrome window rows can expand to list open page tabs (titles only, no URLs). Independent of browserActivityMutedServices.",
+        "control": "toggle",
+        "surface": "sidebar",
+        "visibility": "normal",
+        "commit": "change",
+        "featureId": "chrome"
+      }
+    },
+    "position": {
+      "type": "string",
+      "enum": [
+        "bottom"
+      ],
+      "description": "Classic dock edge; the classic dock renders on the bottom only and the left vertical presentation is the sidebar mode. Drag empty dock background left to switch to the sidebar. Legacy left, right and top read as bottom.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-dock",
+        "order": 280,
+        "label": "No row of its own",
+        "help": "Classic dock edge; the classic dock renders on the bottom only and the left vertical presentation is the sidebar mode. Drag empty dock background left to switch to the sidebar. Legacy left, right and top read as bottom.",
+        "control": "dropdown",
+        "surface": "classic",
+        "visibility": "hidden",
+        "reason": "The classic dock is bottom-only; no Placement row.",
+        "optionLabels": {
+          "bottom": "bottom"
+        },
+        "commit": "change"
+      }
+    },
+    "fullLength": {
+      "type": "boolean",
+      "description": "Extend the dock along its available screen edge.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-size-position",
+        "order": 290,
+        "label": "Full width",
+        "help": "Extend the dock along its available screen edge.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "reserveSpace": {
+      "type": "boolean",
+      "description": "Reserve an exclusive zone; effective false while autoHide is enabled.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-hiding",
+        "order": 310,
+        "label": "Reserve screen space",
+        "help": "Reserve an exclusive zone; effective false while autoHide is enabled.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "requires": {
+          "autoHide": false
+        },
+        "commit": "change"
+      }
+    },
+    "autoHide": {
+      "type": "boolean",
+      "description": "Auto-hide the dock without changing the requested reserveSpace value.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-hiding",
+        "order": 300,
+        "label": "Auto-hide",
+        "help": "Auto-hide the dock without changing the requested reserveSpace value.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "clickAction": {
+      "type": "string",
+      "enum": [
+        "none",
+        "minimize-restore",
+        "previews",
+        "close",
+        "focus-or-launch"
+      ],
+      "legacyReadAliases": {
+        "focus": "focus-or-launch",
+        "launch": "focus-or-launch"
+      },
+      "description": "Left-click action. close may close application windows when used.",
+      "ui": {
+        "section": "behavior",
+        "group": "pointer",
+        "order": 380,
+        "label": "Left click",
+        "help": "Left-click action. close may close application windows when used.",
+        "control": "dropdown",
+        "surface": "classic",
+        "visibility": "normal",
+        "optionLabels": {
+          "none": "Nothing",
+          "minimize-restore": "Minimize / restore",
+          "previews": "Show previews",
+          "close": "Close all its windows",
+          "focus-or-launch": "Focus or launch"
+        },
+        "destructiveOptions": [
+          "close"
+        ],
+        "commit": "change"
+      }
+    },
+    "middleClickAction": {
+      "type": "string",
+      "enum": [
+        "none",
+        "minimize-restore",
+        "previews",
+        "close",
+        "focus-or-launch"
+      ],
+      "legacyReadAliases": {
+        "focus": "focus-or-launch",
+        "launch": "focus-or-launch"
+      },
+      "description": "Middle-click action. New writes use canonical action names.",
+      "ui": {
+        "section": "behavior",
+        "group": "pointer",
+        "order": 390,
+        "label": "Middle click",
+        "help": "Middle-click action. New writes use canonical action names.",
+        "control": "dropdown",
+        "surface": "classic",
+        "visibility": "normal",
+        "optionLabels": {
+          "none": "Nothing",
+          "minimize-restore": "Minimize / restore",
+          "previews": "Show previews",
+          "close": "Close all its windows",
+          "focus-or-launch": "Focus or launch"
+        },
+        "destructiveOptions": [
+          "close"
+        ],
+        "commit": "change"
+      }
+    },
+    "scrollAction": {
+      "type": "string",
+      "enum": [
+        "none",
+        "cycle-windows"
+      ],
+      "description": "Scroll behavior for applications with multiple windows.",
+      "ui": {
+        "section": "behavior",
+        "group": "pointer",
+        "order": 400,
+        "label": "Scroll",
+        "help": "Scroll behavior for applications with multiple windows.",
+        "control": "dropdown",
+        "surface": "classic",
+        "visibility": "normal",
+        "optionLabels": {
+          "none": "Nothing",
+          "cycle-windows": "Cycle windows"
+        },
+        "commit": "change"
+      }
+    },
+    "controlCommand": {
+      "type": "string",
+      "minLength": 1,
+      "risk": "executes-on-use",
+      "description": "Launcher command executed only by the existing launcher action, never by validation or discovery.",
+      "ui": {
+        "section": "apps",
+        "group": "advanced",
+        "order": 580,
+        "label": "App launcher command",
+        "help": "Launcher command executed only by the existing launcher action, never by validation or discovery.",
+        "control": "text",
+        "surface": "all",
+        "visibility": "advanced",
+        "commit": "explicit",
+        "confirm": true
+      }
+    },
+    "sortByWorkspace": {
+      "type": "boolean",
+      "description": "Sort flat-layout applications by their lowest occupied workspace.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-arrange-apps",
+        "order": 370,
+        "label": "Sort by workspace",
+        "help": "Sort flat-layout applications by their lowest occupied workspace.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "conditional",
+        "requires": {
+          "workspaceLayout": "flat"
+        },
+        "commit": "change"
+      }
+    },
+    "workspaceLayout": {
+      "type": "string",
+      "enum": [
+        "flat",
+        "grouped"
+      ],
+      "description": "Grouped cards are supported on top/bottom. Requested grouped survives a move to left/right.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-arrange-apps",
+        "order": 330,
+        "label": "Arrange apps",
+        "help": "Grouped cards are supported on top/bottom. Requested grouped survives a move to left/right.",
+        "control": "segmented",
+        "surface": "classic",
+        "visibility": "normal",
+        "optionLabels": {
+          "flat": "Single row",
+          "grouped": "Card per workspace"
+        },
+        "commit": "change"
+      }
+    },
+    "workspaceMonitorScope": {
+      "type": "string",
+      "enum": [
+        "all",
+        "current-monitor"
+      ],
+      "description": "Workspace-card monitor scope; inactive in flat layout.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-arrange-apps",
+        "order": 340,
+        "label": "Cards include",
+        "help": "Workspace-card monitor scope; inactive in flat layout.",
+        "control": "segmented",
+        "surface": "classic",
+        "visibility": "conditional",
+        "requires": {
+          "workspaceLayout": "grouped"
+        },
+        "optionLabels": {
+          "all": "All monitors",
+          "current-monitor": "This monitor"
+        },
+        "commit": "change"
+      }
+    },
+    "workspaceMonitorOrder": {
+      "type": "array",
+      "format": "monitor-connectors",
+      "description": "Case-sensitive connector order for grouped/all monitor sections. Empty means automatic physical x/y order; disconnected names remain saved for reconnect.",
+      "ui": {
+        "section": "layout",
+        "group": "displays",
+        "order": 240,
+        "label": "Automatic monitor order",
+        "help": "Case-sensitive connector order for grouped/all monitor sections. Empty means automatic physical x/y order; disconnected names remain saved for reconnect.",
+        "control": "monitor-map",
+        "surface": "all",
+        "visibility": "conditional",
+        "intents": [
+          "config.apply"
+        ],
+        "commit": "change",
+        "minMonitors": 2
+      }
+    },
+    "groupWindows": {
+      "type": "boolean",
+      "deprecated": true,
+      "inactive": true,
+      "replacement": "workspaceGroups",
+      "description": "Deprecated stored compatibility value. It no longer changes presentation; use workspaceGroups or the local Group Windows action. New attempts to enable global grouping are rejected.",
+      "ui": {
+        "section": "behavior",
+        "group": "legacy",
+        "order": 470,
+        "label": "Not shown",
+        "help": "Deprecated stored compatibility value. It no longer changes presentation; use workspaceGroups or the local Group Windows action. New attempts to enable global grouping are rejected.",
+        "control": "toggle",
+        "surface": "all",
+        "visibility": "hidden",
+        "reason": "Deprecated and inactive; no editor.",
+        "commit": "change"
+      }
+    },
+    "workspaceGroups": {
+      "type": "array",
+      "format": "workspace-groups",
+      "description": "Opt-in application/workspace group pairs using canonical desktop IDs and id:N or name:N workspace identities.",
+      "ui": {
+        "section": "behavior",
+        "group": "windows",
+        "order": 420,
+        "label": "Grouped apps",
+        "help": "Opt-in application/workspace group pairs using canonical desktop IDs and id:N or name:N workspace identities.",
+        "control": "app-list",
+        "surface": "classic",
+        "visibility": "normal",
+        "intents": [
+          "workspace.ungroup"
+        ],
+        "commit": "change"
+      }
+    },
+    "interfaceAnimationsEnabled": {
+      "type": "boolean",
+      "description": "Enable interface transitions; separate from urgent-window attention motion.",
+      "ui": {
+        "section": "appearance",
+        "group": "motion",
+        "order": 180,
+        "label": "Interface animations",
+        "help": "Enable interface transitions; separate from urgent-window attention motion.",
+        "control": "toggle",
+        "surface": "all",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "windowScope": {
+      "type": "string",
+      "enum": [
+        "all",
+        "workspace",
+        "monitor",
+        "workspace-monitor"
+      ],
+      "description": "Running-window scope, independent of pinned launchers and hidden applications.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-arrange-apps",
+        "order": 350,
+        "label": "Show windows from",
+        "help": "Running-window scope, independent of pinned launchers and hidden applications.",
+        "control": "dropdown",
+        "surface": "classic",
+        "visibility": "conditional",
+        "requires": {
+          "workspaceLayout": "flat"
+        },
+        "optionLabels": {
+          "all": "All monitors",
+          "workspace": "workspace",
+          "monitor": "monitor",
+          "workspace-monitor": "workspace-monitor"
+        },
+        "commit": "change"
+      }
+    },
+    "showUrgentOutsideScope": {
+      "type": "boolean",
+      "description": "Allow genuinely urgent windows outside the selected scope; hidden applications remain hidden.",
+      "ui": {
+        "section": "layout",
+        "group": "classic-arrange-apps",
+        "order": 360,
+        "label": "Always show urgent windows",
+        "help": "Allow genuinely urgent windows outside the selected scope; hidden applications remain hidden.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "conditional",
+        "requires": {
+          "workspaceLayout": "flat"
+        },
+        "commit": "change"
+      }
+    },
+    "attentionBadgesEnabled": {
+      "type": "boolean",
+      "description": "Enable attention indicators without starting a notification daemon.",
+      "ui": {
+        "section": "behavior",
+        "group": "attention",
+        "order": 430,
+        "label": "Attention badges",
+        "help": "Enable attention indicators without starting a notification daemon.",
+        "control": "toggle",
+        "surface": "all",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "urgentWindowAnimationEnabled": {
+      "type": "boolean",
+      "description": "Enable the existing urgent-window attention motion.",
+      "ui": {
+        "section": "behavior",
+        "group": "attention-on-the-dock",
+        "order": 450,
+        "label": "Urgent nudge",
+        "help": "Enable the existing urgent-window attention motion.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "requires": {
+          "attentionBadgesEnabled": true
+        },
+        "commit": "change"
+      }
+    },
+    "launcherBadgeMode": {
+      "type": "string",
+      "enum": [
+        "automatic",
+        "dots-only"
+      ],
+      "description": "Use available provider counts or existing dot fallback; does not install or start a provider.",
+      "ui": {
+        "section": "behavior",
+        "group": "attention",
+        "order": 440,
+        "label": "Badge style",
+        "help": "Use available provider counts or existing dot fallback; does not install or start a provider.",
+        "control": "segmented",
+        "surface": "all",
+        "visibility": "normal",
+        "requires": {
+          "attentionBadgesEnabled": true
+        },
+        "optionLabels": {
+          "automatic": "Numbers when available",
+          "dots-only": "Dots only"
+        },
+        "commit": "change",
+        "featureId": "launcher-counts",
+        "feature": {
+          "id": "launcher-counts",
+          "keys": [
+            "launcherBadgeMode"
+          ],
+          "on": {
+            "launcherBadgeMode": "automatic"
+          },
+          "off": {
+            "launcherBadgeMode": "dots-only"
+          }
+        }
+      }
+    },
+    "browserProfileBadgesEnabled": {
+      "type": "boolean",
+      "description": "Show per-window browser profile badges when the browser-profile provider is installed and the browser exposes a DevTools endpoint; no provider is installed or started by this setting.",
+      "ui": {
+        "section": "apps",
+        "group": "chrome",
+        "order": 540,
+        "label": "Profile badges",
+        "help": "Show per-window browser profile badges when the browser-profile provider is installed and the browser exposes a DevTools endpoint; no provider is installed or started by this setting.",
+        "control": "toggle",
+        "surface": "all",
+        "visibility": "normal",
+        "commit": "change",
+        "featureId": "chrome",
+        "feature": {
+          "id": "chrome",
+          "keys": [
+            "browserProfileBadgesEnabled",
+            "sidebarBrowserTabsEnabled"
+          ],
+          "on": {
+            "browserProfileBadgesEnabled": true,
+            "sidebarBrowserTabsEnabled": true
+          },
+          "off": {
+            "browserProfileBadgesEnabled": false,
+            "sidebarBrowserTabsEnabled": false
+          }
+        }
+      }
+    },
+    "dockHerdrIndicators": {
+      "type": "boolean",
+      "description": "Show Herdr agent state on terminal icons, in hover previews and in the context menu. Uses the existing Herdr provider; enabling it starts that provider while a classic dock is active, including when it is auto-hidden.",
+      "ui": {
+        "section": "behavior",
+        "group": "attention-on-the-dock",
+        "order": 460,
+        "label": "Agent state on terminal icons",
+        "help": "Show Herdr agent state on terminal icons, in hover previews and in the context menu. Uses the existing Herdr provider; enabling it starts that provider while a classic dock is active, including when it is auto-hidden.",
+        "control": "toggle",
+        "surface": "classic",
+        "visibility": "normal",
+        "commit": "change",
+        "featureId": "coding-agents"
+      }
+    },
+    "browserActivityMutedServices": {
+      "type": "array",
+      "format": "browser-activity-service-ids",
+      "resetWithPreferences": false,
+      "description": "Muted Chrome activity service IDs (for example gmail or whatsapp). Muted rows stay visible but are excluded from the popup header and dock badge totals. Retained by preference reset.",
+      "ui": {
+        "section": "apps",
+        "group": "chrome",
+        "order": 560,
+        "label": "Muted unread services",
+        "help": "Muted Chrome activity service IDs (for example gmail or whatsapp). Muted rows stay visible but are excluded from the popup header and dock badge totals. Retained by preference reset.",
+        "control": "multi-select",
+        "surface": "all",
+        "visibility": "normal",
+        "commit": "change"
+      }
+    },
+    "hiddenApplications": {
+      "type": "array",
+      "format": "application-ids",
+      "resetWithPreferences": false,
+      "description": "Hidden desktop IDs; independent of pins. Retained by preference reset.",
+      "ui": {
+        "section": "apps",
+        "group": "hidden",
+        "order": 510,
+        "label": "Hidden apps",
+        "help": "Hidden desktop IDs; independent of pins. Retained by preference reset.",
+        "control": "app-list",
+        "surface": "all",
+        "visibility": "normal",
+        "intents": [
+          "apps.hide",
+          "apps.show"
+        ],
+        "commit": "change"
+      }
+    },
+    "pinned": {
+      "type": "array",
+      "format": "application-ids",
+      "resetWithPreferences": false,
+      "description": "Ordered desktop IDs, including unavailable/hidden apps. Retained by preference reset.",
+      "ui": {
+        "section": "apps",
+        "group": "pinned",
+        "order": 500,
+        "label": "Pinned apps",
+        "help": "Ordered desktop IDs, including unavailable/hidden apps. Retained by preference reset.",
+        "control": "app-list",
+        "surface": "all",
+        "visibility": "normal",
+        "intents": [
+          "apps.pin",
+          "apps.unpin",
+          "apps.move"
+        ],
+        "commit": "change"
+      }
+    }
   }
 }

@@ -175,7 +175,7 @@ assert.match(sidebarSource, /host\.modeGestureDisplayFor\(screen\.name\)/,
 
 // The host owns the single write and its connector-keyed feedback.
 assert.match(hostSource,
-  /function commitMonitorModeGesture\(connector, destination, capturedState\)/,
+  /function commitMonitorModeGesture\(connector, destination, capturedState, menuOrigin\)/,
   'host owns the monitor-scoped mode gesture writer');
 assert.equal(
   (hostSource.match(/saveSettingIntent\("presentationModeByMonitor"/g) || []).length, 1,

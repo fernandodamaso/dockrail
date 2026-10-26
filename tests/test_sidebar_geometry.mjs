@@ -99,14 +99,14 @@ const painted = drag.workspaceGroupRects([
   {key:'ws1',monitorKey:'m0',workspaceIdentity:'id:1',y:30,height:40},
   {key:'ws3',monitorKey:'m0',workspaceIdentity:'id:3',y:80,height:40},
   {key:'ws7',monitorKey:'m1',workspaceIdentity:'id:7',y:160,height:50}
-], 200, 9)
+], 200, 5)
 assert.deepEqual(JSON.parse(JSON.stringify(painted)), [
-  {key:'ws1',monitorKey:'m0',workspaceIdentity:'id:1',kind:'workspace',x:9,y:30,width:182,height:45},
-  {key:'ws3',monitorKey:'m0',workspaceIdentity:'id:3',kind:'workspace',x:9,y:75,width:182,height:45},
-  {key:'ws7',monitorKey:'m1',workspaceIdentity:'id:7',kind:'workspace',x:9,y:160,width:182,height:50}
+  {key:'ws1',monitorKey:'m0',workspaceIdentity:'id:1',kind:'workspace',x:5,y:30,width:190,height:45},
+  {key:'ws3',monitorKey:'m0',workspaceIdentity:'id:3',kind:'workspace',x:5,y:75,width:190,height:45},
+  {key:'ws7',monitorKey:'m1',workspaceIdentity:'id:7',kind:'workspace',x:5,y:160,width:190,height:50}
 ])
 const clipped = drag.clipRect(painted[0],{x:0,y:40,width:200,height:60})
-assert.deepEqual(JSON.parse(JSON.stringify(clipped)),{x:9,y:40,width:182,height:35})
+assert.deepEqual(JSON.parse(JSON.stringify(clipped)),{x:5,y:40,width:190,height:35})
 assert.equal(drag.hitWindowDrop({x:10,y:72},[],painted,[],{x:0,y:0,width:200,height:100},''),'ws1','gap assigned to previous group')
 assert.equal(drag.hitWindowDrop({x:10,y:77},[],painted,[],{x:0,y:0,width:200,height:100},'ws1'),'ws1','small shared-boundary stickiness')
 assert.equal(drag.hitWindowDrop({x:10,y:80},[],painted,[],{x:0,y:0,width:200,height:100},'ws1'),'ws3','stickiness is bounded')

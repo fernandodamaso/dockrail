@@ -27,6 +27,13 @@ install -Dm0755 \
 cat <<EOF
 Launcher badge provider installed:
   $install_dir/smartdock-launcher-badge-provider
+EOF
 
-Restart/reload the Dockrail plugin so its service can start the provider.
+cat <<'EOF'
+
+Plugin-folder invocation:
+  bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/build-launcher-badge-provider"
+
+Next: reload the dock with `omarchy restart shell`.
+Then verify with `dockrail doctor`.
 EOF

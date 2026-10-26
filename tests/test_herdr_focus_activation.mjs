@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { loadModel } from './host_harness.mjs'
 import { interactionFixture, qmlMethods } from './sidebar_interaction_fixture.mjs'
 
 function herdrFixture() {
@@ -77,6 +78,7 @@ function herdrFixture() {
     },
   }
   const agentActions = qmlMethods('DockHerdrAgentActions.qml', {
+    HerdrModel: loadModel('DockHerdrModel'),
     bridge, windowActions: f.actions, herdrService: provider,
     latestFocusRequestId: '', pendingFocusByRequest: {}, pendingFocusByAgent: {},
     focusErrors: {}, focusErrorTimer: { restart() {}, stop() {} },
@@ -90,6 +92,25 @@ function herdrFixture() {
   f.secondAgent = secondAgent
   f.windowKey = windowKey
   return f
+}
+
+// All entry points share the action owner, including cached preview/menu targets.
+for (const change of [
+  { connected: true, version: '0.8.2' },
+  { connected: true, version: '0.9.0' },
+  { capabilities: { focusAgent: false } },
+]) {
+  const fixture = herdrFixture()
+  const target = fixture.controller.captureTarget(fixture.agentRow.key)
+  assert.ok(target)
+  Object.assign(fixture.bridge.snapshot.servers[0], change)
+  assert.equal(fixture.agentActions.captureAgentTarget(
+    fixture.agentRow.toplevel, fixture.agentRow), null,
+  'known unsupported servers cannot produce focus targets')
+  assert.equal(fixture.agentActions.targetIsCurrent(target), false,
+    'a captured target must recheck current server support')
+  assert.equal(fixture.agentActions.activateHerdrTarget(target), false)
+  assert.equal(fixture.focusCalls.length, 0)
 }
 
 const f = herdrFixture()

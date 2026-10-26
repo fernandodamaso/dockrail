@@ -4,6 +4,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_file="$repo_root/provider/browser-profiles/browser_profile_provider.py"
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+cache_home="${XDG_CACHE_HOME:-$HOME/.cache}"
+build_dir="$cache_home/dockrail/browser-profile-provider-build"
 install_dir="$data_home/dockrail/providers"
 
 for command in python3 install; do
@@ -13,7 +15,8 @@ for command in python3 install; do
   }
 done
 
-python3 -m py_compile "$source_file"
+install -d "$build_dir"
+PYTHONPYCACHEPREFIX="$build_dir/pycache" python3 -m py_compile "$source_file"
 
 install -Dm0755 "$source_file" \
   "$install_dir/smartdock-browser-profile-provider"
@@ -22,7 +25,15 @@ cat <<EOF
 Browser profile provider installed:
   $install_dir/smartdock-browser-profile-provider
 
-Restart/reload the Dockrail plugin so its service can start the provider.
-The provider needs Chrome running with a DevTools endpoint
-(--remote-debugging-port, enabled by Omarchy's defaults).
+The provider needs Chrome running with an explicitly enabled DevTools endpoint.
+See $repo_root/docs/browser-activity.md for Chrome setup and the security note.
+EOF
+
+cat <<'EOF'
+
+Plugin-folder invocation:
+  bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/scripts/install-browser-profile-provider"
+
+Next: reload the dock with `omarchy restart shell`.
+Then verify with `dockrail doctor`.
 EOF

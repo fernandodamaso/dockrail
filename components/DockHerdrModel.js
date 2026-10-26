@@ -337,10 +337,44 @@ function serverTransport(server) {
   return value === "remote" || value === "local" ? value : ""
 }
 
+function serverVersionParts(server) {
+  if (!server || typeof server !== "object" || typeof server.version !== "string")
+    return null
+  var value = cleanDisplayText(server.version)
+  var match = /^v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value)
+  if (!match) return null
+  var major = Number(match[1])
+  var minor = Number(match[2])
+  var patch = Number(match[3])
+  if (!isFinite(major) || !isFinite(minor) || !isFinite(patch))
+    return null
+  return { major: major, minor: minor, patch: patch, prerelease: match[4] || "" }
+}
+
+function serverNeedsFocusUpgrade(server) {
+  if (!server || typeof server !== "object" || server.connected !== true)
+    return false
+  var version = serverVersionParts(server)
+  if (!version) return false
+  var current = [version.major, version.minor, version.patch]
+  var minimum = [0, 9, 1]
+  for (var i = 0; i < minimum.length; ++i) {
+    if (current[i] < minimum[i]) return true
+    if (current[i] > minimum[i]) return false
+  }
+  return version.prerelease !== ""
+}
+
+function serverFocusUpgradeMessage(server) {
+  return serverNeedsFocusUpgrade(server)
+    ? "Update Herdr to 0.9.1+ to jump to agents" : ""
+}
+
 function serverFocusAgentSupported(server) {
   return !!(server && typeof server === "object"
     && server.capabilities && typeof server.capabilities === "object"
-    && server.capabilities.focusAgent === true)
+    && server.capabilities.focusAgent === true
+    && !serverNeedsFocusUpgrade(server))
 }
 
 function serverDisplayLabel(server) {

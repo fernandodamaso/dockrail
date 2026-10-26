@@ -47,6 +47,7 @@ PanelWindow {
   signal browserActivityMuteToggled(string serviceId)
   signal autoHideRequested(bool enabled)
   signal positionRequested(string position, var expectedPosition, var gestureToken)
+  signal menuModeSwitchRequested(var token)
   signal openTrashRequested()
   signal emptyTrashRequested()
 
@@ -1305,8 +1306,11 @@ PanelWindow {
         position: root.position
         vertical: root.vertical
         interfaceAnimationsEnabled: root.interfaceAnimationsEnabled
+        modeGestureToken: root.modeGestureToken
         onAddApplicationRequested: root.openAppPicker(controlItem)
         onAutoHideToggled: enabled => root.autoHideRequested(enabled)
+        onSwitchToSidebarRequested: token =>
+          root.menuModeSwitchRequested(token)
         onContextMenuVisibilityChanged: visible => {
           root.openMenuCount = Math.max(0, root.openMenuCount + (visible ? 1 : -1))
         }

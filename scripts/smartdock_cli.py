@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Dockrail's stdlib-only IPC client. Never starts a host or edits its config."""
 import argparse
+import hashlib
+import http.client
 import json
 import math
 import os
 from pathlib import Path
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 import time
@@ -16,7 +19,7 @@ EXIT_CODES = {
     'E_USAGE': 2, 'E_VALIDATION': 2,
     'E_RUNTIME_NOT_FOUND': 3, 'E_RUNTIME_AMBIGUOUS': 3,
     'E_PERSISTENCE': 4, 'E_EXPORT': 4,
-    'E_TRANSPORT': 5, 'E_PROTOCOL': 5, 'E_TIMEOUT': 5,
+    'E_TRANSPORT': 5, 'E_PROTOCOL': 5, 'E_TIMEOUT': 5, 'E_SETUP': 5,
     'E_BUSY': 6, 'E_CONFIG_INVALID': 6,
 }
 HELP = '''Usage: dockrail [OPTIONS] COMMAND
@@ -25,10 +28,15 @@ Read-only commands (never launch or restart the dock):
   help                         Show this help
   agent-guide                  Print the bundled agent configuration guide
   status                       Show the selected host and persistence state
-  doctor                       Check dependencies and selected host health
+  doctor                       Check core health and optional feature readiness
   config schema [KEY]          Describe settings; bundled fallback when offline
   config get [KEY] [--effective]
                                Read requested or normalized live settings
+
+Guided setup (requires one selected running host):
+  setup                        Interactive readiness + optional feature setup on a TTY
+  setup --feature NAME --yes   Script one feature: chrome | herdr | launcher-counts |
+                               agent-launchers
 
 Live configuration (the selected host is the only writer):
   config set KEY VALUE         Parse VALUE using the live setting's declared type
@@ -82,6 +90,993 @@ class CliError(Exception):
         super().__init__(message)
         self.code = code
         self.data = {} if data is None else data
+
+
+
+FEATURE_ORDER = (
+    'sidebar', 'herdrAgents', 'chromeProfilesTabs',
+    'launcherCounts', 'agentLaunchers', 'cliFreshness',
+)
+FEATURE_LABELS = {
+    'sidebar': 'Sidebar',
+    'herdrAgents': 'Herdr agents',
+    'chromeProfilesTabs': 'Chrome profiles/tabs',
+    'launcherCounts': 'Launcher counts',
+    'agentLaunchers': 'Agent launchers',
+    'cliFreshness': 'CLI freshness',
+}
+HERDR_MIN_VERSION = (0, 9, 1)
+AGENT_LAUNCHERS = (
+    'smartdock-agent-pi',
+    'smartdock-agent-oh-my-pi',
+    'smartdock-agent-command-code',
+    'smartdock-agent-cursor',
+    'smartdock-agent-claude-code',
+    'smartdock-agent-kilo-code',
+    'smartdock-agent-cline',
+)
+SETUP_FEATURES = ('chrome', 'herdr', 'launcher-counts', 'agent-launchers')
+
+
+class ReadinessProbes:
+    """Read-only local facts used by doctor and future guided setup."""
+
+    def __init__(self, environ=None, bundle=None):
+        self.environ = os.environ if environ is None else environ
+        self.bundle = Path(BUNDLE if bundle is None else bundle)
+
+    def _home(self):
+        return Path(self.environ.get('HOME') or Path.home())
+
+    def _data_home(self):
+        value = self.environ.get('XDG_DATA_HOME')
+        return Path(value) if value else self._home() / '.local/share'
+
+    def _config_home(self):
+        value = self.environ.get('XDG_CONFIG_HOME')
+        return Path(value) if value else self._home() / '.config'
+
+    def which(self, command):
+        return shutil.which(command, path=self.environ.get('PATH'))
+
+    def herdr_version(self, executable):
+        try:
+            result = subprocess.run(
+                [executable, '--version'], stdin=subprocess.DEVNULL,
+                capture_output=True, text=True, encoding='utf-8',
+                timeout=1.0, check=False)
+        except (OSError, subprocess.TimeoutExpired, UnicodeError):
+            return None
+        output = (result.stdout + '\n' + result.stderr).strip()
+        match = re.search(r'(?<!\d)(\d+)\.(\d+)\.(\d+)(?!\d)', output)
+        if match is None:
+            return None
+        return tuple(int(part) for part in match.groups())
+
+    def _executable(self, path):
+        try:
+            return path.is_file() and os.access(path, os.X_OK)
+        except OSError:
+            return False
+
+    def _process_for_path(self, path):
+        target = os.path.realpath(str(path))
+        try:
+            processes = list(Path('/proc').iterdir())
+        except OSError:
+            return None
+        for process in processes:
+            if not process.name.isdigit():
+                continue
+            try:
+                raw = (process / 'cmdline').read_bytes()
+            except OSError:
+                continue
+            argv = [os.fsdecode(part) for part in raw.split(b'\0') if part]
+            for argument in argv:
+                if not os.path.isabs(argument):
+                    continue
+                try:
+                    if os.path.realpath(argument) == target:
+                        return argv
+                except OSError:
+                    continue
+        return None
+
+    def provider(self, kind):
+        names = {
+            'browser': 'smartdock-browser-profile-provider',
+            'launcher': 'smartdock-launcher-badge-provider',
+        }
+        name = names[kind]
+        data_home = self._data_home()
+        candidates = (
+            data_home / 'dockrail/providers' / name,
+            data_home / 'smartdock/providers' / name,
+        )
+        path = next((candidate for candidate in candidates if self._executable(candidate)),
+                    candidates[0])
+        installed = self._executable(path)
+        argv = self._process_for_path(path) if installed else None
+        return {
+            'path': str(path),
+            'installed': installed,
+            'running': argv is not None,
+            'argv': [] if argv is None else argv,
+        }
+
+    def devtools_reachable(self, port):
+        if type(port) is not int or port <= 0 or port > 65535:
+            return False
+        connection = http.client.HTTPConnection('127.0.0.1', port, timeout=0.5)
+        try:
+            connection.request(
+                'GET', '/json/version', headers={'Host': '127.0.0.1:' + str(port)})
+            response = connection.getresponse()
+            body = response.read(65537)
+            if response.status != 200 or len(body) > 65536:
+                return False
+            value = json.loads(body.decode('utf-8'))
+            socket_url = value.get('webSocketDebuggerUrl') if isinstance(value, dict) else None
+            if not isinstance(socket_url, str):
+                return False
+            return (socket_url.startswith('ws://127.0.0.1:' + str(port) + '/')
+                    or socket_url.startswith('ws://localhost:' + str(port) + '/'))
+        except (OSError, UnicodeError, ValueError, http.client.HTTPException):
+            return False
+        finally:
+            connection.close()
+
+    def missing_agent_launchers(self):
+        data_roots = [self._data_home()]
+        for entry in (self.environ.get('XDG_DATA_DIRS')
+                      or '/usr/local/share:/usr/share').split(':'):
+            path = Path(entry) if entry else None
+            if path is not None and path not in data_roots:
+                data_roots.append(path)
+        missing = []
+        for launcher in AGENT_LAUNCHERS:
+            if not any((root / 'applications' / (launcher + '.desktop')).is_file()
+                       for root in data_roots):
+                missing.append(launcher)
+        return missing
+
+    def _same_path(self, left, right):
+        try:
+            return os.path.realpath(str(left)) == os.path.realpath(str(right))
+        except OSError:
+            return False
+
+    def _runtime_root(self, runtime_mode):
+        if runtime_mode == 'plugin':
+            candidates = [
+                self._config_home() / 'omarchy/plugins/io.github.fernandodamaso.dockrail',
+                self._home() / '.config/omarchy/plugins/io.github.fernandodamaso.dockrail',
+            ]
+            for candidate in candidates:
+                if candidate.exists():
+                    return candidate
+            if self.bundle.name == 'io.github.fernandodamaso.dockrail':
+                return self.bundle
+            return candidates[0]
+        if runtime_mode == 'standalone':
+            return self._data_home() / 'dockrail'
+        return None
+
+    def _client_source_root(self):
+        marker = self.bundle / '.source-dir'
+        try:
+            source = marker.read_text(encoding='utf-8').strip()
+        except (OSError, UnicodeError):
+            return self.bundle
+        return Path(source) if source else self.bundle
+
+    def _git_revision(self, root):
+        if root is None:
+            return None
+        try:
+            result = subprocess.run(
+                ['git', '-C', str(root), 'rev-parse', 'HEAD'],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                encoding='utf-8', timeout=0.75, check=False)
+        except (OSError, subprocess.TimeoutExpired, UnicodeError):
+            return None
+        revision = result.stdout.strip()
+        return (revision if result.returncode == 0
+                and re.fullmatch(r'[0-9a-fA-F]{40,64}', revision) else None)
+
+    def _client_fingerprint(self, root):
+        if root is None:
+            return None
+        digest = hashlib.sha256()
+        for relative in (
+                'scripts/smartdock_cli.py',
+                'config/settings-schema.json',
+                'config/dock.json',
+                'docs/AGENT_CONFIGURATION.md',
+                'docs/CLI_REFERENCE.md'):
+            path = Path(root) / relative
+            try:
+                value = path.read_bytes()
+            except OSError:
+                return None
+            digest.update(relative.encode('utf-8'))
+            digest.update(b'\0')
+            digest.update(value)
+            digest.update(b'\0')
+        return digest.hexdigest()
+
+    def cli_sync(self, runtime_mode):
+        runtime_root = self._runtime_root(runtime_mode)
+        if runtime_root is None:
+            return 'unknown'
+        if self._same_path(self.bundle, runtime_root):
+            return 'live'
+        client_source = self._client_source_root()
+        client_revision = self._git_revision(client_source)
+        runtime_revision = self._git_revision(runtime_root)
+        if (client_revision is not None and runtime_revision is not None
+                and client_revision != runtime_revision):
+            return 'stale'
+        client_hash = self._client_fingerprint(self.bundle)
+        runtime_hash = self._client_fingerprint(runtime_root)
+        if client_hash is not None and runtime_hash is not None:
+            return 'match' if client_hash == runtime_hash else 'stale'
+        if client_revision is not None and runtime_revision is not None:
+            return 'match'
+        return 'unknown'
+
+
+def readiness(status, reason, next_step):
+    return {'status': status, 'reason': reason, 'nextStep': next_step}
+
+
+def provider_port(provider):
+    argv = provider.get('argv') if isinstance(provider, dict) else None
+    argv = argv if isinstance(argv, list) else []
+    for index, argument in enumerate(argv):
+        text = str(argument)
+        value = None
+        if text.startswith('--port='):
+            value = text.split('=', 1)[1]
+        elif text == '--port' and index + 1 < len(argv):
+            value = str(argv[index + 1])
+        if value is not None:
+            try:
+                port = int(value)
+            except ValueError:
+                break
+            if 0 < port <= 65535:
+                return port
+            break
+    return 9222
+
+
+def feature_readiness(status_data, settings, probes=None):
+    """Return stable optional-feature readiness without changing machine state."""
+    probes = ReadinessProbes() if probes is None else probes
+    status_data = status_data if isinstance(status_data, dict) else {}
+    settings = settings if isinstance(settings, dict) else {}
+    presentation = status_data.get('presentation')
+    presentation = presentation if isinstance(presentation, dict) else {}
+    features = {}
+
+    monitors = presentation.get('perMonitor')
+    if not isinstance(monitors, list) or not monitors:
+        features['sidebar'] = readiness(
+            'degraded',
+            'No connected monitor is available to verify the effective presentation.',
+            'Connect a display and rerun dockrail doctor.')
+        sidebar_ready = False
+    else:
+        sidebar_monitors = [
+            str(row.get('connector')) for row in monitors
+            if isinstance(row, dict) and row.get('mode') == 'sidebar'
+        ]
+        if sidebar_monitors:
+            features['sidebar'] = readiness(
+                'ready',
+                'Sidebar is effective on: ' + ', '.join(sidebar_monitors) + '.',
+                'No action needed.')
+            sidebar_ready = True
+        else:
+            features['sidebar'] = readiness(
+                'missing',
+                'No connected monitor currently resolves to Sidebar.',
+                'Switch one connected output to Sidebar, then rerun dockrail doctor.')
+            sidebar_ready = False
+
+    herdr_path = probes.which('herdr')
+    sidebar_widgets = settings.get('sidebarWidgets')
+    sidebar_widgets = sidebar_widgets if isinstance(sidebar_widgets, list) else []
+    widget_enabled = 'herdr.agents' in sidebar_widgets
+    widgets = presentation.get('widgets')
+    rows = widgets.get('rows') if isinstance(widgets, dict) else None
+    rows = rows if isinstance(rows, list) else []
+    herdr_row = next((row for row in rows
+                      if isinstance(row, dict) and row.get('id') == 'herdr.agents'), None)
+    lease_active = isinstance(herdr_row, dict) and herdr_row.get('active') is True
+    herdr_detected_version = probes.herdr_version(herdr_path) if herdr_path else None
+    if not herdr_path:
+        features['herdrAgents'] = readiness(
+            'missing',
+            'Herdr is not available on PATH.',
+            'Install Herdr 0.9.1 or newer, then rerun dockrail doctor.')
+    else:
+        version = herdr_detected_version
+        if version is None:
+            features['herdrAgents'] = readiness(
+                'degraded',
+                'Herdr is installed, but its version could not be verified.',
+                'Verify that herdr --version works, then rerun dockrail doctor.')
+        elif version < HERDR_MIN_VERSION:
+            features['herdrAgents'] = readiness(
+                'degraded',
+                'Herdr ' + '.'.join(map(str, version))
+                + ' is installed; click-to-focus requires Herdr 0.9.1 or newer.',
+                'Upgrade Herdr to 0.9.1 or newer.')
+        elif not widget_enabled:
+            features['herdrAgents'] = readiness(
+                'missing',
+                'Herdr is compatible, but herdr.agents is not enabled in sidebarWidgets.',
+                'Enable herdr.agents while preserving the current sidebarWidgets order.')
+        elif not lease_active:
+            features['herdrAgents'] = readiness(
+                'degraded',
+                'herdr.agents is enabled, but its current provider lease is not active.',
+                ('Switch a connected output to Sidebar so herdr.agents can activate.'
+                 if not sidebar_ready else
+                 'Show the configured Sidebar and rerun dockrail doctor.'))
+        else:
+            features['herdrAgents'] = readiness(
+                'ready',
+                'Herdr is compatible, herdr.agents is enabled, and its provider lease is active.',
+                'No action needed.')
+
+    browser_provider = probes.provider('browser')
+    badges_enabled = settings.get('browserProfileBadgesEnabled') is True
+    tabs_enabled = settings.get('sidebarBrowserTabsEnabled') is True
+    chrome_probe_reachable = None
+    if not browser_provider.get('installed'):
+        features['chromeProfilesTabs'] = readiness(
+            'missing',
+            'The Dockrail Chrome profile provider is not installed.',
+            'Install the Dockrail Chrome profile provider, then rerun dockrail doctor.')
+    elif not badges_enabled and not tabs_enabled:
+        features['chromeProfilesTabs'] = readiness(
+            'missing',
+            'Chrome profile badges and sidebar browser tabs are both disabled.',
+            'Enable browserProfileBadgesEnabled or sidebarBrowserTabsEnabled.')
+    elif not browser_provider.get('running'):
+        features['chromeProfilesTabs'] = readiness(
+            'degraded',
+            'The Chrome profile provider is installed but is not running.',
+            'Reload the running Dockrail host so the installed Chrome provider can start.')
+    else:
+        port = provider_port(browser_provider)
+        chrome_probe_reachable = probes.devtools_reachable(port)
+        if not chrome_probe_reachable:
+            features['chromeProfilesTabs'] = readiness(
+                'degraded',
+                'Chrome DevTools is not reachable on localhost:' + str(port) + '.',
+                'Launch Chrome with --remote-debugging-port=' + str(port)
+                + ' and a separate --user-data-dir. Follow docs/browser-activity.md '
+                + 'for profile setup and the local-access security note, then rerun dockrail doctor.')
+        else:
+            enabled = []
+            if badges_enabled:
+                enabled.append('profile badges')
+            if tabs_enabled:
+                enabled.append('sidebar tabs')
+            features['chromeProfilesTabs'] = readiness(
+                'ready',
+                'Chrome provider and localhost DevTools are reachable; enabled: '
+                + ', '.join(enabled) + '.',
+                'No action needed.')
+
+    launcher_provider = probes.provider('launcher')
+    if launcher_provider.get('installed'):
+        features['launcherCounts'] = readiness(
+            'ready',
+            'The Dockrail launcher-count provider binary is installed.',
+            'No action needed.')
+    else:
+        features['launcherCounts'] = readiness(
+            'missing',
+            'The Dockrail launcher-count provider binary is not installed.',
+            'Install the Dockrail launcher-count provider, then rerun dockrail doctor.')
+
+    missing_launchers = probes.missing_agent_launchers()
+    if missing_launchers:
+        features['agentLaunchers'] = readiness(
+            'missing',
+            str(len(missing_launchers)) + ' terminal-agent launcher(s) are missing: '
+            + ', '.join(missing_launchers) + '.',
+            'Install Dockrail terminal-agent launchers, then rerun dockrail doctor.')
+    else:
+        features['agentLaunchers'] = readiness(
+            'ready',
+            'All Dockrail terminal-agent desktop entries are installed.',
+            'No action needed.')
+
+    runtime = status_data.get('runtime')
+    runtime_mode = runtime.get('mode') if isinstance(runtime, dict) else None
+    sync = probes.cli_sync(runtime_mode)
+    if sync == 'live':
+        features['cliFreshness'] = readiness(
+            'ready',
+            'The CLI reads directly from the running Dockrail installation.',
+            'No action needed.')
+    elif sync == 'match':
+        features['cliFreshness'] = readiness(
+            'ready',
+            'The CLI source revision/client surface matches the running Dockrail installation.',
+            'No action needed.')
+    elif sync == 'stale':
+        features['cliFreshness'] = readiness(
+            'degraded',
+            'The CLI source revision/client surface differs from the running Dockrail installation.',
+            'Reinstall the CLI from the running Dockrail installation, then rerun doctor.')
+    else:
+        features['cliFreshness'] = readiness(
+            'degraded',
+            'CLI freshness could not be compared with the running Dockrail installation.',
+            'Install the CLI from the running Dockrail installation, then rerun doctor.')
+
+    # Add orthogonal Settings dimensions without replacing the stable doctor
+    # status/reason/nextStep contract. A disabled feature does not mean that the
+    # integration binary or Chrome's endpoint disappeared.
+    def enrich(feature, configuration, installation, runtime, action, text):
+        value = features[feature]
+        value['configuration'] = configuration
+        value['installation'] = installation
+        value['runtime'] = runtime
+        value['nextAction'] = {'kind': action, 'text': text}
+
+    def pair_state(left, right):
+        return 'on' if left and right else 'off' if not left and not right else 'partly-on'
+
+    herdr_version = herdr_detected_version
+    herdr_installed = bool(herdr_path)
+    herdr_compatible = herdr_installed and herdr_version is not None and herdr_version >= HERDR_MIN_VERSION
+    herdr_config = pair_state(widget_enabled, settings.get('dockHerdrIndicators') is True)
+    herdr_runtime = ('unavailable' if not herdr_installed else
+                     'ready' if herdr_compatible and lease_active else 'limited')
+    enrich('herdrAgents', herdr_config, 'installed' if herdr_installed else 'missing',
+           herdr_runtime,
+           'install' if not herdr_installed else
+           'configure' if not herdr_compatible else
+           'enable' if herdr_config != 'on' else 'learn-more',
+           features['herdrAgents']['nextStep'])
+
+    chrome_config = pair_state(badges_enabled, tabs_enabled)
+    chrome_installed = bool(browser_provider.get('installed'))
+    chrome_running = chrome_installed and bool(browser_provider.get('running'))
+    chrome_reachable = chrome_running and (chrome_probe_reachable if chrome_probe_reachable is not None
+                                           else probes.devtools_reachable(provider_port(browser_provider)))
+    enrich('chromeProfilesTabs', chrome_config, 'installed' if chrome_installed else 'missing',
+           'ready' if chrome_reachable else 'limited' if chrome_installed else 'unavailable',
+           'install' if not chrome_installed else
+           'configure' if not chrome_reachable else
+           'enable' if chrome_config != 'on' else 'learn-more',
+           features['chromeProfilesTabs']['nextStep'])
+
+    counts_installed = bool(launcher_provider.get('installed'))
+    enrich('launcherCounts',
+           'off' if settings.get('launcherBadgeMode') == 'dots-only' else 'on',
+           'installed' if counts_installed else 'missing',
+           'ready' if counts_installed else 'unavailable',
+           'install' if not counts_installed else 'learn-more',
+           features['launcherCounts']['nextStep'])
+    # INF-4 will make this probe selective/ownership-aware. Keep its current
+    # seven-launcher semantics and legacy summary until that ticket lands.
+    launchers_installed = not missing_launchers
+    enrich('agentLaunchers', 'on' if launchers_installed else 'off',
+           'installed' if launchers_installed else 'missing',
+           'ready' if launchers_installed else 'unavailable',
+           'install' if not launchers_installed else 'learn-more',
+           features['agentLaunchers']['nextStep'])
+
+    for key in ('sidebar', 'cliFreshness'):
+        legacy = features[key]
+        good = legacy['status'] == 'ready'
+        enrich(key, 'on', 'installed', 'ready' if good else 'limited',
+               'learn-more', legacy['nextStep'])
+    return {key: features[key] for key in FEATURE_ORDER}
+
+
+def format_doctor(data):
+    runtime = data.get('runtime') if isinstance(data, dict) else {}
+    checks = data.get('checks') if isinstance(data, dict) else {}
+    features = data.get('features') if isinstance(data, dict) else {}
+    lines = ['Dockrail doctor']
+    if isinstance(runtime, dict):
+        lines.append('Runtime: ' + str(runtime.get('mode', 'unknown'))
+                     + ' (' + str(runtime.get('instanceId', 'unknown')) + ')')
+    lines.append('Core checks:')
+    if isinstance(checks, dict):
+        for name in ('python', 'quickshell', 'omarchyShell', 'liveRuntime'):
+            lines.append('  ' + name + ': ' + ('ready' if checks.get(name) is True else 'missing'))
+    lines.append('Feature readiness:')
+    for key in FEATURE_ORDER:
+        item = features.get(key) if isinstance(features, dict) else None
+        if not isinstance(item, dict):
+            continue
+        lines.append('  ' + FEATURE_LABELS[key] + ': ' + str(item.get('status', 'degraded')))
+        lines.append('    Reason: ' + str(item.get('reason', 'Unknown.')))
+        lines.append('    Next: ' + str(item.get('nextStep', 'Rerun dockrail doctor.')))
+    return '\n'.join(lines)
+
+
+class SetupActions:
+    """Explicit local install actions used only after setup has a selected host."""
+
+    def __init__(self, runtime_mode, probes=None, environ=None):
+        self.probes = ReadinessProbes(environ=environ) if probes is None else probes
+        self.environ = os.environ if environ is None else environ
+        root = self.probes._runtime_root(runtime_mode)
+        self.root = Path(BUNDLE if root is None else root)
+
+    def _run_script(self, relative, arguments, label):
+        script = self.root / relative
+        if not script.is_file():
+            raise CliError(
+                'E_SETUP',
+                label + ' installer is unavailable in the selected running Dockrail tree: '
+                + str(script))
+        try:
+            completed = subprocess.run(
+                ['bash', str(script), *arguments],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                env=self.environ,
+                timeout=120,
+                check=False)
+        except (OSError, subprocess.TimeoutExpired, UnicodeError) as error:
+            raise CliError('E_SETUP', label + ' installer could not run: ' + str(error)) from error
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout).strip()
+            if len(detail) > 600:
+                detail = detail[:600] + '...'
+            suffix = '' if not detail else ': ' + detail
+            raise CliError('E_SETUP', label + ' installer failed' + suffix)
+        return {
+            'script': str(script),
+            'stdout': completed.stdout.strip(),
+            'stderr': completed.stderr.strip(),
+        }
+
+    def install_browser_provider(self):
+        return self._run_script(
+            'scripts/install-browser-profile-provider', [], 'Chrome profile provider')
+
+    def install_agent_launchers(self):
+        return self._run_script(
+            'install.sh', ['--agent-assets-only'], 'Terminal-agent launcher')
+
+    def launcher_counts_command(self):
+        return 'bash ' + shlex.quote(str(self.root / 'scripts/build-launcher-badge-provider'))
+
+
+def setup_require_ok(reply):
+    if not reply['ok']:
+        error = reply['error']
+        raise CliError(error['code'], error['message'], reply.get('data') or {})
+    return reply
+
+
+def setup_status(transport, instance, reply=None):
+    reply = setup_require_ok(
+        transport.request(instance, 'status') if reply is None else reply)
+    validate_status(reply, instance)
+    data = reply['data']
+    if data['loadState'] == 'invalid':
+        raise CliError('E_CONFIG_INVALID', data['loadError'], data)
+    if data['writeState'] == 'error':
+        raise CliError('E_PERSISTENCE', data['writeError'], data)
+    return reply
+
+
+def setup_requested_settings(transport, instance):
+    reply = validate_read(
+        transport.request(instance, 'config.get', {'effective': False}), 'get')
+    setup_require_ok(reply)
+    return reply['data']['settings']
+
+
+def setup_snapshot(transport, instance, checks, probes, status_reply=None):
+    status = setup_status(transport, instance, status_reply)
+    settings = setup_requested_settings(transport, instance)
+    data = dict(status['data'])
+    data['checks'] = dict(checks, liveRuntime=True)
+    data['features'] = feature_readiness(data, settings, probes)
+    return data, settings
+
+
+def setup_apply_patch(transport, instance, patch):
+    """Dry-run one minimal host patch, apply it once, then read it back."""
+    dry = validate_mutation(
+        transport.request(instance, 'config.apply', {'patch': patch, 'dryRun': True}),
+        instance)
+    setup_require_ok(dry)
+    if dry['data'].get('applied') is not False:
+        raise CliError('E_PROTOCOL', 'Setup dry-run unexpectedly reported an applied mutation.')
+
+    actual = None
+    if not dry['data']['noop']:
+        actual = validate_mutation(
+            transport.request(instance, 'config.apply', {'patch': patch, 'dryRun': False}),
+            instance)
+        setup_require_ok(actual)
+        mutation = actual['data']
+        if not mutation['noop'] and mutation['applied'] is not True:
+            raise CliError('E_PROTOCOL', 'Setup apply did not acknowledge the requested mutation.')
+        if mutation['applied'] and mutation['persisted'] is not True:
+            raise CliError(
+                'E_PERSISTENCE',
+                'Setup was applied live but was not confirmed persisted.',
+                mutation)
+
+    settings = setup_requested_settings(transport, instance)
+    for key, expected in patch.items():
+        if key not in settings or settings[key] != expected:
+            raise CliError(
+                'E_PROTOCOL',
+                'Setup readback did not match the requested value for ' + key + '.')
+    status = setup_status(transport, instance)
+    if (actual is not None and actual['data']['applied']
+            and (status['data']['writeState'] != 'saved'
+                 or status['data']['persisted'] is not True)):
+        raise CliError(
+            'E_PERSISTENCE',
+            'Setup write was not durably confirmed by host readback.',
+            status['data'])
+    return {
+        'changed': not dry['data']['noop'],
+        'applied': False if actual is None else actual['data']['applied'],
+        'persisted': status['data']['persisted'],
+        'settings': settings,
+    }
+
+
+def format_feature_readiness(features):
+    lines = ['Feature readiness:']
+    for key in FEATURE_ORDER:
+        item = features.get(key) if isinstance(features, dict) else None
+        if not isinstance(item, dict):
+            continue
+        lines.append('  ' + FEATURE_LABELS[key] + ': ' + str(item.get('status', 'degraded')))
+        lines.append('    ' + str(item.get('reason', 'Unknown.')))
+        lines.append('    Next: ' + str(item.get('nextStep', 'Rerun dockrail doctor.')))
+    return '\n'.join(lines)
+
+
+def setup_prompt(input_fn, prompt):
+    try:
+        answer = input_fn(prompt)
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return str(answer).strip().lower() in ('y', 'yes')
+
+
+def setup_choose_monitor(status_data, input_fn):
+    presentation = status_data.get('presentation')
+    rows = presentation.get('perMonitor') if isinstance(presentation, dict) else None
+    rows = rows if isinstance(rows, list) else []
+    connectors = []
+    for row in rows:
+        connector = row.get('connector') if isinstance(row, dict) else None
+        if isinstance(connector, str) and connector and connector not in connectors:
+            connectors.append(connector)
+    if not connectors:
+        return None
+    if len(connectors) == 1:
+        return connectors[0]
+    choices = ', '.join(str(index + 1) + '=' + name
+                        for index, name in enumerate(connectors))
+    while True:
+        try:
+            answer = str(input_fn('Choose a monitor (' + choices + ', blank cancels): ')).strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
+        if not answer:
+            return None
+        if answer in connectors:
+            return answer
+        if answer.isdigit() and 1 <= int(answer) <= len(connectors):
+            return connectors[int(answer) - 1]
+        print('Choose one listed number or connector name.')
+
+
+def setup_chrome_guidance(probes):
+    flags_file = probes._config_home() / 'chrome-flags.conf'
+    profile_dir = probes._home() / '.config/google-chrome-debug'
+    return (
+        'Add these Chrome flags yourself to ' + str(flags_file) + ':\n'
+        '  --user-data-dir=' + str(profile_dir) + '\n'
+        '  --remote-debugging-port=9222\n'
+        'The separate user-data directory is a fresh Chrome profile; sign in and '
+        'configure extensions there separately. Security: while the localhost '
+        'DevTools port is open, any local process can control that Chrome profile '
+        'and read its pages and cookies. Dockrail never edits chrome-flags.conf or '
+        'restarts Chrome. After adding the lines, quit all Chrome windows and '
+        'restart Chrome yourself.')
+
+
+def setup_action(feature, status, message, mutation=None):
+    value = {'feature': feature, 'status': status, 'message': message}
+    if mutation is not None:
+        value['mutation'] = {
+            'changed': mutation['changed'],
+            'applied': mutation['applied'],
+            'persisted': mutation['persisted'],
+        }
+    return value
+
+
+def run_setup(transport, instance, initial_status, args, checks, probes=None,
+              actions=None, input_fn=input, stdin_is_tty=None):
+    """Run guided setup only after execute() selected a real running host."""
+    # Discovery is already complete. Human prompts and installers must not
+    # consume the discovery deadline; each IPC call keeps its own timeout.
+    transport.deadline = None
+    probes = ReadinessProbes() if probes is None else probes
+    initial, settings = setup_snapshot(
+        transport, instance, checks, probes, status_reply=initial_status)
+    initial_features = initial['features']
+    scripted = args.feature is not None
+    interactive = not scripted
+    tty = sys.stdin.isatty() if stdin_is_tty is None else stdin_is_tty
+
+    if args.yes and not scripted:
+        raise CliError(
+            'E_USAGE',
+            '--yes requires --feature. Interactive setup asks before each action.')
+    if scripted and not args.yes:
+        raise CliError(
+            'E_USAGE',
+            '--feature requires --yes. For guided prompts run dockrail setup.')
+    if interactive and getattr(args, 'json', False):
+        raise CliError(
+            'E_USAGE',
+            'Interactive setup cannot use --json. Use --feature NAME --yes --json.')
+    if interactive and not tty:
+        raise CliError(
+            'E_USAGE',
+            'dockrail setup requires a TTY. For scripts use '
+            'dockrail setup --feature NAME --yes.')
+
+    if interactive:
+        print(format_feature_readiness(initial_features))
+
+    runtime = initial.get('runtime') if isinstance(initial, dict) else {}
+    runtime_mode = runtime.get('mode') if isinstance(runtime, dict) else None
+    actions = SetupActions(runtime_mode, probes=probes) if actions is None else actions
+    records = []
+    reload_needed = False
+    chrome_restart_needed = False
+
+    if interactive and initial_features['sidebar']['status'] != 'ready':
+        if setup_prompt(
+                input_fn,
+                'Sidebar uses one selected monitor override. Enable Sidebar on a monitor? [y/N] '):
+            connector = setup_choose_monitor(initial, input_fn)
+            if connector is None:
+                records.append(setup_action(
+                    'sidebar', 'skipped', 'No monitor was selected; no setting changed.'))
+            else:
+                current = setup_requested_settings(transport, instance)
+                modes = current.get('presentationModeByMonitor')
+                if not isinstance(modes, dict):
+                    raise CliError(
+                        'E_CONFIG_INVALID',
+                        'presentationModeByMonitor must be repaired before guided setup.')
+                updated = dict(modes)
+                updated[connector] = 'sidebar'
+                mutation = setup_apply_patch(
+                    transport, instance, {'presentationModeByMonitor': updated})
+                settings = mutation['settings']
+                records.append(setup_action(
+                    'sidebar',
+                    'changed' if mutation['changed'] else 'unchanged',
+                    'Sidebar selected for ' + connector
+                    + '; all other monitor entries were preserved.',
+                    mutation))
+        else:
+            records.append(setup_action(
+                'sidebar', 'skipped', 'Sidebar was left unchanged.'))
+
+    wants_herdr = (args.feature == 'herdr') if scripted else (
+        initial_features['herdrAgents']['status'] != 'ready')
+    if wants_herdr:
+        if initial_features['herdrAgents']['status'] == 'ready':
+            records.append(setup_action(
+                'herdr', 'ready', 'Herdr agents are already ready; no change was made.'))
+        else:
+            herdr_path = probes.which('herdr')
+            if not herdr_path:
+                records.append(setup_action(
+                    'herdr', 'unavailable',
+                    'Herdr is not on PATH. Install Herdr 0.9.1 or newer, confirm '
+                    'herdr --version works, then rerun dockrail setup --feature herdr --yes. '
+                    'No setting was changed.'))
+            else:
+                version = probes.herdr_version(herdr_path)
+                version_text = ('unknown' if version is None
+                                else '.'.join(map(str, version)))
+                proceed = scripted or setup_prompt(
+                    input_fn,
+                    'Herdr agents reads local/attached Herdr sessions. '
+                    'Enable herdr.agents in sidebarWidgets? [y/N] ')
+                if not proceed:
+                    records.append(setup_action(
+                        'herdr', 'skipped', 'Herdr widget selection was left unchanged.'))
+                else:
+                    current = setup_requested_settings(transport, instance)
+                    widgets = current.get('sidebarWidgets')
+                    if not isinstance(widgets, list):
+                        raise CliError(
+                            'E_CONFIG_INVALID',
+                            'sidebarWidgets must be repaired before guided setup.')
+                    if 'herdr.agents' in widgets:
+                        mutation = None
+                        changed = False
+                    else:
+                        updated = list(widgets)
+                        updated.append('herdr.agents')
+                        mutation = setup_apply_patch(
+                            transport, instance, {'sidebarWidgets': updated})
+                        settings = mutation['settings']
+                        changed = mutation['changed']
+                    warning = ''
+                    if version is None:
+                        warning = (
+                            ' Herdr version could not be verified; run herdr --version. '
+                            'Click-to-focus requires 0.9.1 or newer.')
+                    elif version < HERDR_MIN_VERSION:
+                        warning = (
+                            ' Herdr ' + version_text
+                            + ' is below 0.9.1; update Herdr to use click-to-focus.')
+                    records.append(setup_action(
+                        'herdr',
+                        'changed' if changed else 'unchanged',
+                        ('herdr.agents was appended without reordering existing widgets.'
+                         if changed else
+                         'herdr.agents is already present; widget order was left unchanged.')
+                        + warning,
+                        mutation))
+
+    wants_chrome = (args.feature == 'chrome') if scripted else (
+        initial_features['chromeProfilesTabs']['status'] != 'ready')
+    if wants_chrome:
+        if initial_features['chromeProfilesTabs']['status'] == 'ready':
+            records.append(setup_action(
+                'chrome', 'ready', 'Chrome profiles/tabs are already ready; no action ran.'))
+        else:
+            proceed = scripted or setup_prompt(
+                input_fn,
+                'Chrome profiles/tabs uses a separate debug profile and a localhost '
+                'DevTools port visible to local processes. Install the Dockrail provider '
+                'and show the manual Chrome flags? [y/N] ')
+            if not proceed:
+                records.append(setup_action(
+                    'chrome', 'skipped', 'Chrome setup was left unchanged.'))
+            else:
+                provider = probes.provider('browser')
+                installed_now = False
+                if not provider.get('installed'):
+                    actions.install_browser_provider()
+                    installed_now = True
+                    reload_needed = True
+                elif not provider.get('running'):
+                    reload_needed = True
+                endpoint_ready = (provider.get('running') is True
+                                  and probes.devtools_reachable(provider_port(provider)))
+                guidance = setup_chrome_guidance(probes)
+                if (settings.get('browserProfileBadgesEnabled') is not True
+                        and settings.get('sidebarBrowserTabsEnabled') is not True):
+                    guidance += (
+                        '\nBoth Dockrail Chrome display settings are currently disabled. '
+                        'Guided setup preserves that preference; enable '
+                        'browserProfileBadgesEnabled or sidebarBrowserTabsEnabled explicitly '
+                        'through the host writer if you want display output.')
+                chrome_restart_needed = not endpoint_ready
+                records.append(setup_action(
+                    'chrome',
+                    'installed' if installed_now else 'manual',
+                    ('The browser-profile provider was installed from the selected running '
+                     'Dockrail tree.\n' if installed_now else
+                     'The browser-profile provider is already installed; it was not reinstalled.\n')
+                    + guidance))
+
+    wants_agents = (args.feature == 'agent-launchers') if scripted else (
+        initial_features['agentLaunchers']['status'] != 'ready')
+    if wants_agents:
+        if initial_features['agentLaunchers']['status'] == 'ready':
+            records.append(setup_action(
+                'agent-launchers', 'ready',
+                'Terminal-agent launchers are already installed; no action ran.'))
+        else:
+            proceed = scripted or setup_prompt(
+                input_fn,
+                'Agent launchers install Dockrail desktop entries and icons for supported '
+                'terminal agents. Install them now? [y/N] ')
+            if not proceed:
+                records.append(setup_action(
+                    'agent-launchers', 'skipped',
+                    'Terminal-agent launchers were left unchanged.'))
+            else:
+                actions.install_agent_launchers()
+                reload_needed = True
+                records.append(setup_action(
+                    'agent-launchers', 'installed',
+                    'Terminal-agent launchers were installed from the selected running '
+                    'Dockrail tree. No host configuration key was replaced.'))
+
+    wants_counts = (args.feature == 'launcher-counts') if scripted else (
+        initial_features['launcherCounts']['status'] != 'ready')
+    if wants_counts:
+        if initial_features['launcherCounts']['status'] == 'ready':
+            records.append(setup_action(
+                'launcher-counts', 'ready',
+                'Launcher counts are already installed; no build ran.'))
+        else:
+            proceed = scripted or setup_prompt(
+                input_fn,
+                'Launcher counts need CMake, a C++20 compiler, and Qt 6.6+ Core/DBus. '
+                'Show the manual build command? [y/N] ')
+            if not proceed:
+                records.append(setup_action(
+                    'launcher-counts', 'skipped',
+                    'Launcher-count provider was not built.'))
+            else:
+                records.append(setup_action(
+                    'launcher-counts', 'manual',
+                    'Dockrail never builds launcher counts automatically. Run this yourself '
+                    'after reviewing the optional build requirements:\n  '
+                    + actions.launcher_counts_command()))
+
+    final, settings = setup_snapshot(transport, instance, checks, probes)
+    return envelope({
+        'interactive': interactive,
+        'initialFeatures': initial_features,
+        'actions': records,
+        'doctor': final,
+        'reloadNeeded': reload_needed,
+        'chromeRestartNeeded': chrome_restart_needed,
+    })
+
+
+def format_setup(data):
+    lines = ['Dockrail setup']
+    if not data.get('interactive'):
+        lines.append(format_feature_readiness(data.get('initialFeatures', {})))
+    lines.append('Actions:')
+    actions = data.get('actions')
+    if not actions:
+        lines.append('  None.')
+    else:
+        for action in actions:
+            message_lines = str(action.get('message', '')).splitlines() or ['']
+            lines.append(
+                '  ' + str(action.get('feature', 'setup')) + ': '
+                + str(action.get('status', 'unknown')) + ' - ' + message_lines[0])
+            for extra in message_lines[1:]:
+                lines.append('    ' + extra)
+    lines.append('')
+    lines.append('Final doctor summary:')
+    lines.append(format_doctor(data.get('doctor', {})))
+    if data.get('reloadNeeded'):
+        lines.append('Next: run omarchy restart shell once to load newly installed Dockrail assets.')
+    else:
+        lines.append('No Dockrail shell reload is required by the actions that ran.')
+    if data.get('chromeRestartNeeded'):
+        lines.append(
+            'Chrome: after adding the printed flags yourself, quit all Chrome windows '
+            'and restart Chrome yourself.')
+    return '\n'.join(lines)
 
 
 def envelope(data, warnings=None):
@@ -225,7 +1220,8 @@ class Transport:
         self.deadline = time.monotonic() + deadline
 
     def run(self, argv):
-        timeout = min(self.timeout, self.deadline - time.monotonic())
+        timeout = (self.timeout if self.deadline is None
+                   else min(self.timeout, self.deadline - time.monotonic()))
         if timeout <= 0:
             raise CliError('E_TIMEOUT', 'Discovery deadline exceeded. Read status before retrying.',
                            {'applied': None, 'persisted': None})
@@ -332,6 +1328,9 @@ def build_parser():
     commands = parser.add_subparsers(dest='group')
     for name in ('help', 'agent-guide', 'status', 'doctor'):
         child_parser(commands, name)
+    setup = child_parser(commands, 'setup')
+    setup.add_argument('--feature', choices=SETUP_FEATURES)
+    setup.add_argument('--yes', action='store_true')
     config = child_parser(commands, 'config')
     actions = config.add_subparsers(dest='action')
     for name in ('schema', 'get', 'reset'):
@@ -551,6 +1550,14 @@ def execute(args):
             raise CliError('E_PROTOCOL', 'Bundled agent guide is unavailable: ' + str(error)) from error
     if args.group in ('config', 'apps', 'icons') and args.action is None:
         raise CliError('E_USAGE', args.group + ' requires a subcommand. Run dockrail help.')
+    if args.group == 'setup' and args.feature is None and args.yes:
+        raise CliError(
+            'E_USAGE',
+            '--yes requires --feature. Interactive setup asks before each action.')
+    if args.group == 'setup' and args.feature is not None and not args.yes:
+        raise CliError(
+            'E_USAGE',
+            '--feature requires --yes. For guided prompts run dockrail setup.')
     if args.group == 'config' and args.action == 'reset' and (args.key is None) == (not args.preferences):
         raise CliError('E_USAGE', 'Reset requires either KEY or --preferences, not both.')
     if args.group == 'apps' and args.action == 'show' and (args.id is None) == (not args.all):
@@ -573,6 +1580,9 @@ def execute(args):
         if args.group == 'doctor':
             error.data['checks'] = checks
         raise
+    if args.group == 'setup':
+        checks['liveRuntime'] = True
+        return run_setup(transport, instance, status, args, checks)
     if args.group in ('status', 'doctor'):
         if args.group == 'doctor':
             checks['liveRuntime'] = True
@@ -581,6 +1591,15 @@ def execute(args):
                 raise CliError('E_CONFIG_INVALID', status['data']['loadError'], status['data'])
             if status['data']['writeState'] == 'error':
                 raise CliError('E_PERSISTENCE', status['data']['writeError'], status['data'])
+            requested = validate_read(
+                transport.request(instance, 'config.get', {'effective': False}), 'get')
+            if not requested['ok']:
+                error = requested['error']
+                data = requested['data']
+                data['checks'] = checks
+                raise CliError(error['code'], error['message'], data)
+            status['data']['features'] = feature_readiness(
+                status['data'], requested['data']['settings'])
         return status
     if args.group in ('apps', 'icons'):
         return app_icon_request(transport, instance, args)
@@ -613,8 +1632,10 @@ def execute(args):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     as_json = '--json' in argv
+    parsed = None
     try:
-        reply = execute(build_parser().parse_args(argv))
+        parsed = build_parser().parse_args(argv)
+        reply = execute(parsed)
     except CliError as error:
         reply = {'apiVersion': 1, 'ok': False, 'error': {'code': error.code, 'message': str(error)},
                  'data': error.data, 'warnings': []}
@@ -622,7 +1643,12 @@ def main(argv=None):
         print(json.dumps(reply, ensure_ascii=False, allow_nan=False, separators=(',', ':')))
     elif reply['ok']:
         data = reply['data']
-        print(data['text'] if 'text' in data else json.dumps(data, ensure_ascii=False, indent=2))
+        if parsed is not None and parsed.group == 'doctor':
+            print(format_doctor(data))
+        elif parsed is not None and parsed.group == 'setup':
+            print(format_setup(data))
+        else:
+            print(data['text'] if 'text' in data else json.dumps(data, ensure_ascii=False, indent=2))
         for warning in reply['warnings']:
             print('dockrail: ' + str(warning), file=sys.stderr)
     else:

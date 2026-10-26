@@ -220,6 +220,17 @@ class ServerState:
                 max(0, int((now - self.last_snapshot_at) * 1000)),
             "clients": _public_clients(self.clients),
         }
+        if self.snapshot is not None:
+            version = _text(self.snapshot.get("version"), 64)
+            if version:
+                row["version"] = version
+            protocol = self.snapshot.get("protocol")
+            if isinstance(protocol, int) and not isinstance(protocol, bool) and 0 <= protocol <= 2 ** 31 - 1:
+                row["protocol"] = protocol
+            elif isinstance(protocol, str):
+                public_protocol = _text(protocol, 64)
+                if public_protocol:
+                    row["protocol"] = public_protocol
         if self.error:
             row["errorCode"] = _text(self.error, 64) or "unavailable"
         return row

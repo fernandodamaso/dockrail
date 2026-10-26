@@ -150,14 +150,7 @@ Item {
       // Classic-only settings are still honored by classic outputs; this lists
       // what the sidebar presentation ignores, so it is empty only when no
       // sidebar is configured or rendered.
-      inactiveClassicSettings: sidebarPresentation ? ["position", "workspaceLayout", "workspaceGroups",
-        "windowScope", "workspaceMonitorScope", "reserveSpace", "autoHide", "showPreviews",
-        "clickAction", "middleClickAction", "scrollAction", "magnification", "iconSize",
-        "sortByWorkspace", "fullLength", "margin", "backgroundOpacity", "backgroundColorEnabled",
-        "backgroundColor", "borderColorEnabled", "borderColor", "borderWidthEnabled", "borderWidth",
-        "workspaceBadgeBackgroundColorEnabled", "workspaceBadgeBackgroundColor", "workspaceBadgeTextColorEnabled",
-        "workspaceBadgeTextColor", "hoverGlowEnabled", "hoverGlowOpacity", "hoverGlowRadius", "magnificationRadius",
-        "urgentWindowAnimationEnabled", "showUrgentOutsideScope"] : [],
+      inactiveClassicSettings: DockModel.inactiveClassicSettings(sidebarPresentation),
       widgets: SidebarWidgetModel.describe(requested.sidebarWidgets, root.host.sidebarWidgetRegistry || {},
         controller && controller.widgetManager ? controller.widgetManager.diagnostics() : null),
       // Source slices remain unreleased until the integrated SB-06 runtime gate.

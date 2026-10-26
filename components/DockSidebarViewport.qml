@@ -290,7 +290,7 @@ FocusScope {
         workspaceIdentity:row.workspaceIdentity, y:geom.y, height:geom.height})
     }
     return InteractionModel.workspaceGroupRects(items, list.width,
-      root.workspaceCardInset + Style.space(4))
+      root.workspaceCardInset)
   }
 
   function workspacePaintRect(key) {

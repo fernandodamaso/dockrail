@@ -5,6 +5,7 @@ new runtime, or desktop session is involved. The marked guide blocks are inputs.
 """
 import argparse
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -77,9 +78,9 @@ class CliDocumentationTests(unittest.TestCase):
         self.assertTrue(reply['ok'], reply)
         return reply['data']
 
-    def block(self, name, language):
+    def block(self, name, language, text=None):
         match = re.search(r'<!-- recipe: ' + re.escape(name) + r' -->\s*```'
-                          + language + r'\n(.*?)\n```', self.guide, re.S)
+                          + language + r'\n(.*?)\n```', self.guide if text is None else text, re.S)
         self.assertIsNotNone(match, 'Missing executable guide recipe: ' + name)
         return match.group(1)
 
@@ -87,6 +88,7 @@ class CliDocumentationTests(unittest.TestCase):
         inventory = ROOT / 'docs/CONFIGURATION.md'
         reference = ROOT / 'docs/CLI_REFERENCE.md'
         for path in (inventory, reference, ROOT / 'docs/CLI_RUNTIME_CHECKS.md',
+                     ROOT / 'docs/SETTINGS.md',
                      ROOT / 'docs/plans/2026-09-10-cli-first-migration.md'):
             self.assertTrue(path.is_file(), 'Missing deliverable: ' + str(path))
         rows = re.findall(r'^\| `([^`]+)` \| `([^`]+)` \|', inventory.read_text(), re.M)
@@ -153,6 +155,46 @@ class CliDocumentationTests(unittest.TestCase):
                          {'presentationMode': 'sidebar'})
         self.run_command('dockrail config set presentationMode classic --json')
 
+    def run_shell_recipe_line(self, command):
+        # Parse the documented printf pipeline without invoking a shell or any
+        # live command. Only transport is replaced; stdin parsing and the host
+        # settings methods are production code.
+        args = shlex.split(command)
+        if args[0] == 'dockrail':
+            return self.run_command(command)
+        self.assertEqual(args[:2], ['printf', '%s\\n'])
+        self.assertEqual(args[3:5], ['|', 'dockrail'])
+        self.assertIn('--stdin', args[5:])
+        with io.TextIOWrapper(io.BytesIO((args[2] + '\n').encode())) as stdin:
+            with patch.object(cli.sys, 'stdin', stdin):
+                reply = cli.execute(cli.build_parser().parse_args(args[5:]))
+        self.assertTrue(reply['ok'], reply)
+        return reply['data']
+
+    def test_readme_sidebar_recipe_preserves_monitor_choices_and_other_settings(self):
+        self.transport.initial['presentationModeByMonitor'] = {'DP-1': 'classic'}
+        text = (ROOT / 'README.md').read_text(encoding='utf-8')
+        before = self.run_command('dockrail config get --json')['settings']
+        result = self.run_shell_recipe_line(self.block('sidebar-default', 'bash', text))
+        self.assertTrue(result['persisted'])
+        after = self.run_command('dockrail config get --json')['settings']
+        self.assertEqual(after, dict(before, presentationMode='sidebar', sidebarEdge='left'))
+        self.assertEqual(after['presentationModeByMonitor'], {'DP-1': 'classic'})
+        self.assertIn('per-monitor choices in `presentationModeByMonitor` take precedence', text)
+
+    def test_reference_sidebar_examples_use_the_real_cli_and_host(self):
+        text = (ROOT / 'docs/CLI_REFERENCE.md').read_text(encoding='utf-8')
+        for line in self.block('sidebar-settings', 'sh', text).splitlines():
+            with self.subTest(command=line):
+                self.run_shell_recipe_line(line)
+        settings = self.run_command('dockrail config get --json')['settings']
+        self.assertEqual(settings['sidebarCollapsedByMonitor'], {'DP-1': True, 'HDMI-A-1': False})
+        self.assertEqual(settings['presentationMode'], 'classic')
+        self.assertEqual(settings['presentationModeByMonitor'], {})
+        self.assertEqual(settings['extensionData'], self.transport.initial['extensionData'])
+        self.assertEqual(settings['iconOverrides'], self.transport.initial['iconOverrides'])
+        self.assertEqual(settings['pinned'], self.transport.initial['pinned'])
+
     def test_application_recipe_restores_and_orders_without_dropping_unknown_ids(self):
         for line in self.block('applications', 'sh').splitlines():
             self.run_command(line)
@@ -217,6 +259,51 @@ class CliDocumentationTests(unittest.TestCase):
             for target in re.findall(r'\[[^\]]+\]\(([^)]+\.md)\)', text):
                 if '://' not in target:
                     self.assertIn(target, DOCUMENTS, (name, 'Uninstalled documentation link', target))
+
+    def test_settings_policy_and_accepted_design_record(self):
+        agents = (ROOT / 'AGENTS.md').read_text(encoding='utf-8')
+        reference = (ROOT / 'docs/CLI_REFERENCE.md').read_text(encoding='utf-8')
+        record = (ROOT / 'docs/SETTINGS.md').read_text(encoding='utf-8')
+
+        self.assertNotIn('Do not add a settings window', agents)
+        self.assertNotIn('Configuration is CLI-only', self.guide)
+        for text in (agents, self.guide, reference):
+            self.assertIn('AI coding agents', text)
+            self.assertIn('Settings', text)
+            self.assertIn('single host', text)
+        self.assertIn('Change Icon', agents)
+        self.assertRegex(agents, r'sole icon\s+editor')
+        self.assertIn('does not ship', agents)
+        self.assertIn('not shipped', self.guide)
+        self.assertIn('does **not** ship', reference)
+
+        for required in (
+                'KeyboardPanel', '680 px wide', 'two panes', 'Omarchy 4.0.4',
+                'Appearance', 'Layout', 'Behavior', 'Sidebar & Widgets',
+                'Features', 'Apps', 'Apply on change',
+                'Sliders commit on release', 'Classic visibility rule',
+                'One editing slot', 'Changed elsewhere', 'E_STALE',
+                'Saving', 'Saved', 'Not saved', 'E_PERSISTENCE',
+                'E_VALIDATION', 'E_CONFIG_INVALID',
+                '0dbd7c54151577457deb45b3cf282b37fb2fc258',
+                '## Decided'):
+            self.assertIn(required, record)
+        self.assertIn('Change Icon is the sole icon editor', record)
+        self.assertIn('single host FileView/settings writer', record)
+        self.assertIn('SET-01 is documentation and policy only', record)
+        self.assertIn('dockrail-settings-implementation-plan-rev18.md', record)
+        self.assertIn('dockrail-settings-design-canvas-2026-10-21.md', record)
+        self.assertIn('Partly on', record)
+        self.assertIn('Apps › Chrome', record)
+        self.assertIn('Classic settings stay visible', record)
+        self.assertIn('Settings may start named typed Dockrail actions', record)
+        frozen = re.findall(
+            r'^\| `([^`]+)` \| (?:Appearance|Layout|Behavior|Sidebar & Widgets|Apps) \|',
+            record, re.M)
+        self.assertEqual(len(frozen), 58)
+        keys = set(json.loads((ROOT / 'config/settings-schema.json').read_text())['settings'])
+        self.assertEqual(set(frozen), keys)
+
 
     def test_installed_guide_and_reference_are_offline_and_match_source(self):
         with tempfile.TemporaryDirectory(prefix='smartdock docs ') as temporary:

@@ -17,6 +17,11 @@ behavior is in [`SIDEBAR_RESIZE.md`](SIDEBAR_RESIZE.md); SB-04 is in
 
 ## Source boundary
 
+Shared workspace-monitor routing retains the FDM-942/FDM-943 pin enforcement
+hooks for callers that establish a pin; the current workspace header has no pin
+menu. FDM-949 tracks the full-host monitor-section qualification. User-facing
+behavior is documented in `CONFIGURATION.md` without internal tracking IDs.
+
 SB-03 starts from accepted SB-02 head
 `1b06719163a3d333b712cbbbb73582c1a865da06` on
 `feat/fdm-964-global-sidebar`. Stack the child against that exact source until the

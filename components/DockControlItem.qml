@@ -24,8 +24,10 @@ Item {
   required property string position
   required property bool vertical
   required property bool interfaceAnimationsEnabled
+  property var modeGestureToken: null
   signal addApplicationRequested()
   signal autoHideToggled(bool enabled)
+  signal switchToSidebarRequested(var token)
   signal contextMenuVisibilityChanged(bool visible)
 
   readonly property real itemCenter: (vertical ? y + height / 2 : x + width / 2)
@@ -38,6 +40,11 @@ Item {
   function activate() {
     if (root.controlCommand)
       Quickshell.execDetached(["sh", "-lc", root.controlCommand])
+  }
+
+  function openControlsMenu() {
+    contextMenu.modeSwitchToken = root.modeGestureToken
+    contextMenu.open()
   }
 
   width: vertical ? slotSize + 6 : slotSize
@@ -145,12 +152,12 @@ Item {
 
   TapHandler {
     acceptedButtons: Qt.LeftButton
-    onTapped: contextMenu.open()
+    onTapped: root.openControlsMenu()
   }
 
   TapHandler {
     acceptedButtons: Qt.RightButton
-    onTapped: contextMenu.open()
+    onTapped: root.openControlsMenu()
   }
 
   DockContextMenu {
@@ -171,5 +178,8 @@ Item {
     }
     onAddApplication: root.addApplicationRequested()
     onToggleAutoHide: root.autoHideToggled(!root.autoHide)
+    onSwitchPresentationRequested: (destination, token) => {
+      if (destination === "sidebar") root.switchToSidebarRequested(token)
+    }
   }
 }

@@ -18,11 +18,22 @@ Item {
 
   required property string configPath
   required property string runtimeMode
+  readonly property alias settingsActions: settingsActionBroker
+  DockSettingsActions {
+    id: settingsActionBroker
+  }
+  // The panel toggles this visibility in SET-03; when closed, no polling.
+  readonly property alias featureReadinessBridge: featureReadinessProbe
+  DockFeatureReadinessBridge {
+    id: featureReadinessProbe
+  }
   property string dataRoot: ""
   property var notificationService: null
   property var launcherBadgeService: null
   property var browserProfileService: null
   property var herdrService: null
+  property bool herdrBinaryInstalled: false
+  property bool herdrBinaryProbePending: false
   readonly property var applications: DesktopEntries.applications.values || []
   property int iconReloadRevision: 0
   // Menus may cache popup instances, but only one editor owns a live session.
@@ -43,6 +54,22 @@ Item {
   function releaseIconDialog(dialog) {
     if (root.activeIconDialog === dialog) root.activeIconDialog = null
   }
+
+  // Picker readiness is deliberately independent from DockHerdrService.available:
+  // the service reports the bundled provider, while this bounded probe reports
+  // whether the user's Herdr CLI is currently discoverable on PATH.
+  function refreshHerdrBinaryAvailability() {
+    if (herdrBinaryProbe.running) return false
+    root.herdrBinaryProbePending = true
+    herdrBinaryProbeTimeout.restart()
+    herdrBinaryProbe.running = true
+    return true
+  }
+
+  // Keep the lease boundary stable while unrelated registry entries refresh.
+  function acquireHerdrWidget(owner) {
+    return root.herdrWindowAgents.createConsumerLease(owner)
+  }
   readonly property var connectedScreens: Quickshell.screens
   readonly property var hyprMonitors: Hyprland.monitors ? Hyprland.monitors.values || [] : []
   readonly property var hyprWorkspaces: Hyprland.workspaces ? Hyprland.workspaces.values || [] : []
@@ -59,11 +86,13 @@ Item {
     if (root.herdrService) {
       registry["herdr.agents"] = {
         id: "herdr.agents",
-        label: "Coding agents",
-        manageable: false,
-        available: root.herdrService.available !== false,
+        label: "Herdr agents",
+        description: "Show coding-agent sessions from Herdr in the sidebar.",
+        feature: "herdr",
+        manageable: root.herdrBinaryInstalled,
+        available: root.herdrBinaryInstalled && root.herdrService.available !== false,
         revision: 1,
-        acquire: function(owner) { return root.herdrWindowAgents.createConsumerLease(owner) },
+        acquire: root.acquireHerdrWidget,
         expandedView: herdrExpandedView,
         compactView: herdrCompactView,
         popupView: herdrPopupView
@@ -116,11 +145,14 @@ Item {
   // Background mode-switch feedback keyed by output connector. Each renderer
   // reports only its own connector, and the host owns the map — so a stale or
   // rejected gesture on one monitor can never display on another, even across
-  // renderer replacement. Persistence failures stay host-wide through
-  // settingsWriteState rather than being stored per connector. Cleared
-  // explicitly when settings reload or save, and overwritten by the next
+  // renderer replacement. Drag persistence failures stay host-wide through
+  // settingsWriteState; menu persistence failures use modeMenuWriteConnector.
+  // Feedback clears when settings reload or save, and is overwritten by the next
   // gesture for that connector.
   property var modeGestureFeedbackByMonitor: ({})
+  // A menu-initiated save failure belongs to the menu's output; background
+  // gesture failures retain their existing host-wide persistence feedback.
+  property string modeMenuWriteConnector: ""
   property bool settingsReloadPending: false
   property string settingsLoadedText: ""
   property string settingsWriteBaseText: ""
@@ -158,6 +190,7 @@ Item {
         iconReloadRevision++
       if (JSON.stringify(settings) !== JSON.stringify(requested)) settingsRevision++
       modeGestureFeedbackByMonitor = ({})
+      modeMenuWriteConnector = ""
       settings = requested
       settingsLoadState = "loaded"
       settingsLoadError = ""
@@ -330,6 +363,44 @@ Item {
     return { accepted: accepted, pending: pending, reply: reply }
   }
 
+  // The Settings page owns the user-visible draft; the host owns the one
+  // canonical writer. Compare the complete touched-key snapshot synchronously
+  // before validation or mutation; a stale colour/feature pair changes nothing.
+  // Expected values are mandatory for every touched key, never inferred here.
+  function saveSettingsIntent(patch, expectedValues) {
+    var blocked = mutationBlocked()
+    if (blocked) return { accepted: false, pending: false, reply: blocked }
+    var valid = patch && typeof patch === "object" && !Array.isArray(patch)
+      && expectedValues && typeof expectedValues === "object" && !Array.isArray(expectedValues)
+    var keys = valid ? Object.keys(patch) : []
+    if (!valid || !keys.length || keys.some(function(key) {
+      return !Object.prototype.hasOwnProperty.call(expectedValues, key)
+    })) {
+      return { accepted: false, pending: false,
+        reply: dockControl.failure("E_VALIDATION",
+          "Every touched setting needs an expected starting value.") }
+    }
+    for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i]
+      if (!DockModel.sameSettingValue(settings[key], expectedValues[key])) {
+        var stale = dockControl.mutationData(settings, settings, [], false, false)
+        stale.key = key
+        stale.currentValue = settings[key]
+        stale.expectedValue = expectedValues[key]
+        return { accepted: false, pending: false,
+          reply: dockControl.failure("E_STALE",
+            "Preference changed after the interaction started; refresh before retrying.", stale) }
+      }
+    }
+    // saveSettings reuses ConfigModel.applyPatch, commitSettings and FileView;
+    // this synchronous call never opens a second writer or editor.
+    var reply = saveSettings(patch, false)
+    var applied = !!(reply && reply.data && reply.data.applied === true)
+    var accepted = !!(reply && (reply.ok || applied))
+    var pending = accepted && !reply.ok && !!reply.error && reply.error.code === "E_BUSY"
+    return { accepted: accepted, pending: pending, reply: reply }
+  }
+
   // Per-connector rejection text stored for a completed background gesture.
   function modeGestureFeedbackFor(connector) {
     var text = modeGestureFeedbackByMonitor[String(connector || "")]
@@ -348,11 +419,13 @@ Item {
   }
 
   // What a surface displays: its own connector's rejection first, plus a
-  // persistence failure host-wide — that applies to every output regardless of
-  // which gesture triggered the save, so no surviving renderer silently drops it.
+  // persistence failure. Drag failures remain host-wide; menu failures appear
+  // only on the output whose menu started the write.
   function modeGestureDisplayFor(connector) {
     var local = modeGestureFeedbackFor(connector)
     if (settingsWriteState !== "error") return local
+    if (modeMenuWriteConnector && String(connector || "") !== modeMenuWriteConnector)
+      return local
     var persistence = DockModel.persistenceFeedback(settingsWriteError)
     return local ? local + " · " + persistence : persistence
   }
@@ -362,10 +435,19 @@ Item {
   // only that connector's presentationModeByMonitor entry may change. Feedback
   // is stored on the host because the gesture's own renderer may be the one
   // torn down by a successful switch.
-  function commitMonitorModeGesture(connector, destination, capturedState) {
+  function commitMonitorModeGesture(connector, destination, capturedState, menuOrigin) {
+    if (menuOrigin !== true) modeMenuWriteConnector = ""
     var feedback = DockModel.modeDragWriteError(
       monitorModeIntent(connector, destination, capturedState))
     setModeGestureFeedback(connector, feedback)
+    return feedback
+  }
+
+  function commitMonitorModeMenu(connector, destination, capturedState) {
+    var previousOrigin = modeMenuWriteConnector
+    modeMenuWriteConnector = String(connector || "")
+    var feedback = commitMonitorModeGesture(connector, destination, capturedState, true)
+    if (feedback) modeMenuWriteConnector = previousOrigin
     return feedback
   }
 
@@ -511,6 +593,7 @@ Item {
     settingsWriteError = ""
     settingsWriteState = "saved"
     modeGestureFeedbackByMonitor = ({})
+    modeMenuWriteConnector = ""
     settingsLoadedText = settingsWriteText
     settingsLoadState = "loaded"
     settingsLoadError = ""
@@ -524,8 +607,8 @@ Item {
       + "Retry before restarting. " + FileViewError.toString(error)
     settingsWriteState = "error"
     settingsPersisted = false
-    // No per-connector message: a persistence failure is host-wide and every
-    // surface derives it from settingsWriteState through modeGestureDisplayFor.
+    // Every surface derives the persistence result from settingsWriteState;
+    // modeGestureDisplayFor applies the menu origin when one is recorded.
     console.warn("Dock: could not save " + configPath + ":", error)
     reloadSettingsIfPending()
   }
@@ -586,6 +669,7 @@ Item {
 
   Component.onCompleted: {
     refreshWorkspaceCounts()
+    refreshHerdrBinaryAvailability()
     scopeRefreshController.requestRefresh()
   }
 
@@ -625,6 +709,36 @@ Item {
     function onValuesChanged() {
       workspaceCountsRefreshTimer.restart()
     }
+  }
+
+  Process {
+    id: herdrBinaryProbe
+    command: ["sh", "-c", "command -v herdr >/dev/null 2>&1"]
+    onExited: function(exitCode) {
+      herdrBinaryProbeTimeout.stop()
+      if (!root.herdrBinaryProbePending) return
+      root.herdrBinaryProbePending = false
+      root.herdrBinaryInstalled = exitCode === 0
+    }
+  }
+
+  Timer {
+    id: herdrBinaryProbeTimeout
+    interval: 1500
+    repeat: false
+    onTriggered: {
+      if (!root.herdrBinaryProbePending) return
+      root.herdrBinaryProbePending = false
+      root.herdrBinaryInstalled = false
+      if (herdrBinaryProbe.running) herdrBinaryProbe.running = false
+    }
+  }
+
+  Timer {
+    interval: 30000
+    repeat: true
+    running: true
+    onTriggered: root.refreshHerdrBinaryAvailability()
   }
 
   Process {
@@ -845,6 +959,9 @@ Item {
         onPositionRequested: (position, expectedPosition, gestureToken) =>
           root.handlePositionRequest(classicRoot.owner ? classicRoot.owner.connector : "",
             position, expectedPosition, gestureToken)
+        onMenuModeSwitchRequested: token =>
+          root.commitMonitorModeMenu(classicRoot.owner ? classicRoot.owner.connector : "",
+            "sidebar", token)
         onOpenTrashRequested: root.openTrash()
         onEmptyTrashRequested: root.emptyTrash()
       }

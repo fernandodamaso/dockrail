@@ -127,6 +127,9 @@ def project_snapshot(snap):
     version = snap.get("version")
     if type(version) is int or (isinstance(version, str) and len(version) <= 128):
         out["version"] = version
+    protocol = snap.get("protocol")
+    if type(protocol) is int or (isinstance(protocol, str) and len(protocol) <= 128):
+        out["protocol"] = protocol
     return out
 
 

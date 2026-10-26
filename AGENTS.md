@@ -64,9 +64,11 @@ When proposing or implementing a UI refactor:
   primitive meaningfully removes duplicated code without weakening the
   Dockrail-specific contract. Visual similarity alone is not enough.
 - Treat `docs/FDM-858-native-ui-audit.md` as historical rationale only, not as a
-  current component inventory or test checklist. Do not restore obsolete
-  Settings surfaces or their validation paths; preferences remain CLI-first as
-  documented below.
+  current component inventory or test checklist. Do not restore the deleted
+  FDM-918 Settings implementation or its obsolete validation paths. The accepted
+  Dockrail 3.1 human Settings surface is recorded in `docs/SETTINGS.md`; new UI
+  must follow that record and this maintenance check instead of reviving old
+  components.
 
 ### UI refactor maintenance check
 
@@ -132,14 +134,24 @@ patches, then read back effective values and actual persistence. Never execute
 controlCommand for validation. Source work is reserved for an explicitly
 requested unsupported feature or an evidenced defect under its owning issue.
 
-Preferences remain CLI-first. Icon artwork (application, browser profile and
-window-title rules) may also be edited through **Change Icon** from the context
-menu. Menus lazily cache dialog instances, but the host permits only one active
-editing session at a time; saves use `DockHost.saveIconChange` and its existing
-FileView writer. Do not add a settings window, a generic preferences editor,
-preview-only preferences, another icon editor, or a second config writer. Retain
-ordinary window previews, the app picker, dock menus, drag reordering and live
-theme bindings.
+Configuration has two audiences. The CLI remains the complete configuration
+interface for AI coding agents and automation. Dockrail 3.1 also has an accepted
+Settings-panel design for people, recorded in `docs/SETTINGS.md`; SET-01 is the
+policy/design foundation and does not ship that UI. Both interfaces must submit
+the same host intents through the single host FileView/settings writer, with the
+same applied, persisted and readback semantics. QML must never become a second
+writer or edit `dock.json` directly.
+
+Icon artwork (application, browser profile and window-title rules) continues to
+use **Change Icon** from the context menu; **Change Icon** remains the sole icon
+editor. Menus lazily cache dialog instances, and the accepted Settings panel
+shares the host-wide single active editing slot with Change Icon. Saves from
+Change Icon keep using `DockHost.saveIconChange` and the existing FileView
+writer. Do not add a second config writer, preview-only preferences, another icon
+editor, or any Settings surface outside the accepted 3.1 design. Retain ordinary
+window previews, the app picker, dock menus, drag reordering and live theme
+bindings.
+
 The host's FileView remains the only live settings writer. Saved settings and
 verified rendering are separate facts; headless tests do not qualify Omarchy
 focus, auto-hide scheduling, image decoding or cache behavior.

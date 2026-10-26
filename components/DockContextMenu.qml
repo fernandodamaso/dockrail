@@ -25,6 +25,8 @@ PopupWindow {
   property bool interfaceAnimationsEnabled: true
   property bool originOnly: false
   property bool controlItem: false
+  property bool sidebarHeaderMenu: false
+  property var modeSwitchToken: null
   // Optional sidebar adapters; classic menus retain their saved grouping and
   // numeric move page. The owning controller supplies exact-target validation.
   property bool sidebarMode: false
@@ -39,6 +41,7 @@ PopupWindow {
   signal removeFromDock()
   signal hideFromDock()
   signal toggleAutoHide()
+  signal switchPresentationRequested(string destination, var token)
 
   property string page: "app"
   property var pageStack: []
@@ -127,7 +130,8 @@ PopupWindow {
       ? root.targetContexts[0] : null
     root.groupCandidateSnapshot = root.captureGroupCandidateSnapshot()
     root.openedWorkspaceGroupsSignature = root.workspaceGroupsSignature()
-    root.page = root.sidebarMode && root.workspaceContext ? "sidebar-workspace" : DockMenuModel.initialPage(
+    root.page = root.sidebarHeaderMenu ? "controls"
+      : root.sidebarMode && root.workspaceContext ? "sidebar-workspace" : DockMenuModel.initialPage(
       root.controlItem, root.targetContexts.length, root.pageTarget !== null,
       root.representedWorkspaceGrouped())
     root.feedbackTitle = ""
@@ -897,6 +901,12 @@ PopupWindow {
   }
 
   function controlPageActions() {
+    if (root.sidebarHeaderMenu) return [
+      DockMenuModel.headerRecord("sidebar-controls:header", "Sidebar", ""),
+      DockMenuModel.actionRecord("sidebar-controls:switch", "Switch to dock",
+        "panel-bottom", true, "switch-presentation", null,
+        { destination: "classic" })
+    ]
     return [
       DockMenuModel.headerRecord("controls:header", "Dock Controls", ""),
       DockMenuModel.actionRecord(
@@ -907,6 +917,9 @@ PopupWindow {
         "controls:add", "Add Pinned Application",
         DockModel.dockControlIcon("add", root.autoHide),
         true, "add-application", null),
+      DockMenuModel.actionRecord(
+        "controls:switch", "Switch to sidebar", "panel-left-open",
+        true, "switch-presentation", null, { destination: "sidebar" }),
       DockMenuModel.actionRecord(
         "controls:auto-hide",
         root.autoHide ? "Disable Auto-Hide" : "Enable Auto-Hide",
@@ -995,7 +1008,8 @@ PopupWindow {
   function baselinePageActions() {
     if (root.sidebarMode && root.workspaceContext)
       return root.page === "sidebar-monitors" ? root.sidebarMonitorActions() : root.sidebarWorkspaceActions()
-    if (root.controlItem || root.page === "controls") return root.controlPageActions()
+    if (root.controlItem || root.sidebarHeaderMenu || root.page === "controls")
+      return root.controlPageActions()
     if (root.page === "window") return root.windowPageActions()
     if (root.page === "chooser") return root.chooserPageActions()
     if (root.page === "workspaces") return root.workspacePageActions()
@@ -1132,6 +1146,12 @@ PopupWindow {
       root.dismiss(); root.addApplication(); return true
     case "toggle-auto-hide":
       root.toggleAutoHide(); root.dismiss(); return true
+    case "switch-presentation":
+      var token = root.modeSwitchToken
+      var destination = record.destination
+      root.dismiss()
+      root.switchPresentationRequested(destination, token)
+      return true
     default: return false
     }
   }

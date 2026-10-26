@@ -1547,3 +1547,45 @@ function buildVisibleItems(pinnedIds, toplevels, entries, handles, sortByWorkspa
 
   return visibleItems
 }
+
+// Shared pure inventory for Settings UI and runtime projection.
+var classicOnlySettings = [
+  "position",
+  "workspaceLayout",
+  "workspaceGroups",
+  "windowScope",
+  "workspaceMonitorScope",
+  "reserveSpace",
+  "autoHide",
+  "showPreviews",
+  "clickAction",
+  "middleClickAction",
+  "scrollAction",
+  "magnification",
+  "iconSize",
+  "sortByWorkspace",
+  "fullLength",
+  "margin",
+  "backgroundOpacity",
+  "backgroundColorEnabled",
+  "backgroundColor",
+  "borderColorEnabled",
+  "borderColor",
+  "borderWidthEnabled",
+  "borderWidth",
+  "workspaceBadgeBackgroundColorEnabled",
+  "workspaceBadgeBackgroundColor",
+  "workspaceBadgeTextColorEnabled",
+  "workspaceBadgeTextColor",
+  "hoverGlowEnabled",
+  "hoverGlowOpacity",
+  "hoverGlowRadius",
+  "magnificationRadius",
+  "urgentWindowAnimationEnabled",
+  "showUrgentOutsideScope",
+  "dockHerdrIndicators"
+]
+
+function inactiveClassicSettings(hasSidebar) {
+  return hasSidebar ? classicOnlySettings.slice() : []
+}
