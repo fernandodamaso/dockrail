@@ -83,13 +83,18 @@ Rebased onto merged `main@c0ed274` (SET-00/SET-02/INF-1/INF-2/INF-3 merged). Con
 Installed host (read-only inspection, no edits): `omarchy 4.0.6-1`, `hyprland 0.56.2-4`, `quickshell 0.3.2.r7.g2b4501a-1`, `/usr/share/omarchy/version` = `4.0.0.alpha`. Re-inspected `shell/Ui/KeyboardPanel.qml` (focus prime, dismissal twins, `fittedContentHeight`), `PanelKeyCatcher.qml` (blocked forwarding, j/k/h/l/Tab/Esc), `NumberField.qml` (SpinBox `onValueModified`), `PanelSlider.qml` (drag `moved`/`released`, wheel commits), and `shell/plugins/panels/monitor/Panel.qml` (cursor sections, IPC open/close/toggle). No new focus timer, second writer, or command runner added. Installed-revision physical session still required (see gates below).
 
 ### Verification (continuation)
-
 - QML: full `tst_settings_writer` passes including 4 new cases (focused connector, saving lock, per-row reset, close cancels pending keyboard commit). `tst_settings_review` still passes.
 - JS: `test_settings_registry.mjs` passes; `test_settings_review.mjs` extended with focused summon, anchor lifecycle, and per-key reset (all pass). All other `test_*.mjs` model tests pass.
 - CLI: `test_cli_settings.py` (2 tests) passes; `settings` still issues the fixed no-arg IPC `open` and treats `no-anchor` as `E_RUNTIME_NOT_FOUND`.
 - Headless QML suite on this tree: 504 passed, 9 failed — the same 9 failures reproduce on clean `origin/main` (478 passed, 9 failed) in `DockWidgetCard`, `HerdrRemoteFallback`, `WidgetKit`; no new failure introduced.
 - `bash -n`, `py_compile`, `git diff --check`, `qmllint` (warnings only), `omarchy plugin validate .`, and `timeout 6s ./scripts/run` all pass.
 - KVM guest check not run: no verified base image at `~/.local/state/smartdock/dev-sessions/_kvm-feasibility/images/` in this environment. Native Omarchy smoke (four entries, focus/keyboard, CLI round trips, themes/monitors, error states) remains the required gate before merge.
+
+### Owner-directed change (2026-10-26, live desktop review)
+
+- Sidebar header gear removed: with the gear rendered it duplicated the sliders "Sidebar menu" button, so the header had two settings-looking buttons. The sidebar entry is the Sidebar menu (which already contains "Dockrail Settings…" plus "Switch to dock"); the sliders icon is restored there.
+- Summon anchors follow the decision: the header menu button registers the sidebar anchor while expanded, the collapse/Expand button covers the icon rail, so keyboard/IPC/CLI summon keeps working on sidebar-only setups without a dedicated gear.
+- This supersedes canvas board 3's "third header button" for the sidebar. The Dock Controls menu entry and its new gear glyph are unchanged.
 
 ## Remaining acceptance gates
 

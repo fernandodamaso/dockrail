@@ -334,7 +334,7 @@ PanelWindow {
       Item {
         id: headerBar
         width: parent.width
-        height: root.panelCollapsed ? Style.space(82) : Style.space(44)
+        height: Style.space(44)
         HoverHandler { cursorShape: Qt.ArrowCursor }
         Row {
           id: brandRow
@@ -373,8 +373,7 @@ PanelWindow {
         // value binding re-centers on every width/mode change.
         Ui.Button {
           id: collapseButton
-          anchors.verticalCenter: root.panelCollapsed ? undefined : parent.verticalCenter
-          y: root.panelCollapsed ? Style.space(7) : 0
+          anchors.verticalCenter: parent.verticalCenter
           x: root.panelCollapsed
             ? Math.round((parent.width - width) / 2)
             : parent.width - width
@@ -388,6 +387,11 @@ PanelWindow {
           focusable: true
           enabled: !root.controller.interactionBusy
           onClicked: root.controller.requestCollapse(root.screen)
+          // Summon anchor for keyboard/IPC/CLI Settings in both expanded and
+          // rail modes; the header menu button covers expanded only.
+          Component.onCompleted: if (root.host)
+            root.host.registerSettingsAnchor(collapseButton,root.screen ? root.screen.name : "", "sidebar")
+          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(collapseButton)
           DockLucideIcon {
             anchors.centerIn: parent
             width: 14
@@ -398,39 +402,10 @@ PanelWindow {
           }
         }
         Ui.Button {
-          id: settingsGear
-          anchors.verticalCenter: root.panelCollapsed ? undefined : parent.verticalCenter
-          y: root.panelCollapsed ? Style.space(44) : 0
-          anchors.right: root.panelCollapsed ? undefined : collapseButton.left
-          x: root.panelCollapsed ? Math.round((parent.width-width)/2) : 0
-          anchors.rightMargin: Style.space(8)
-          visible: true
-          width: Style.space(30)
-          height: Style.space(30)
-          iconText: ""
-          tooltipText: "Dockrail Settings"
-          Accessible.role: Accessible.Button
-          Accessible.name: tooltipText
-          focusable: visible
-          onClicked: if (root.host) root.host.openSettings(settingsGear,
-            root.screen ? root.screen.name : "")
-          Component.onCompleted: if (root.host)
-            root.host.registerSettingsAnchor(settingsGear,root.screen ? root.screen.name : "", "sidebar")
-          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(settingsGear)
-          DockLucideIcon {
-            anchors.centerIn: parent
-            width: 14
-            height: 14
-            iconName: "settings"
-            iconSize: 14
-            tint: Color.foreground
-          }
-        }
-        Ui.Button {
           id: widgetManage
           visible: !root.panelCollapsed
           anchors.verticalCenter: parent.verticalCenter
-          anchors.right: settingsGear.left
+          anchors.right: collapseButton.left
           anchors.rightMargin: Style.space(8)
           width: visible ? Style.space(30) : 0
           height: Style.space(30)
@@ -466,11 +441,15 @@ PanelWindow {
           focusable: visible
           enabled: !root.controller.interactionBusy
           onClicked: root.openHeaderMenu()
+          // Sidebar summon anchor for keyboard/IPC/CLI Settings while expanded.
+          Component.onCompleted: if (root.host)
+            root.host.registerSettingsAnchor(headerMenuButton,root.screen ? root.screen.name : "", "sidebar")
+          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(headerMenuButton)
           DockLucideIcon {
             anchors.centerIn: parent
             width: 14
             height: 14
-            iconName: "menu"
+            iconName: "settings-2"
             iconSize: 14
             tint: Color.foreground
             visible: headerMenuButton.visible
