@@ -470,7 +470,7 @@ PanelWindow {
             anchors.centerIn: parent
             width: 14
             height: 14
-            iconName: "settings-2"
+            iconName: "menu"
             iconSize: 14
             tint: Color.foreground
             visible: headerMenuButton.visible
