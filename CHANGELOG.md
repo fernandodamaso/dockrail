@@ -6,8 +6,9 @@
 
 SmartDock for Omarchy is now **Dockrail**. The repository moved to
 <https://github.com/fernandodamaso/dockrail>; the old
-`fernandodamaso/smart-omarchy-dock` URL redirects, so existing plugin
-installs keep updating through `omarchy plugin update`.
+`fernandodamaso/smart-omarchy-dock` URL redirects. The plugin ID is now
+`io.github.fernandodamaso.dockrail`, so existing SmartDock plugin installs
+reinstall once (see below); settings are kept.
 
 ### Upgrade and compatibility
 
