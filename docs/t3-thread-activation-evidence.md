@@ -15,10 +15,15 @@ product modifications (controller, model, preview, menu, docs, tests):
   74d8cf4aada287c78d9a2ca95ac52fb5b9d6ef82
 ```
 
-Product HEAD for test evidence is `74d8cf4` (tree-verified clean, fast
-suites re-run at this checkout). A docs-only evidence commit may sit on
-top; docs-only commits carry no product delta and do not invalidate the
-headless evidence above.
+Test evidence pair: base `774fc8e548177af27a9bd0585d377c7301617a69`,
+product HEAD `74d8cf4aada287c78d9a2ca95ac52fb5b9d6ef82`. Per
+`docs/DELIVERY.md`, acceptance applies to the exact checked-out base/head
+pair, and any new commit invalidates prior evidence for the old head. This
+record was last updated in a docs-only commit on top of the product HEAD
+(no product delta); the focused suites below were re-run at the final
+checkout HEAD and the exact SHAs are reported with the result. The
+authoritative pair for any checkout is `git rev-parse
+origin/feat/t3-project-branding` and `git rev-parse HEAD`.
 
 Stack parent is `feat/t3-project-branding` (local main checkout is stale for
 this stack). No merge or deployment performed; no live dock switch.
