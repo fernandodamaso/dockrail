@@ -10,12 +10,15 @@ function rows(registry, requested, development) {
   registered.forEach(function(row){lookup[row.id]=row})
   var out=[]
   enabled.forEach(function(id) {
-    if (!development && id.indexOf("demo.")===0) return
     var row=lookup[id]
+    // Enabled demo.* IDs stay visible in production as unavailable rows so the
+    // persisted value can still be reviewed and removed; only the Off group
+    // hides development widgets.
+    var devHidden = !development && id.indexOf("demo.")===0
     out.push(Object.assign({},row||{
       id:id,label:id,description:"Widget unavailable on this installation",
       iconName:"alert-circle",available:false,manageable:false
-    },{id:id,enabled:true,registered:!!row,unavailable:!row||row.available===false,
+    },{id:id,enabled:true,registered:!!row && !devHidden,unavailable:!row||row.available===false||devHidden,
       position:out.length+1,group:"enabled",
       label:id==="herdr.agents"?"Coding agents":(row ? row.label : id)}))
   })

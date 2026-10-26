@@ -89,6 +89,9 @@ Item {
     if(selectedTarget) toggle(selectedTarget.widgetId,!selectedTarget.isEnabled)
   }
   function reorderSelected(delta) {
+    // Keyboard reorder is a synchronous read-modify-write: no CLI change can
+    // land mid-call, so no drag-window snapshot is needed here. The pointer
+    // path passes the snapshot taken when the drag started.
     if(selectedTarget && selectedTarget.isEnabled)
       move(selectedTarget.widgetId,delta)
   }
@@ -154,7 +157,8 @@ Item {
         var created=service.result.data.created
         root.createPending=false
         root.createdPath=created.sourcePath
-        root.createdStatus="Created. Installing the Widget package…"
+        root.createdStatus="Created " + created.id + " from " + created.sourcePath
+          + ". Installing the Widget package…"
         root.createdInstallPending=true
         Qt.callLater(function() {
           var next=root.broker.start("install",{source:root.createdPath})
@@ -193,6 +197,10 @@ Item {
         spacing:Style.space(8)
         Text {text:"Widgets";font.bold:true;font.family:Style.font.family;font.pixelSize:Style.font.body;color:Color.foreground}
         Text {
+          text:"Drag the grip or press Alt+↑/↓ to reorder."
+          color:Color.foreground;opacity:0.8;font.family:Style.font.family;font.pixelSize:Style.font.caption
+        }
+        Text {
           visible:root.widgetRows.filter(function(row){return row.enabled}).length===0
           text:"No widgets on the sidebar yet."
           color:Color.foreground;opacity:0.8;font.family:Style.font.family;font.pixelSize:Style.font.caption
@@ -208,10 +216,16 @@ Item {
             required property int index
             readonly property string widgetId:modelData.id
             readonly property bool isEnabled:modelData.enabled
-            readonly property bool canToggle:modelData.registered && (modelData.available || isEnabled)
+            // Disabling is always allowed so a stuck unknown ID can be removed;
+            // enabling stays gated on registration and availability.
+            readonly property bool canToggle:isEnabled || (modelData.registered && modelData.available)
             property var orderExpected:null
             property bool popupOpen:false
             property bool textFocused:false
+            Accessible.role: Accessible.Grouping
+            Accessible.name: entry.modelData.label + (entry.isEnabled
+              ? ", position " + entry.modelData.position + ". Alt Up or Alt Down to reorder."
+              : ", off")
             width:cardBody.width
             spacing:Style.space(5)
             function command(){return root.copyCommand()}
@@ -270,17 +284,21 @@ Item {
                   font.family:Style.font.family;font.pixelSize:Style.font.caption
                 }
                 Ui.Button {
+                  // The Features section arrives in SET-06; until then there is
+                  // nowhere to navigate, so the button stays hidden.
                   visible:entry.widgetId==="herdr.agents"&&root.herdrLimited
+                    && Registry.order.indexOf("features") >= 0
                   text:"Herdr setup in Features…"
                   onClicked:root.openFeatures()
                 }
               }
               Ui.ToggleSwitch {
                 id:switchControl
-                width:Style.space(32)
                 anchors.verticalCenter:parent.verticalCenter
                 checked:entry.isEnabled
                 interactive:false
+                busy:root.busy
+                hasCursor:root.cursorActive && root.selectedTarget === entry
                 foreground:Color.foreground
                 accent:Color.accent
                 opacity:entry.canToggle?1:0.45

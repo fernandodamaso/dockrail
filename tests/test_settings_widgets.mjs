@@ -10,11 +10,16 @@ const registry={
 const selected=['io.local.weather','legacy.unavailable','herdr.agents','demo.display']
 let list=plain(model.rows(registry,selected,false))
 assert.deepEqual(list.map(x=>x.id),[
-  'io.local.weather','legacy.unavailable','herdr.agents','io.local.system'])
-assert.deepEqual(list.map(x=>x.group),['enabled','enabled','enabled','off'])
-assert.deepEqual(list.map(x=>x.position),[1,2,3,null])
+  'io.local.weather','legacy.unavailable','herdr.agents','demo.display','io.local.system'])
+assert.deepEqual(list.map(x=>x.group),['enabled','enabled','enabled','enabled','off'])
+assert.deepEqual(list.map(x=>x.position),[1,2,3,4,null])
 assert.equal(list[1].unavailable,true)
 assert.equal(list[1].registered,false)
+// Enabled demo.* IDs stay visible in production as unavailable rows so the
+// persisted value can be reviewed and removed; canToggle inputs below.
+assert.equal(list[3].unavailable,true)
+assert.equal(list[3].registered,false)
+assert.equal(list[3].enabled,true)
 assert.equal(list[2].label,'Coding agents')
 assert.equal(list[2].unavailable,false)
 assert.deepEqual(plain(model.rows(registry,selected,true)).map(x=>x.id),[
@@ -23,6 +28,17 @@ assert.equal(model.moveSlot(selected,'herdr.agents',-1),1)
 assert.equal(model.moveSlot(selected,'io.local.weather',-1),-1)
 assert.equal(model.moveSlot(selected,'herdr.agents',1),4)
 assert.equal(model.moveSlot(selected,'io.local.system',1),-1)
+// First/last boundaries: neither direction escapes the enabled order.
+assert.equal(model.moveSlot(selected,selected[0],-1),-1)
+assert.equal(model.moveSlot(selected,selected[selected.length-1],1),-1)
+assert.equal(model.moveSlot(selected,'missing.id',1),-1)
+// canToggle inputs: disabling is always allowed (stuck unknown IDs stay
+// removable); enabling requires registration and availability.
+for (const row of list) {
+  const canToggle=row.enabled || (row.registered && row.available !== false)
+  if (!row.enabled) assert.equal(canToggle,row.registered && row.available !== false,row.id)
+  else assert.equal(canToggle,true,row.id+': disable always allowed')
+}
 assert.equal(model.limited({herdrAgents:{runtime:'limited',version:'0.8.2'}}),true)
 assert.equal(model.limited({herdrAgents:{runtime:'limited',version:'0.9.0'}}),true)
 assert.equal(model.limited({herdrAgents:{runtime:'ready',version:'0.9.1'}}),false)

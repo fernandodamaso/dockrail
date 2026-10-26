@@ -335,9 +335,7 @@ Item {
                   && root.selectedSection !== "behavior"
                   && root.selectedSection !== "sidebar-widgets"
                 width: parent.width
-                text: root.selectedSection === "sidebar-widgets"
-                  ? "Sidebar & Widgets controls will be added in SET-05. Layout is available now."
-                  : "This section is reserved for the next Settings implementation ticket."
+                text: "This section is reserved for the next Settings implementation ticket."
                 wrapMode: Text.WordWrap
                 font.family: Style.font.family
                 color: Commons.Color.foreground
