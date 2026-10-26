@@ -3,6 +3,7 @@ import QtQuick
 import qs.Ui as Ui
 import qs.Commons
 import "DockSettingsRegistry.js" as Registry
+import "DockSettingsPairModel.js" as PairModel
 
 // A pair is one user control and one stale-safe host writer transaction.
 Column {
@@ -44,9 +45,7 @@ Column {
 
   function beginEdit() {
     if (editing) return
-    expected = ({})
-    expected[key] = current
-    expected[flagKey] = flag
+    expected = PairModel.pairExpected(key,flagKey,current,flag)
     editing = true
   }
   function cancelPending() { keyboardCommit.stop(); editing = false; conflict = false; customOpen = false; feedback = "" }
@@ -56,9 +55,7 @@ Column {
     if (!editable) return false
     beginEdit()
     if (conflict) { feedback = "Changed while editing. Reload or keep editing."; return false }
-    var patch = ({})
-    patch[key] = value
-    patch[flagKey] = enabled
+    var patch = PairModel.pairPatch(key,flagKey,value,enabled)
     var result = Registry.writeOutcome(host.saveSettingsIntent(patch,expected))
     if (result.accepted) {
       editing = false
@@ -84,7 +81,7 @@ Column {
   }
   function saveHex() {
     var color = customHex.text.trim()
-    if (!/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(color)) {
+    if (!PairModel.validHex(color)) {
       feedback = "Enter a hex color (#RRGGBB or #AARRGGBB)."
       return false
     }
@@ -139,11 +136,7 @@ Column {
     id: chooser
     visible: !root.isWidth
     width: Math.min(root.width,Style.space(300))
-    options: [{value:"default",label:"Theme default"},
-      {value:"@accent",label:"Theme accent"},
-      {value:"@foreground",label:"Theme foreground"},
-      {value:"@menu.background",label:"Theme menu background"},
-      {value:"custom",label:"Custom hex…"}]
+    options: PairModel.colorOptions()
     value: root.selection
     enabled: root.editable
     hasCursor: root.hasCursor
