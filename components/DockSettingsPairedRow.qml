@@ -36,7 +36,10 @@ Column {
   opacity: editable ? 1 : 0.6
   Accessible.role: Accessible.Grouping
   Accessible.name: row.ui.label
-  onCurrentChanged: if (editing && JSON.stringify(current) !== JSON.stringify(expected[key])) conflict = true
+  onCurrentChanged: {
+    if (editing && JSON.stringify(current) !== JSON.stringify(expected[key])) conflict = true
+    if (!editing) draftWidth = Number(current || 0)
+  }
   onFlagChanged: if (editing && flag !== expected[flagKey]) conflict = true
 
   function beginEdit() {
@@ -105,7 +108,6 @@ Column {
   }
   function command() { return Registry.cliCommand(key,current) + " && " + Registry.cliCommand(flagKey,flag) }
   property int draftWidth: Number(current || 0)
-  onCurrentChanged: if (!editing) draftWidth = Number(current || 0)
   Timer { id: keyboardCommit; interval: 400; onTriggered: root.commitPair(root.draftWidth,true) }
   HoverHandler { onHoveredChanged: if (hovered) root.hovered() }
 
