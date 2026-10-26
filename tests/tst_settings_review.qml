@@ -103,4 +103,101 @@ TestCase {
     verify(panel.reportWrite({ok:false,error:{code:"E_BUSY"},data:{applied:true}}))
     compare(panel.rowFeedback,"")
   }
+  Component {
+    id: pairHostFactory
+    Item {
+      property var settings: ({backgroundColor:"#112233",backgroundColorEnabled:true,borderWidth:4,borderWidthEnabled:true,workspaceGroups:[{desktopId:"org.example.App",workspace:"id:1"}]})
+      property string settingsLoadState: "loaded"
+      property string settingsWriteState: "saved"
+      property bool settingsReloadPending: false
+      property bool settingsLoaded: true
+      property var writes: []
+      property var ungroupCalls: []
+      property var connectedScreens: []
+      function saveSettingsIntent(patch, expected) {
+        for (var key in expected)
+          if (JSON.stringify(settings[key]) !== JSON.stringify(expected[key]))
+            return {accepted:false,reply:{ok:false,error:{code:"E_STALE",message:"Changed"}}}
+        writes = writes.concat([{patch:patch,expected:expected}])
+        var next = Object.assign({},settings)
+        for (var applied in patch) next[applied] = patch[applied]
+        settings = next
+        return {accepted:true,reply:{ok:true,data:{applied:true}}}
+      }
+      function defaultSetting(key) {
+        return {backgroundColor:"",backgroundColorEnabled:false,borderWidth:2,borderWidthEnabled:false}[key]
+      }
+      function shownSetting(key) { return settings[key] }
+      function ungroupWorkspaceApplication(desktopId, workspace) {
+        ungroupCalls = ungroupCalls.concat([{desktopId:desktopId,workspace:workspace}])
+        var next = Object.assign({},settings,{workspaceGroups:[]})
+        settings = next
+        return {accepted:true,reply:{ok:true,data:{applied:true}}}
+      }
+      function currentPresentation() {return {entries:[],classicScreens:["DP-1"]}}
+    }
+  }
+  Component { id: pairedFactory; DockSettingsPairedRow {width:400} }
+  function makePaired(key, flagKey) {
+    var host=createTemporaryObject(pairHostFactory,testCase)
+    return createTemporaryObject(pairedFactory,host,{host:host,
+      row:{key:key,ui:{label:key,help:"",pairedWith:flagKey}}})
+  }
+  function test_paired_reset_writes_one_atomic_default_patch() {
+    var row=makePaired("backgroundColor","backgroundColorEnabled")
+    verify(row.needsReset)
+    verify(row.resetToDefault())
+    compare(row.host.writes.length,1)
+    compare(row.host.settings.backgroundColor,"")
+    compare(row.host.settings.backgroundColorEnabled,false)
+    verify(!row.needsReset)
+  }
+  function test_paired_external_change_marks_changed_elsewhere() {
+    var row=makePaired("borderWidth","borderWidthEnabled")
+    row.host.settings=Object.assign({},row.host.settings,{borderWidth:6})
+    verify(row.changedElsewhere)
+    compare(row.current,6)
+  }
+  function test_paired_adjust_from_default_keeps_custom_value() {
+    var row=makePaired("backgroundColor","backgroundColorEnabled")
+    row.host.settings=Object.assign({},row.host.settings,{backgroundColorEnabled:false})
+    compare(row.selection,"default")
+    row.adjust(1)
+    compare(row.host.settings.backgroundColorEnabled,true)
+    compare(row.host.settings.backgroundColor,"#112233")
+  }
+  function test_paired_empty_hex_commits_with_flag_on() {
+    var row=makePaired("backgroundColor","backgroundColorEnabled")
+    row.customOpen=true
+    row.beginEdit()
+    var field=findChild(row,"paired-hex")
+    verify(!!field)
+    field.text=""
+    verify(row.saveHex())
+    compare(row.host.settings.backgroundColor,"")
+    compare(row.host.settings.backgroundColorEnabled,true)
+  }
+  function test_behavior_groups_render_pointer_first() {
+    var host=createTemporaryObject(pairHostFactory,testCase)
+    var sectionMeta={settings:{
+      clickAction:{type:"string",ui:{section:"behavior",group:"pointer",order:380,label:"Left click",control:"dropdown",visibility:"normal"}},
+      showPreviews:{type:"boolean",ui:{section:"behavior",group:"windows",order:410,label:"Previews",control:"toggle",visibility:"normal"}},
+      attentionBadgesEnabled:{type:"boolean",ui:{section:"behavior",group:"attention",order:430,label:"Badges",control:"toggle",visibility:"normal"}},
+      dockHerdrIndicators:{type:"boolean",ui:{section:"behavior",group:"attention-on-the-dock",order:460,label:"Agent state",control:"toggle",visibility:"normal"}}}}
+    var section=createTemporaryObject(generalFactory,testCase,{host:host,metadata:sectionMeta,section:"behavior"})
+    compare(section.groups.map(function(group){return group.id}),
+      ["pointer","windows","attention","attention-on-the-dock"])
+  }
+  function test_grouped_apps_keyboard_ungroup() {
+    var host=createTemporaryObject(pairHostFactory,testCase)
+    var sectionMeta={settings:{
+      workspaceGroups:{type:"array",ui:{section:"behavior",group:"windows",order:420,label:"Grouped apps",control:"app-list",visibility:"normal"}}}}
+    var section=createTemporaryObject(generalFactory,testCase,{host:host,metadata:sectionMeta,section:"behavior"})
+    var lists=section.targets.filter(function(target){return target.adjust && target.ungroupAt})
+    compare(lists.length,1)
+    lists[0].activate()
+    compare(host.ungroupCalls.length,1)
+    compare(host.ungroupCalls[0].desktopId,"org.example.App")
+  }
+  Component { id: generalFactory; DockSettingsGeneralSection {width:470} }
 }

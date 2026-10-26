@@ -89,4 +89,24 @@ assert.equal(registry.displayValue(metadata.settings.magnification.ui,1.2),'1.20
 assert.equal(registry.displayValue(metadata.settings.hoverGlowRadius.ui,25),'25px')
 assert.match(read('components/DockSettingsRow.qml'),/Registry\.displayValue\(root\.ui, root\.shown\)/,
   'requested versus rendered help reflects schema displayScale')
+// Behavior card contract: Pointer, Windows, Attention, Attention on the dock.
+const behaviorGroups=plain(registry.sectionRows(metadata,'behavior'))
+  .filter(row=>row.ui.visibility==='normal')
+const byGroup={}
+for (const row of behaviorGroups)
+  byGroup[row.ui.group]=Math.min(byGroup[row.ui.group] ?? Infinity,row.ui.order)
+assert.deepEqual(Object.keys(byGroup).sort((a,b)=>byGroup[a]-byGroup[b]),
+  ['pointer','windows','attention','attention-on-the-dock'])
+// Paired reset is one atomic patch carrying both defaults.
+for (const [key, enabledKey] of [['backgroundColor','backgroundColorEnabled'],['borderWidth','borderWidthEnabled']]) {
+  const h2=hostHarness({presentationMode:'classic'})
+  const cur=h2.host.settings[key], curFlag=h2.host.settings[enabledKey]
+  const patch=pair.pairPatch(key,enabledKey,
+    key==='borderWidth' ? 2 : '',false)
+  const reset=h2.host.saveSettingsIntent(patch,
+    pair.pairExpected(key,enabledKey,cur,curFlag))
+  assert.equal(reset.accepted,true,key+': atomic reset accepted')
+  assert.equal(h2.host.settings[key],key==='borderWidth' ? 2 : '')
+  assert.equal(h2.host.settings[enabledKey],false)
+}
 console.log('SET-04 schema sections, dependencies and stale-safe atomic paired writes passed')

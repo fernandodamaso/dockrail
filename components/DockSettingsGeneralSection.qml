@@ -20,7 +20,7 @@ Item {
   })
   readonly property var groupOrder: section === "appearance"
     ? ["icons","hover-glow","dock-surface","workspace-badges","motion"]
-    : ["attention","pointer","windows","attention-on-the-dock"]
+    : ["pointer","windows","attention","attention-on-the-dock"]
   readonly property var groups: groupOrder.map(function(id) {
     return {id:id, rows:root.rows.filter(function(row){return row.ui.group === id})}
   })
@@ -33,7 +33,8 @@ Item {
       for (var j=0;j<card.fields.count;++j) {
         var entry=card.fields.itemAt(j)
         if (!entry) continue
-        var selected=entry.paired ? entry.pairedControl : entry.normalControl
+        var selected=entry.paired ? entry.pairedControl
+          : (entry.modelData.ui.control === "app-list" ? entry.listControl : entry.normalControl)
         if (selected && selected.visible) values.push(selected)
       }
     }
@@ -132,6 +133,7 @@ Item {
               readonly property bool paired: modelData.ui.pairedWith !== undefined
               property alias normalControl:normal
               property alias pairedControl:pairedEditor
+              property alias listControl:appList
               width:cardBody.width
               spacing:Style.space(5)
               DockSettingsRow {
@@ -161,34 +163,56 @@ Item {
                 onFocusSections:root.focusSections()
               }
               Column {
+                id: appList
                 visible:entry.modelData.ui.control==="app-list"
                 width:parent.width
                 spacing:Style.space(8)
-                Text {text:entry.modelData.ui.label; color:Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.body;font.bold:true}
+                // Keyboard parity: the cursor lands here, left/right picks the
+                // grouped app, Enter ungroups it. Mouse users click directly.
+                property int selectedGroup: 0
+                property bool hasCursor: root.cursorActive && root.selectedTarget === this
+                readonly property bool popupOpen: false
+                readonly property bool textFocused: false
+                readonly property var grouped: root.host.settings.workspaceGroups || []
+                function ungroupAt(index) {
+                  var pair = grouped[index]
+                  if (!pair) return false
+                  var result = Registry.writeOutcome(root.host.ungroupWorkspaceApplication(
+                    pair.desktopId, pair.workspace))
+                  if (result.accepted) root.changed()
+                  return result.accepted
+                }
+                function adjust(delta) {
+                  if (!grouped.length) return
+                  selectedGroup = Math.max(0, Math.min(grouped.length - 1, selectedGroup + delta))
+                }
+                function activate() { ungroupAt(selectedGroup) }
+                function dismissEditor() { return false }
+                function cancelPending() { selectedGroup = 0 }
+                HoverHandler { onHoveredChanged: if (hovered) root.hovered(appList) }
+                Text {text:entry.modelData.ui.label; color:appList.hasCursor ? Color.accent : Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.body;font.bold:true}
                 Repeater {
-                  model:root.host.settings.workspaceGroups || []
+                  model:appList.grouped
                   delegate:Row {
                     required property var modelData
+                    required property int index
                     spacing:Style.space(8)
                     Text {
                       text: parent.modelData.desktopId + " · " + parent.modelData.workspace
                       width:cardBody.width-Style.space(110)
                       elide:Text.ElideRight
-                      color:Color.foreground
+                      color:appList.hasCursor && appList.selectedGroup === parent.index ? Color.accent : Color.foreground
                     }
                     Ui.Button {
                       text:"Ungroup"
+                      focusable:true
+                      Accessible.name:"Ungroup " + parent.modelData.desktopId + " from " + parent.modelData.workspace
                       enabled:root.host.settingsLoadState!=="invalid"&&root.host.settingsWriteState!=="saving"
-                      onClicked: {
-                        var pair=parent.modelData
-                        var result=Registry.writeOutcome(root.host.ungroupWorkspaceApplication(
-                          pair.desktopId, pair.workspace))
-                        if(result.accepted) root.changed()
-                      }
+                      onClicked: appList.ungroupAt(parent.index)
                     }
                   }
                 }
-                Text {visible:(root.host.settings.workspaceGroups || []).length===0;text:"No grouped apps. Right-click an app and choose Group Windows.";wrapMode:Text.WordWrap;color:Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption}
+                Text {visible:appList.grouped.length===0;text:"No grouped apps. Right-click an app and choose Group Windows.";wrapMode:Text.WordWrap;color:Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption}
               }
             }
           }
