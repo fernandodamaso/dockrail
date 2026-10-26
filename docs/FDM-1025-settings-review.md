@@ -90,6 +90,24 @@ Installed host (read-only inspection, no edits): `omarchy 4.0.6-1`, `hyprland 0.
 - `bash -n`, `py_compile`, `git diff --check`, `qmllint` (warnings only), `omarchy plugin validate .`, and `timeout 6s ./scripts/run` all pass.
 - KVM guest check not run: no verified base image at `~/.local/state/smartdock/dev-sessions/_kvm-feasibility/images/` in this environment. Native Omarchy smoke (four entries, focus/keyboard, CLI round trips, themes/monitors, error states) remains the required gate before merge.
 
+### Native smoke on Omarchy (2026-10-26, this machine, PASS with noted limits)
+
+Driver: hypruse 0.13.0 shell verbs from source (rootless, `HYPRUSE_JOURNAL=1`; journal at `~/.local/state/hypruse/journal.ndjson`), screenshots in `/tmp/opencode/proof/`. Host: omarchy 4.0.6-1, hyprland 0.56.2, quickshell 0.3.2, single monitor HDMI-A-1, classic dock. Branch head at the time: `d41ec77` (code changes; doc-only commits followed, no runtime diff).
+
+- CLI/IPC summon: `dockrail settings` → `opened:true`, `omarchy-keyboard-panel` layer appears (01).
+- Shell: one host-owned two-pane panel; Appearance placeholder + Open Layout (01, 03); Layout via nav click (05, 06).
+- Layout one-monitor classic rendering: Displays card (HDMI-A-1 Classic/Sidebar), Sidebar card (Edge, Width, Reset Default:320, Compact rows), Classic dock card (Size and position, Hiding, Apps on the dock with Single row / Card per workspace tiles) (11, 28).
+- Panel→CLI: clicked Full width toggle ON → `config get fullLength` = true (08 readback; 10/11 show ON + stretched dock; panel re-anchors with the Controls item, by design).
+- CLI→panel: `config set fullLength false` → toggle renders OFF with no panel interaction (09); reopen lands on Layout = last-section memory (24).
+- Keyboard: panel holds the grab (keys never reached the terminal); `j`/`k` move the row cursor (12, 13); `Tab` stable; first `Esc` closes help only, second closes the panel = nested Escape (28→29, layer count 0).
+- `?` popover: host, settings file, same-writer note, full keyboard model (28).
+- Dock Controls route: left-click Controls → menu with gear-glyphed `Dockrail Settings…` after separator (17) → click opens panel (18).
+- Editing slot: right-click dock icon while panel open hits the panel's dismissal veil (panel closes, 19) — dock unreachable while open, by design. With panel closed: app menu → Change Icon… opens dialog (22, 23); `dockrail settings` then closes dialog and opens panel (24).
+- Per-row Reset rows render with defaults (11, 28); reset behavior itself covered headlessly.
+- Settings after all native writes byte-identical to pre-test backup (`config export` diff empty); status idle/persisted.
+
+Explicitly NOT covered natively (no sidebar surface, one monitor): sidebar/icon-rail gear (removed per owner decision), Widget-manager footer entry, multi-monitor matrix, `E_CONFIG_INVALID` (not deliberately breaking the live config), screen-reader announcements, `c` clipboard copy (skipped to preserve owner clipboard).
+
 ### Owner-directed change (2026-10-26, live desktop review)
 
 - Sidebar header gear removed: with the gear rendered it duplicated the sliders "Sidebar menu" button, so the header had two settings-looking buttons. The sidebar entry is the Sidebar menu (which already contains "Dockrail Settings…" plus "Switch to dock"); the sliders icon is restored there.
