@@ -397,13 +397,14 @@ def feature_readiness(status_data, settings, probes=None):
     herdr_row = next((row for row in rows
                       if isinstance(row, dict) and row.get('id') == 'herdr.agents'), None)
     lease_active = isinstance(herdr_row, dict) and herdr_row.get('active') is True
+    herdr_detected_version = probes.herdr_version(herdr_path) if herdr_path else None
     if not herdr_path:
         features['herdrAgents'] = readiness(
             'missing',
             'Herdr is not available on PATH.',
             'Install Herdr 0.9.1 or newer, then rerun dockrail doctor.')
     else:
-        version = probes.herdr_version(herdr_path)
+        version = herdr_detected_version
         if version is None:
             features['herdrAgents'] = readiness(
                 'degraded',
@@ -436,6 +437,7 @@ def feature_readiness(status_data, settings, probes=None):
     browser_provider = probes.provider('browser')
     badges_enabled = settings.get('browserProfileBadgesEnabled') is True
     tabs_enabled = settings.get('sidebarBrowserTabsEnabled') is True
+    chrome_probe_reachable = None
     if not browser_provider.get('installed'):
         features['chromeProfilesTabs'] = readiness(
             'missing',
@@ -453,7 +455,8 @@ def feature_readiness(status_data, settings, probes=None):
             'Reload the running Dockrail host so the installed Chrome provider can start.')
     else:
         port = provider_port(browser_provider)
-        if not probes.devtools_reachable(port):
+        chrome_probe_reachable = probes.devtools_reachable(port)
+        if not chrome_probe_reachable:
             features['chromeProfilesTabs'] = readiness(
                 'degraded',
                 'Chrome DevTools is not reachable on localhost:' + str(port) + '.',
@@ -521,6 +524,65 @@ def feature_readiness(status_data, settings, probes=None):
             'CLI freshness could not be compared with the running Dockrail installation.',
             'Install the CLI from the running Dockrail installation, then rerun doctor.')
 
+    # Add orthogonal Settings dimensions without replacing the stable doctor
+    # status/reason/nextStep contract. A disabled feature does not mean that the
+    # integration binary or Chrome's endpoint disappeared.
+    def enrich(feature, configuration, installation, runtime, action, text):
+        value = features[feature]
+        value['configuration'] = configuration
+        value['installation'] = installation
+        value['runtime'] = runtime
+        value['nextAction'] = {'kind': action, 'text': text}
+
+    def pair_state(left, right):
+        return 'on' if left and right else 'off' if not left and not right else 'partly-on'
+
+    herdr_version = herdr_detected_version
+    herdr_installed = bool(herdr_path)
+    herdr_compatible = herdr_installed and herdr_version is not None and herdr_version >= HERDR_MIN_VERSION
+    herdr_config = pair_state(widget_enabled, settings.get('dockHerdrIndicators') is True)
+    herdr_runtime = ('unavailable' if not herdr_installed else
+                     'ready' if herdr_compatible and lease_active else 'limited')
+    enrich('herdrAgents', herdr_config, 'installed' if herdr_installed else 'missing',
+           herdr_runtime,
+           'install' if not herdr_installed else
+           'configure' if not herdr_compatible else
+           'enable' if herdr_config != 'on' else 'learn-more',
+           features['herdrAgents']['nextStep'])
+
+    chrome_config = pair_state(badges_enabled, tabs_enabled)
+    chrome_installed = bool(browser_provider.get('installed'))
+    chrome_running = chrome_installed and bool(browser_provider.get('running'))
+    chrome_reachable = chrome_running and (chrome_probe_reachable if chrome_probe_reachable is not None
+                                           else probes.devtools_reachable(provider_port(browser_provider)))
+    enrich('chromeProfilesTabs', chrome_config, 'installed' if chrome_installed else 'missing',
+           'ready' if chrome_reachable else 'limited' if chrome_installed else 'unavailable',
+           'install' if not chrome_installed else
+           'configure' if not chrome_reachable else
+           'enable' if chrome_config != 'on' else 'learn-more',
+           features['chromeProfilesTabs']['nextStep'])
+
+    counts_installed = bool(launcher_provider.get('installed'))
+    enrich('launcherCounts',
+           'off' if settings.get('launcherBadgeMode') == 'dots-only' else 'on',
+           'installed' if counts_installed else 'missing',
+           'ready' if counts_installed else 'unavailable',
+           'install' if not counts_installed else 'learn-more',
+           features['launcherCounts']['nextStep'])
+    # INF-4 will make this probe selective/ownership-aware. Keep its current
+    # seven-launcher semantics and legacy summary until that ticket lands.
+    launchers_installed = not missing_launchers
+    enrich('agentLaunchers', 'on' if launchers_installed else 'off',
+           'installed' if launchers_installed else 'missing',
+           'ready' if launchers_installed else 'unavailable',
+           'install' if not launchers_installed else 'learn-more',
+           features['agentLaunchers']['nextStep'])
+
+    for key in ('sidebar', 'cliFreshness'):
+        legacy = features[key]
+        good = legacy['status'] == 'ready'
+        enrich(key, 'on', 'installed', 'ready' if good else 'limited',
+               'learn-more', legacy['nextStep'])
     return {key: features[key] for key in FEATURE_ORDER}
 
 

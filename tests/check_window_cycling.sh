@@ -29,7 +29,9 @@ require_pattern '"scrollAction"[[:space:]]*:[[:space:]]*"none"' config/dock.json
 require_pattern 'property var settings: dockControl\.defaults' DockHost.qml
 require_pattern 'scrollAction:[[:space:]]*normalizeSetting\(' components/DockModel.js
 require_pattern 'scrollAction:[[:space:]]*settings\.scrollAction' components/Dock.qml
-require_pattern '"scrollAction".*"cycle-windows"' config/settings-schema.json
+# Validate the schema JSON semantically: UI metadata makes formatting multiline.
+python3 -c 'import json; s=json.load(open("config/settings-schema.json", encoding="utf-8")); assert s["settings"]["scrollAction"]["enum"] == ["none", "cycle-windows"]' \
+  || fail 'scrollAction must still expose exactly none and cycle-windows'
 require_pattern 'scrollAction' README.md
 require_pattern 'cycle-windows' README.md
 

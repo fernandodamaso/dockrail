@@ -45,6 +45,9 @@ Requested values retain intent. Effective output projects current normalization 
 
 ### Doctor feature readiness
 
+Doctor keeps its legacy `status`, `reason` and `nextStep` fields for existing CLI agents. Each feature also exposes additive `configuration` (`off`, `partly-on`, `on`), `installation` (`missing`, `installed`), `runtime` (`unavailable`, `limited`, `ready`), and `nextAction` with `kind` and `text`. A disabled Chrome or Herdr preference does not by itself mean its provider is uninstalled. The Settings bridge reads `dockrail doctor --json` asynchronously, caches the last good result, and never runs installers.
+
+
 `dockrail doctor --json` keeps `apiVersion: 1` and adds a stable
 `data.features` object. Its keys are `sidebar`, `herdrAgents`,
 `chromeProfilesTabs`, `launcherCounts`, `agentLaunchers`, and
@@ -210,6 +213,30 @@ This installs `${XDG_BIN_HOME:-$HOME/.local/bin}/dockrail` and the `smartdock` c
 From a separate source checkout, `bash ./install.sh --cli-only` retains the copied client bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail-cli`; refresh that bundle explicitly from the intended checkout. Full standalone installation retains its own bundle under `${XDG_DATA_HOME:-$HOME/.local/share}/dockrail`. Client-only and standalone installation can coexist in either order, and removing one retains the launchers while the other owns them. The canonical client takes precedence over standalone and legacy bundles. Help and guide follow the selected bundle, not `.source-dir`.
 
 Full `install.sh` is an explicit standalone installation with separate lifecycle effects and optional autostart; it is not needed to configure the plugin. Explicit wrapper commands `launch`/`--daemonize`, `restart`, `stop`, `update`, `uninstall`, and `autostart enable|disable|status` remain standalone lifecycle commands, outside this versioned control-command JSON contract. `dockrail update` is not a plugin or client-only updater. Updating or restarting an installed plugin is a separate, explicit operation; configuration commands never do it automatically.
+
+## T3 Code pairing (`dockrail t3`)
+
+`dockrail t3 pair` pairs the local machine with the local T3 Code server over
+a read-only bearer session, so Dockrail can show T3 Code threads. The token is
+written to a `0600` file under the Dockrail data root and is never printed,
+logged, or placed on a command line. Pairing is local-only; remote T3
+environments are out of scope.
+
+```sh
+dockrail t3 pair [--url http://127.0.0.1:3773] [--json]
+dockrail t3 status [--json]
+dockrail t3 unpair [--json]
+```
+
+`pair` checks the T3 listener ownership, issues a read-only pairing credential
+through the `t3` CLI, exchanges it for a bearer session, verifies the session,
+and writes the connection file atomically. `status` reports paired state,
+environment id, label, expiry and days left, and whether the server answers;
+it exits 0 when paired and unexpired, 1 otherwise. `unpair` deletes the local
+connection file; the running provider withdraws T3 threads within seconds.
+Local unpairing does not revoke the server-side session: revoke it separately
+with `t3 auth session list` / `t3 auth session revoke <id>` when needed.
+Errors exit 2 with a one-line message, or `{"ok":false,...}` with `--json`.
 
 ## Sidebar configuration and diagnostics
 

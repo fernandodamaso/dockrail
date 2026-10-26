@@ -10,7 +10,9 @@ const read = name => fs.readFileSync(path.join(base, name), 'utf8');
 const removed = ['DockSettings', 'DockSettingSlider', 'DockSettingsSection',
   'DockSettingsToggleRow', 'DockColorTokenDropdown', 'DockColorSwatch',
   'DockActionDropdown', 'DockHiddenApplicationRow'];
-const obsolete = /DockSettings|dockSettings|settingPreviews|SettingsRequested|settingsRequested|smartdock-settings|openIconEditor|openSettings|DockSettingSlider|DockColorTokenDropdown|DockColorSwatch|DockActionDropdown|DockHiddenApplicationRow/;
+// Preserve the FDM-918 removal guard, while allowing the explicitly approved
+// 3.1 Settings route and new typed-action components (FDM-1022).
+const obsolete = /settingPreviews|previewSetting|clearSettingPreview|settingsPatchRequested|resetSettingsRequested|smartdock-settings|openIconEditor|DockSettingSlider|DockSettingsToggleRow|DockSettingsSection|DockColorTokenDropdown|DockColorSwatch|DockActionDropdown|DockHiddenApplicationRow/;
 function files(directory) {
   if (!fs.existsSync(path.join(base, directory))) return [];
   return fs.readdirSync(path.join(base, directory), { withFileTypes: true }).flatMap(entry => {
