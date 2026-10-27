@@ -89,6 +89,23 @@ test ! -e "$XDG_BIN_HOME/dockrail"
 test ! -e "$XDG_BIN_HOME/smartdock"
 test "$config_before" = "$(cat "$XDG_CONFIG_HOME/dockrail/dock.json")"
 
+# Purge refuses before removing anything while a plugin exists under the XDG root.
+full_install >/dev/null
+xdg_plugin="$XDG_CONFIG_HOME/omarchy/plugins/io.github.fernandodamaso.dockrail"
+mkdir -p "$xdg_plugin"
+if bash "$repo/uninstall.sh" --purge 2>/dev/null; then
+  echo 'Purge must be refused while the plugin is installed' >&2
+  exit 1
+fi
+test -f "$XDG_DATA_HOME/dockrail/shell.qml"
+test -x "$XDG_BIN_HOME/dockrail"
+test "$config_before" = "$(cat "$XDG_CONFIG_HOME/dockrail/dock.json")"
+rm -rf -- "$XDG_CONFIG_HOME/omarchy"
+bash "$repo/uninstall.sh" --purge >/dev/null
+test ! -e "$XDG_DATA_HOME/dockrail/shell.qml"
+test ! -e "$XDG_CONFIG_HOME/dockrail"
+test ! -e "$XDG_BIN_HOME/dockrail"
+
 # A plugin install uses its live tree, including a path with spaces, and survives updates.
 export HOME="$tmp/plugin home with spaces"
 export XDG_DATA_HOME="$HOME/data" XDG_CONFIG_HOME="$HOME/config"

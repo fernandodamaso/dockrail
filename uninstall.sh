@@ -91,6 +91,21 @@ if $agent_assets_only; then
   echo 'Removed Dockrail terminal-agent launchers and icons.'
   exit
 fi
+# Refuse --purge before removing anything: the plugin shares the configuration.
+# Check both plugin roots, as install.sh --cli-only and the CLI do.
+if $purge; then
+  for plugins_dir in "$HOME/.config/omarchy/plugins" "$config_home/omarchy/plugins"; do
+    for plugin_id in io.github.fernandodamaso.dockrail io.github.fernandodamaso.smartdock; do
+      plugin_root="$plugins_dir/$plugin_id"
+      plugin_backup="$plugins_dir/.$plugin_id.smartdock-installed"
+      if [[ -e "$plugin_root" || -L "$plugin_root" || -e "$plugin_backup" ]]; then
+        echo 'Refusing --purge while the Omarchy Dockrail plugin is installed or in development mode.' >&2
+        echo "Nothing was removed. Configuration preserved at: $config_dir/dock.json" >&2
+        exit 1
+      fi
+    done
+  done
+fi
 if command -v qs >/dev/null 2>&1; then
   qs kill -p "$app_dir" --any-display >/dev/null 2>&1 || true
 fi
@@ -107,19 +122,6 @@ if ! has_supported_bundle; then
   rm -f -- "$bin_home/dockrail" "$bin_home/smartdock"
 fi
 if $purge; then
-  plugin_present=false
-  for plugin_id in io.github.fernandodamaso.dockrail io.github.fernandodamaso.smartdock; do
-    plugin_root="$HOME/.config/omarchy/plugins/$plugin_id"
-    plugin_backup="$HOME/.config/omarchy/plugins/.$plugin_id.smartdock-installed"
-    if [[ -e "$plugin_root" || -L "$plugin_root" || -e "$plugin_backup" ]]; then
-      plugin_present=true
-    fi
-  done
-  if $plugin_present; then
-    echo 'Refusing --purge while the Omarchy Dockrail plugin is installed or in development mode.' >&2
-    echo "Configuration preserved at: $config_dir/dock.json" >&2
-    exit 1
-  fi
   rm -rf -- "$config_dir"
   if [[ -L "$legacy_config_dir" ]]; then
     legacy_target="$(readlink -f -- "$legacy_config_dir" 2>/dev/null || true)"

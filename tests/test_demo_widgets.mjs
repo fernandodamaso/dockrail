@@ -29,14 +29,11 @@ test('all four demo bodies are real Widget-kit compositions', () => {
   }
 })
 
-test('branch installer seeds demos alongside existing Widgets exactly once', () => {
+test('installer never enables demo Widgets in user configuration', () => {
   const installer = read('install.sh')
-  assert.match(installer, /\.demo-widgets-seeded-v2/)
-  assert.match(installer, /smartdock_seed_demo_widgets\.py/)
-  const seeder = read('scripts/smartdock_seed_demo_widgets.py')
-  assert.match(seeder, /next_ids = list\(current\)/)
-  assert.match(seeder, /if widget_id not in next_ids/)
-  assert.match(seeder, /if marker_path\.exists\(\)/)
+  assert.doesNotMatch(installer, /demo-widgets-seeded|seed_demo_widgets/)
+  assert.doesNotMatch(installer, /demo\.(display|lists|inputs|actions-states)/)
+  assert.equal(fs.existsSync(new URL('../scripts/smartdock_seed_demo_widgets.py', import.meta.url)), false)
 })
 
 test('Widget demo Lucide assets are bundled', () => {
