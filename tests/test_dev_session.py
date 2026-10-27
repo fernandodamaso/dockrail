@@ -1200,6 +1200,27 @@ class CrossTargetingTests(unittest.TestCase):
 GUEST_CONTROL_SH = Path(__file__).resolve().parent / "runtime/dev-session/guest-control.sh"
 
 
+def _test_machine_is_kvm_guest():
+    """Mirror guest-control.sh: on a KVM guest its host guard rightly passes."""
+    fields = []
+    for name in ("sys_vendor", "product_name"):
+        try:
+            fields.append(Path("/sys/class/dmi/id", name).read_text(errors="replace"))
+        except OSError:
+            pass
+    try:
+        fields.append(subprocess.run(
+            ["systemd-detect-virt", "--vm"], capture_output=True, text=True, timeout=5,
+        ).stdout)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return any(marker in field.lower() for field in fields for marker in ("qemu", "kvm"))
+
+
+skip_in_kvm_guest = unittest.skipIf(
+    _test_machine_is_kvm_guest(), "the host guard intentionally passes inside a KVM guest")
+
+
 class GuestControlHostGuardTests(unittest.TestCase):
     def run_control(self, cmd, extra_env=None):
         env = os.environ.copy()
@@ -1225,6 +1246,7 @@ class GuestControlHostGuardTests(unittest.TestCase):
         lua = (GUEST_CONTROL_SH.parent / "guest-hyprland.lua").read_text(encoding="utf-8")
         self.assertIn("auto-right", lua)
 
+    @skip_in_kvm_guest
     def test_start_dock_refuses_on_host(self):
         result = self.run_control("start-dock")
         self.assertNotEqual(result.returncode, 0)
@@ -1239,11 +1261,13 @@ class GuestControlHostGuardTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertRegex(result.stderr, r"refuses to run on the host")
 
+    @skip_in_kvm_guest
     def test_start_compositor_refuses_on_host(self):
         result = self.run_control("start-compositor")
         self.assertNotEqual(result.returncode, 0)
         self.assertRegex(result.stderr, r"refuses to run on the host")
 
+    @skip_in_kvm_guest
     def test_env_capture_and_stop_dock_refuse_on_host(self):
         for cmd in ("env", "capture", "stop-dock", "seed-desktop"):
             result = subprocess.run(
