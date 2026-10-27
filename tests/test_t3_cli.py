@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "provider" / "t3" / "tests"))
 
 from fake_t3 import FakeT3
+import dockrail_t3
 
 TOKEN = "cli-token-xyz"
 ENV = "00000000-0000-4000-8000-000000000001"
@@ -168,6 +169,29 @@ class CliTests(unittest.TestCase):
         self.assertTrue(json.loads(again.stdout)["ok"])
         status = self.run_cli("status", "--json")
         self.assertEqual(status.returncode, 1)
+
+
+class ListenerRecordsTests(unittest.TestCase):
+    HEADER = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+    ROW = "   0: 0100007F:0EC9 00000000:0000 0A 00000000:00000000 00:00000000 00000000  {uid:>5d}        0 111 1 0000000000000000 100 0 0 10 0\n"
+
+    def setUp(self) -> None:
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(self.root)], check=False))
+        (self.root / "net").mkdir()
+
+    def test_missing_tcp6_reads_as_ipv6_disabled(self) -> None:
+        (self.root / "net" / "tcp").write_text(self.HEADER + self.ROW.format(uid=os.getuid()))
+        self.assertEqual(
+            dockrail_t3.listener_records(3785, self.root), [("socket:[111]", os.getuid())]
+        )
+        dockrail_t3.assert_own_listener(3785, self.root)
+
+    def test_missing_tcp_table_stays_untrusted(self) -> None:
+        (self.root / "net" / "tcp6").write_text(self.HEADER)
+        with self.assertRaises(dockrail_t3.CliError) as ctx:
+            dockrail_t3.listener_records(3785, self.root)
+        self.assertEqual(ctx.exception.code, "listener_untrusted")
 
 
 if __name__ == "__main__":
