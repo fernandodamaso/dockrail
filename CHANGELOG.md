@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fresh standalone installs no longer enable the four demo Widgets in the
+  sidebar. Existing configurations are not changed; remove unwanted
+  `demo.*` entries from `sidebarWidgets` if an earlier install added them.
+- `dockrail t3 pair` and `status`, and the T3 provider, work on hosts booted
+  with IPv6 disabled.
+- `scripts/run` and `dockrail launch`/`restart` follow a moved `OMARCHY_PATH`
+  instead of failing on a stale `qs` import alias.
+- `uninstall.sh --purge` refuses before removing anything while the plugin is
+  installed, including under a custom `XDG_CONFIG_HOME`.
+
 ## 3.0.0 - 2026-09-25
 
 SmartDock for Omarchy is now **Dockrail**. The repository moved to
