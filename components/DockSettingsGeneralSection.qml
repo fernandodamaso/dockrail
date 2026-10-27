@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Ui as Ui
 import qs.Commons
+import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 
 // Sections are built entirely from SET-02 group, order, control and requires metadata.
@@ -41,8 +42,8 @@ Item {
     return values
   }
   readonly property var selectedTarget: targets.length ? targets[Math.min(cursor,targets.length-1)] : null
-  readonly property bool editorFocused: !!(selectedTarget && selectedTarget.textFocused)
-  readonly property bool popupOpen: !!(selectedTarget && selectedTarget.popupOpen)
+  readonly property bool editorFocused: targets.some(function(target) {return target.textFocused})
+  readonly property bool popupOpen: targets.some(function(target) {return target.popupOpen})
   signal changed()
   signal focusSettings()
   signal focusSections()
@@ -71,7 +72,7 @@ Item {
       font.family: Style.font.family
       font.pixelSize: Style.font.title
       font.bold: true
-      color: Color.foreground
+      color: Commons.Color.foreground
     }
     Repeater {
       id: cards
@@ -87,8 +88,8 @@ Item {
         property alias fields: fields
         width: stack.width
         height: cardBody.implicitHeight + Style.space(24)
-        color: Qt.tint(Color.background,Util.alpha(Color.foreground,0.035))
-        borderSpec: Border.surfaceSpec("popups","border",Util.alpha(Color.foreground,0.15),1)
+        color: Qt.tint(Commons.Color.background,Util.alpha(Commons.Color.foreground,0.035))
+        borderSpec: Border.surfaceSpec("popups","border",Util.alpha(Commons.Color.foreground,0.15),1)
         radius: Style.cornerRadius
         Column {
           id:cardBody
@@ -98,6 +99,16 @@ Item {
           Row {
             width:parent.width
             spacing:Style.space(8)
+            DockLucideIcon {
+              id: cardIcon
+              width: Style.space(16)
+              height: width
+              iconSize: width
+              iconName: ({icons:"app-window", "hover-glow":"sparkles", "dock-surface":"panel-bottom",
+                "workspace-badges":"layout-grid", motion:"move", pointer:"mouse-pointer-click",
+                windows:"app-window", attention:"circle-alert", "attention-on-the-dock":"bot"})[card.modelData.id]
+              tint: Commons.Color.foreground
+            }
             Text {
               text: ({
                 "icons":"Icons","hover-glow":"Hover glow","dock-surface":"Dock surface",
@@ -108,15 +119,15 @@ Item {
               font.bold:true
               font.family:Style.font.family
               font.pixelSize:Style.font.body
-              color:Color.foreground
-              width:parent.width-Style.space(138)
+              color:Commons.Color.foreground
+              width:parent.width-Style.space(138)-cardIcon.width-parent.spacing
             }
             Text {
               width:Style.space(130)
               horizontalAlignment:Text.AlignRight
               text:card.classicCard ? (root.classicUsed ? "Classic dock" : "Classic dock · Not in use") : "Dock and sidebar"
               wrapMode:Text.WordWrap
-              color:Color.foreground
+              color:Commons.Color.foreground
               opacity:0.9
               font.family:Style.font.family
               font.pixelSize:Style.font.caption
@@ -174,7 +185,11 @@ Item {
                 readonly property bool popupOpen: false
                 readonly property bool textFocused: false
                 readonly property var grouped: root.host.settings.workspaceGroups || []
+                readonly property bool editable: root.host.settingsLoadState !== "invalid"
+                  && root.host.settingsWriteState !== "saving"
+                  && root.host.settingsReloadPending !== true && root.host.settingsLoaded !== false
                 function ungroupAt(index) {
+                  if (!editable) return false
                   var pair = grouped[index]
                   if (!pair) return false
                   var result = Registry.writeOutcome(root.host.ungroupWorkspaceApplication(
@@ -190,7 +205,7 @@ Item {
                 function dismissEditor() { return false }
                 function cancelPending() { selectedGroup = 0 }
                 HoverHandler { onHoveredChanged: if (hovered) root.hovered(appList) }
-                Text {text:entry.modelData.ui.label; color:appList.hasCursor ? Color.accent : Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.body;font.bold:true}
+                Text {text:entry.modelData.ui.label; color:appList.hasCursor ? Commons.Color.accent : Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.body;font.bold:true}
                 Repeater {
                   model:appList.grouped
                   delegate:Row {
@@ -201,18 +216,18 @@ Item {
                       text: parent.modelData.desktopId + " · " + parent.modelData.workspace
                       width:cardBody.width-Style.space(110)
                       elide:Text.ElideRight
-                      color:appList.hasCursor && appList.selectedGroup === parent.index ? Color.accent : Color.foreground
+                      color:appList.hasCursor && appList.selectedGroup === parent.index ? Commons.Color.accent : Commons.Color.foreground
                     }
                     Ui.Button {
                       text:"Ungroup"
                       focusable:true
                       Accessible.name:"Ungroup " + parent.modelData.desktopId + " from " + parent.modelData.workspace
-                      enabled:root.host.settingsLoadState!=="invalid"&&root.host.settingsWriteState!=="saving"
+                      enabled:appList.editable
                       onClicked: appList.ungroupAt(parent.index)
                     }
                   }
                 }
-                Text {visible:appList.grouped.length===0;text:"No grouped apps. Right-click an app and choose Group Windows.";wrapMode:Text.WordWrap;color:Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption}
+                Text {visible:appList.grouped.length===0;text:"No grouped apps. Right-click an app and choose Group Windows.";wrapMode:Text.WordWrap;color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption}
               }
             }
           }

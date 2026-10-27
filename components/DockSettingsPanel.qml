@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Ui as Ui
 import qs.Commons
+import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 
 // One host-owned KeyboardPanel, never a delegate-owned preferences editor.
@@ -123,8 +124,7 @@ Item {
       id: keyboard
       Shortcut { sequence: "Alt+Up"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(-1) }
       Shortcut { sequence: "Alt+Down"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(1) }
-      width: panel.contentWidth
-      height: panel.contentHeight
+      anchors.fill: parent
       blocked: !!root.activeSectionView && (root.activeSectionView.popupOpen || root.activeSectionView.editorFocused)
       onCloseRequested: {
         if (root.activeSectionView && root.activeSectionView.dismissEditor()) return
@@ -168,7 +168,7 @@ Item {
             font.family: Style.font.family
             font.pixelSize: Style.font.title
             font.bold: true
-            color: Color.foreground
+            color: Commons.Color.foreground
             width: navigation.width
             wrapMode: Text.WordWrap
           }
@@ -203,7 +203,7 @@ Item {
             spacing: Style.space(12)
             Text {
               text: root.saveLabel === "Saved" && root.savedRevision === 0 ? "" : root.saveLabel
-              color: Color.foreground
+              color: Commons.Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
             }
@@ -223,7 +223,7 @@ Item {
             width: parent.width
             text: "Configuration is invalid. Repair it outside Settings before editing."
             wrapMode: Text.WordWrap
-            color: Color.foreground
+            color: Commons.Color.foreground
           }
           Text {
             id: feedbackText
@@ -231,7 +231,7 @@ Item {
             text: root.rowFeedback
             wrapMode: Text.WordWrap
             width: parent.width
-            color: Color.foreground
+            color: Commons.Color.foreground
           }
           Text {
             id: helpText
@@ -244,7 +244,7 @@ Item {
             width: parent.width
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
-            color: Color.foreground
+            color: Commons.Color.foreground
           }
           Flickable {
             id: settingsScroll
@@ -319,7 +319,7 @@ Item {
                   : "This section is reserved for the next Settings implementation ticket."
                 wrapMode: Text.WordWrap
                 font.family: Style.font.family
-                color: Color.foreground
+                color: Commons.Color.foreground
               }
               Ui.Button {
                 visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"

@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Wayland._BackgroundEffect
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "DockModel.js" as DockModel
 import "DockSidebarWidgetModel.js" as WidgetModel
@@ -283,17 +284,17 @@ PanelWindow {
   // Border/Util; first-party BorderSurface usage in plugins/panels/tailscale.
   // Theme-reactive card fills for expanded section chrome (phase 4).
   readonly property QtObject sidebarAppearance: QtObject {
-    readonly property color monitorFill: Qt.tint(Color.background, Util.alpha(Color.foreground, 0.035))
-    readonly property color workspaceFill: Qt.darker(Color.background, 1.04)
-    readonly property color workspaceHoverFill: Qt.tint(workspaceFill, Util.alpha(Color.foreground, 0.09))
-    readonly property color activeWorkspaceBorder: Util.alpha(Color.accent, 0.50)
+    readonly property color monitorFill: Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035))
+    readonly property color workspaceFill: Qt.darker(Commons.Color.background, 1.04)
+    readonly property color workspaceHoverFill: Qt.tint(workspaceFill, Util.alpha(Commons.Color.foreground, 0.09))
+    readonly property color activeWorkspaceBorder: Util.alpha(Commons.Color.accent, 0.50)
     readonly property real cardRadius: Math.min(3, Style.cornerRadius)
   }
 
   Ui.BorderSurface {
     id: surface
     anchors.fill: parent
-    color: Util.alpha(Color.background, 0.85)
+    color: Util.alpha(Commons.Color.background, 0.85)
     borderSpec: Border.none()
     clip: true
     // Empty-background gesture: drag downward to switch back to the bottom
@@ -321,7 +322,7 @@ PanelWindow {
       anchors.bottom: parent.bottom
       anchors.right: root.controller.edge === "left" ? parent.right : undefined
       anchors.left: root.controller.edge === "right" ? parent.left : undefined
-      color: Util.alpha(Color.foreground, 0.10)
+      color: Util.alpha(Commons.Color.foreground, 0.10)
     }
     Column {
       id: controls
@@ -347,18 +348,21 @@ PanelWindow {
           Accessible.role: Accessible.StaticText
           Accessible.name: "Dockrail"
           Text {
+            id: brandDock
+            width: Math.min(implicitWidth, brandRow.width)
             text: "Dock"
             textFormat: Text.PlainText
-            color: Color.foreground
+            color: Commons.Color.foreground
             font.family: Style.font.family
             font.pixelSize: Style.font.title
             font.bold: true
             elide: Text.ElideRight
           }
           Text {
+            width: Math.max(0, brandRow.width - brandDock.width)
             text: "rail"
             textFormat: Text.PlainText
-            color: Color.accent
+            color: Commons.Color.accent
             font.family: Style.font.family
             font.pixelSize: Style.font.title
             font.bold: true
@@ -398,14 +402,38 @@ PanelWindow {
             height: 14
             iconName: root.collapseIcon
             iconSize: 14
-            tint: Color.foreground
+            tint: Commons.Color.foreground
+          }
+        }
+        Ui.Button {
+          id: settingsGear
+          visible: !root.panelCollapsed
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: collapseButton.left
+          anchors.rightMargin: Style.space(8)
+          width: visible ? Style.space(30) : 0
+          height: Style.space(30)
+          tooltipText: "Dockrail Settings"
+          Accessible.name: tooltipText
+          focusable: visible
+          enabled: !root.controller.interactionBusy
+          onClicked: if (root.host) root.host.openSettings(settingsGear, root.screen ? root.screen.name : "")
+          Component.onCompleted: if (root.host)
+            root.host.registerSettingsAnchor(settingsGear, root.screen ? root.screen.name : "", "sidebar")
+          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(settingsGear)
+          DockLucideIcon {
+            anchors.centerIn: parent
+            width: 14; height: 14
+            iconName: "settings"
+            iconSize: 14
+            tint: Commons.Color.foreground
           }
         }
         Ui.Button {
           id: widgetManage
           visible: !root.panelCollapsed
           anchors.verticalCenter: parent.verticalCenter
-          anchors.right: collapseButton.left
+          anchors.right: settingsGear.left
           anchors.rightMargin: Style.space(8)
           width: visible ? Style.space(30) : 0
           height: Style.space(30)
@@ -422,7 +450,7 @@ PanelWindow {
             height: 14
             iconName: "layout-grid"
             iconSize: 14
-            tint: Color.foreground
+            tint: Commons.Color.foreground
             visible: widgetManage.visible
           }
         }
@@ -451,9 +479,31 @@ PanelWindow {
             height: 14
             iconName: "settings-2"
             iconSize: 14
-            tint: Color.foreground
+            tint: Commons.Color.foreground
             visible: headerMenuButton.visible
           }
+        }
+      }
+      Ui.Button {
+        id: railSettingsGear
+        visible: root.panelCollapsed
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Style.space(30)
+        height: Style.space(30)
+        tooltipText: "Dockrail Settings"
+        Accessible.name: tooltipText
+        focusable: visible
+        enabled: !root.controller.interactionBusy
+        onClicked: if (root.host) root.host.openSettings(railSettingsGear, root.screen ? root.screen.name : "")
+        Component.onCompleted: if (root.host)
+          root.host.registerSettingsAnchor(railSettingsGear, root.screen ? root.screen.name : "", "sidebar")
+        Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(railSettingsGear)
+        DockLucideIcon {
+          anchors.centerIn: parent
+          width: 14; height: 14
+          iconName: "settings"
+          iconSize: 14
+          tint: Commons.Color.foreground
         }
       }
       Text {
@@ -462,7 +512,7 @@ PanelWindow {
         text: root.preferenceFeedback
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
-        color: Color.urgent
+        color: Commons.Color.urgent
         font.family: Style.font.family
         font.pixelSize: Style.font.caption
       }
@@ -577,12 +627,12 @@ PanelWindow {
           anchors.fill: parent
           radius: root.sidebarAppearance.cardRadius
           color: launcherPress.pressed
-            ? Style.pressedFillFor(Color.foreground, Color.accent)
+            ? Style.pressedFillFor(Commons.Color.foreground, Commons.Color.accent)
             : (launcherHover.hovered || launcher.activeFocus)
               ? root.sidebarAppearance.workspaceHoverFill
               : Qt.tint(root.sidebarAppearance.workspaceFill, Style.normalFill)
           borderSpec: launcher.activeFocus
-            ? Border.controlSpec("focus", Color.foreground, Color.accent)
+            ? Border.controlSpec("focus", Commons.Color.foreground, Commons.Color.accent)
             : Border.none()
           enabled: false
         }
@@ -594,7 +644,7 @@ PanelWindow {
           height: 21
           iconName: "layout-grid"
           iconSize: 21
-          tint: Util.alpha(Color.foreground, 0.82)
+          tint: Util.alpha(Commons.Color.foreground, 0.82)
         }
         Text {
           visible: !root.panelCollapsed
@@ -605,7 +655,7 @@ PanelWindow {
           anchors.rightMargin: Style.space(6)
           text: "Applications"
           textFormat: Text.PlainText
-          color: Color.foreground
+          color: Commons.Color.foreground
           font.family: Style.font.family
           font.pixelSize: Style.font.bodySmall
           elide: Text.ElideRight
@@ -620,7 +670,7 @@ PanelWindow {
           height: 14
           iconName: "chevron-right"
           iconSize: 14
-          tint: Color.foreground
+          tint: Commons.Color.foreground
         }
         HoverHandler { id: launcherHover }
         TapHandler {
@@ -681,7 +731,7 @@ PanelWindow {
           height: 14
           iconName: "trash-2"
           iconSize: 14
-          tint: Color.foreground
+          tint: Commons.Color.foreground
           visible: trashButton.visible
         }
       }
@@ -695,7 +745,7 @@ PanelWindow {
     panelWidth: root.width
     screenX: root.screen ? Number(root.screen.x || 0) : 0
     screenWidth: root.screen ? Number(root.screen.width || 0) : 0
-    affordanceColor: Util.alpha(Color.foreground, 0.28)
+    affordanceColor: Util.alpha(Commons.Color.foreground, 0.28)
     animationsEnabled: root.controller.settings.interfaceAnimationsEnabled !== false
     width: 8
     anchors.top: parent.top

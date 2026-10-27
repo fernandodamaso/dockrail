@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Ui as Ui
 import qs.Commons
+import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 import "DockSettingsPairModel.js" as PairModel
 
@@ -39,12 +40,13 @@ Column {
   property bool changedElsewhere: false
   property string feedback: ""
   property bool customOpen: false
+  property string hexDraft: ""
+  property bool hexDirty: false
   signal edited()
   signal hovered()
   signal focusSections()
   spacing: Style.space(6)
   width: parent ? parent.width : 400
-  opacity: editable ? 1 : 0.6
   Accessible.role: Accessible.Grouping
   Accessible.name: row.ui.label + (conflict ? ", changed while editing" : changedElsewhere ? ", changed elsewhere" : "")
   onCurrentChanged: {
@@ -69,10 +71,22 @@ Column {
   function beginEdit() {
     if (editing) return
     expected = PairModel.pairExpected(key,flagKey,current,flag)
+    hexDraft = customHex.text
     editing = true
   }
-  function cancelPending() { keyboardCommit.stop(); editing = false; conflict = false; customOpen = false; feedback = "" }
-  function hexBinding() { return root.flag && root.selection === "custom" ? String(root.current) : "" }
+  function cancelPending() {
+    keyboardCommit.stop()
+    editing = false
+    conflict = false
+    customOpen = false
+    hexDirty = false
+    draftWidth = Number(current || 0)
+    feedback = ""
+  }
+  function hexBinding() {
+    return root.editing ? root.hexDraft
+      : root.flag && root.selection === "custom" ? String(root.current) : ""
+  }
   function reloadDraft() {
     cancelPending()
     // Re-establish the declarative binding instead of assigning once, so the
@@ -81,6 +95,7 @@ Column {
   }
   function keepEditing() { expected[key] = current; expected[flagKey] = flag; conflict = false; feedback = "" }
   function commitPair(value, enabled) {
+    keyboardCommit.stop()
     if (!editable) return false
     beginEdit()
     if (conflict) { feedback = "Changed while editing. Reload or keep editing."; return false }
@@ -92,6 +107,8 @@ Column {
       editing = false
       conflict = false
       changedElsewhere = false
+      hexDirty = false
+      if (isWidth) draftWidth = Number(current)
       feedback = ""
       edited()
     } else {
@@ -103,6 +120,7 @@ Column {
   }
   function resetToDefault() {
     if (!resettable || defaultValue === undefined || defaultFlag === undefined) return false
+    keyboardCommit.stop()
     if (!editing) beginEdit()
     if (conflict) { feedback = "Changed while editing. Reload or keep editing."; return false }
     if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
@@ -116,6 +134,8 @@ Column {
       conflict = false
       changedElsewhere = false
       customOpen = false
+      hexDirty = false
+      if (isWidth) draftWidth = Number(defaultValue)
       feedback = ""
       edited()
     } else {
@@ -134,6 +154,7 @@ Column {
       } else {
         customOpen = true
         beginEdit()
+        Qt.callLater(function() { if (root.customOpen) customHex.forceActiveFocus() })
       }
       return
     }
@@ -174,7 +195,7 @@ Column {
   Text {
     width: parent.width
     text: root.row.ui.label
-    color: root.hasCursor ? Color.accent : Color.foreground
+    color: root.hasCursor ? Commons.Color.accent : Commons.Color.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.body
     font.bold: true
@@ -183,7 +204,7 @@ Column {
     width: parent.width
     text: root.row.ui.help || ""
     wrapMode: Text.WordWrap
-    color: Color.foreground
+    color: Commons.Color.foreground
     opacity: 0.8
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
@@ -208,6 +229,10 @@ Column {
       root.choose(value)
       chooser.value = Qt.binding(function() {return root.selection})
     }
+    onPopupOpenChanged: {
+      if (popupOpen) root.beginEdit()
+      else if (root.editing && !root.customOpen && !root.conflict) root.reloadDraft()
+    }
   }
   Ui.PanelSlider {
     visible: root.isWidth && root.flag
@@ -218,8 +243,8 @@ Column {
     step: 1
     value: root.editing ? root.draftWidth : Number(root.current)
     enabled: root.editable
-    onDraggingChanged: if (dragging) root.beginEdit()
-    onMoved: value => {root.beginEdit();root.draftWidth=value}
+    onDraggingChanged: if (dragging) {keyboardCommit.stop();root.beginEdit()}
+    onMoved: value => {keyboardCommit.stop();root.beginEdit();root.draftWidth=value}
     onReleased: value => {root.beginEdit();root.draftWidth=value;root.commitPair(value,true)}
   }
   Ui.TextField {
@@ -228,36 +253,53 @@ Column {
     visible: !root.isWidth && (root.customOpen || (root.flag && root.selection === "custom"))
     width: Math.min(root.width,Style.space(300))
     placeholderText: "#RRGGBB or #AARRGGBB"
-    text: root.flag && root.selection === "custom" ? String(root.current) : ""
+    text: root.hexBinding()
     enabled: root.editable
     Accessible.name: root.row.ui.label + " hex value"
     onActiveFocusChanged: if (activeFocus) root.beginEdit()
+    onTextEdited: {
+      var value = text
+      root.beginEdit()
+      root.hexDraft = value
+      root.hexDirty = true
+    }
     onAccepted: root.saveHex()
+    onEditingFinished: if (root.hexDirty && !root.conflict) root.saveHex()
     Keys.onEscapePressed: {root.reloadDraft();root.forceActiveFocus()}
   }
   Ui.Button {
     visible: !root.isWidth && root.customOpen
     text: "Apply hex color"
     enabled: root.editable && !root.conflict
-    onClicked: root.saveHex()
+    onClicked: if (root.editing) root.saveHex()
+  }
+  Text {
+    width: parent.width
+    visible: root.isWidth && root.flag
+    text: Registry.displayValue(root.row.ui, Number(root.editing ? root.draftWidth : root.current))
+    color: Commons.Color.foreground
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    Accessible.name: root.row.ui.label + ": " + text
   }
   Text {
     width: parent.width
     visible: root.isWidth && JSON.stringify(root.current) !== JSON.stringify(root.shownValue)
-    text: Registry.displayValue(root.row.ui, Number(root.current)) + " → shows "
-      + Registry.displayValue(root.row.ui, Number(root.shownValue))
+    text: root.shownValue === null ? "Theme width; saved custom value: " + Registry.displayValue(root.row.ui, Number(root.current))
+      : Registry.displayValue(root.row.ui, Number(root.current)) + " → shows "
+        + Registry.displayValue(root.row.ui, Number(root.shownValue))
     wrapMode: Text.WordWrap
     font.italic: true
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
-    color: Color.foreground
+    color: Commons.Color.foreground
   }
   Text {
     width: parent.width
     visible: root.changedElsewhere || root.feedback !== "" || root.writerBusy
     text: root.feedback || (root.writerBusy ? "Saving…" : "Changed elsewhere")
     wrapMode: Text.WordWrap
-    color: Color.foreground
+    color: Commons.Color.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     Accessible.role: Accessible.StaticText
@@ -277,7 +319,7 @@ Column {
       text: "Default: " + (root.defaultFlag === true ? String(root.defaultValue) : "Theme default")
       font.family: Style.font.family
       font.pixelSize: Style.font.caption
-      color: Color.foreground
+      color: Commons.Color.foreground
       wrapMode: Text.WordWrap
       width: Math.max(0, root.width - Style.space(80))
       anchors.verticalCenter: parent.verticalCenter

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Ui as Ui
 import qs.Commons
+import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 
 // A canonical schema row. Drafts are interaction snapshots, never preview state.
@@ -42,7 +43,6 @@ Column {
   signal hovered()
   signal focusSections()
   spacing: Style.space(6)
-  opacity: editable ? 1 : 0.6
   Accessible.role: Accessible.Grouping
   Accessible.name: ui.label + (conflict ? ", changed while editing" : changedElsewhere ? ", changed elsewhere" : "")
   onCurrentChanged: {
@@ -75,6 +75,7 @@ Column {
     feedback = ""
   }
   function commitDraft() {
+    keyboardCommit.stop()
     if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
     if (!editable && !conflict) return false
     if (!editing) beginEdit()
@@ -85,6 +86,7 @@ Column {
     if (outcome.accepted) {
       editing = false
       conflict = false
+      changedElsewhere = false
       feedback = ""
       edited()
     } else {
@@ -100,18 +102,20 @@ Column {
   }
   function resetToDefault() {
     if (!resettable || defaultValue === undefined) return false
+    keyboardCommit.stop()
     if (!editing) beginEdit()
     if (conflict) { feedback = "Changed while editing. Reload or keep editing."; return false }
     if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
+    localWrite = true
     var resetIntent = host.resetSettingIntent
       ? host.resetSettingIntent(key, expected)
       : host.saveSettingIntent(key, defaultValue, expected)
-    localWrite = true
     var outcome = Registry.writeOutcome(resetIntent)
     localWrite = false
     if (outcome.accepted) {
       editing = false
       conflict = false
+      changedElsewhere = false
       feedback = ""
       edited()
     } else {
@@ -168,21 +172,22 @@ Column {
   }
   Text {
     width: parent.width
+    visible: root.ui.control !== "toggle"
     text: root.ui.label
     wrapMode: Text.WordWrap
     font.family: Style.font.family
     font.pixelSize: Style.font.body
     font.bold: true
-    color: root.hasCursor ? Color.accent : Color.foreground
+    color: root.hasCursor ? Commons.Color.accent : Commons.Color.foreground
   }
   Text {
     width: parent.width
-    visible: text !== ""
+    visible: text !== "" && root.ui.control !== "toggle"
     text: root.ui.help || ""
     wrapMode: Text.WordWrap
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
-    color: Color.foreground
+    color: Commons.Color.foreground
   }
   Text {
     width: parent.width
@@ -193,12 +198,13 @@ Column {
     font.italic: true
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
-    color: Color.foreground
+    color: Commons.Color.foreground
   }
   Ui.Toggle {
     width: parent.width
     visible: root.ui.control === "toggle"
     label: root.ui.label
+    description: root.ui.help || ""
     checked: root.current === true
     enabled: root.editable
     hasCursor: root.hasCursor
@@ -233,8 +239,8 @@ Column {
           anchors.centerIn: parent
           width: parent.width - Style.space(12)
           spacing: Style.space(8)
-          DockLucideIcon { anchors.horizontalCenter: parent.horizontalCenter; iconName: modelData.icon; iconSize:24; width:24; height:24; tint:Color.foreground }
-          Text { width:parent.width; text:modelData.label; horizontalAlignment:Text.AlignHCenter; wrapMode:Text.WordWrap; color:Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body }
+          DockLucideIcon { anchors.horizontalCenter: parent.horizontalCenter; iconName: modelData.icon; iconSize:24; width:24; height:24; tint:Commons.Color.foreground }
+          Text { width:parent.width; text:modelData.label; horizontalAlignment:Text.AlignHCenter; wrapMode:Text.WordWrap; color:Commons.Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body }
         }
       }
     }
@@ -248,7 +254,10 @@ Column {
     value: String(root.current)
     enabled: root.editable
     hasCursor: root.hasCursor
-    onPopupOpenChanged: if (popupOpen) root.beginEdit()
+    onPopupOpenChanged: {
+      if (popupOpen) root.beginEdit()
+      else if (root.editing && !root.conflict) root.reloadDraft()
+    }
     onChanged: value => {
       root.commitValue(value)
       // The native Dropdown assigns its own value during selection.
@@ -289,15 +298,15 @@ Column {
     step: root.spec.effectiveStep || (root.spec.type === "integer" ? 1 : 0.05)
     integer: root.spec.type === "integer"
     enabled: root.editable
-    onDraggingChanged: if (dragging) root.beginEdit()
-    onMoved: value => { root.beginEdit(); root.draft = value }
+    onDraggingChanged: if (dragging) { keyboardCommit.stop(); root.beginEdit() }
+    onMoved: value => { keyboardCommit.stop(); root.beginEdit(); root.draft = value }
     onReleased: value => { root.beginEdit(); root.draft = value; root.commitDraft() }
   }
   Text {
     visible: root.ui.control === "slider"
     width: parent.width
     text: Registry.displayValue(root.ui, Number(root.editing ? root.draft : root.current))
-    color: Color.foreground
+    color: Commons.Color.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     Accessible.role: Accessible.StaticText
@@ -308,7 +317,7 @@ Column {
     width: parent.width
     text: root.feedback || (root.writerBusy ? "Saving…" : "Changed elsewhere")
     wrapMode: Text.WordWrap
-    color: Color.foreground
+    color: Commons.Color.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     Accessible.role: Accessible.StaticText
@@ -328,7 +337,7 @@ Column {
       text: "Default: " + String(root.defaultValue)
       font.family: Style.font.family
       font.pixelSize: Style.font.caption
-      color: Color.foreground
+      color: Commons.Color.foreground
       wrapMode: Text.WordWrap
       width: Math.max(0, root.width - Style.space(80))
       anchors.verticalCenter: parent.verticalCenter

@@ -49,6 +49,17 @@ assert.equal(h.host.focusedSettingsConnector(),'DP-2')
 assert.equal(h.host.openSettingsForFocused(),true)
 assert.equal(h.host.settingsPanel.anchor,vis2)
 assert.equal(h.host.settingsConnector,'DP-2')
+// A Loader assigns the surface's monitor after child Component.onCompleted.
+// The registered connector may therefore name the initial primary monitor.
+h.host.settingsAnchors=[]
+const lateScreenAnchor={visible:true,width:30,height:30,
+  QsWindow:{window:{screen:{name:'DP-2'}}}}
+h.host.currentPresentation=()=>({entries:[{connector:'DP-1',mode:'classic'},
+  {connector:'DP-2',mode:'sidebar'}]})
+h.host.registerSettingsAnchor(lateScreenAnchor,'DP-1','sidebar')
+assert.equal(h.host.openSettings(lateScreenAnchor,'DP-2'),true,
+  'use the actual surface screen after the Loader assigns its owner')
+assert.equal(h.host.settingsConnector,'DP-2')
 // Per-key reset uses the same writer with the default value.
 assert.equal(typeof h.host.resetSettingIntent,'function')
 const before=h.host.settings.margin
