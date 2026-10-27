@@ -11,6 +11,8 @@
   with IPv6 disabled.
 - `scripts/run` and `dockrail launch`/`restart` follow a moved `OMARCHY_PATH`
   instead of failing on a stale `qs` import alias.
+- The Trash item no longer polls `gio` while every screen shows the sidebar,
+  and a failed Trash listing shows as unknown instead of empty.
 - `uninstall.sh --purge` refuses before removing anything while the plugin is
   installed, including under a custom `XDG_CONFIG_HOME`.
 

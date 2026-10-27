@@ -238,6 +238,9 @@ Item {
 
   property int trashItemCount: 0
   property bool trashStateKnown: false
+  // One listing settles only after both its exit code and its output arrive.
+  property int trashListExitCode: -1
+  property bool trashListOutputDone: false
   property bool settingsLoaded: false
   property bool showTrashSetting: true
   property string settingsLoadState: "missing"
@@ -728,7 +731,23 @@ Item {
 
   function refreshTrash() {
     if (!TrashModel.shouldRefresh(showTrash, trashListProcess.running, settingsLoaded)) return
+    trashListExitCode = -1
+    trashListOutputDone = false
     trashListProcess.running = true
+  }
+
+  // A failed listing is unknown, never an empty Trash.
+  function settleTrashList() {
+    if (trashListExitCode < 0) return
+    if (trashListExitCode === 0 && !trashListOutputDone) return
+    var code = trashListExitCode
+    trashListExitCode = -1
+    if (code !== 0) {
+      trashStateKnown = false
+      return
+    }
+    trashItemCount = DockModel.trashItemCount(trashListOutput.text)
+    trashStateKnown = true
   }
 
   function refreshWorkspaceCounts() {
@@ -782,7 +801,10 @@ Item {
   Timer {
     interval: 3000
     repeat: true
+    // The Trash item exists only in the classic dock.
     running: root.settingsLoaded && root.showTrash
+      && root.presentation.classicScreens.length > 0
+    triggeredOnStart: true
     onTriggered: root.refreshTrash()
   }
 
@@ -871,14 +893,17 @@ Item {
     id: trashListProcess
     command: ["gio", "trash", "--list"]
     stdout: StdioCollector {
+      id: trashListOutput
       waitForEnd: true
       onStreamFinished: {
-        root.trashItemCount = DockModel.trashItemCount(text)
-        root.trashStateKnown = true
+        root.trashListOutputDone = true
+        root.settleTrashList()
       }
     }
     onExited: function(exitCode) {
       if (exitCode !== 0) console.warn("Dock: could not inspect Trash (gio exited " + exitCode + ")")
+      root.trashListExitCode = exitCode
+      root.settleTrashList()
     }
   }
 
