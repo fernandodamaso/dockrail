@@ -402,6 +402,7 @@ Item {
           // selected host's list snapshot is held; no broad mutation on cancel.
           Ui.ConfirmDialog {
             id:showAllConfirm
+            objectName:"apps-show-all-confirm"
             parent:keyboard
             anchors.fill:parent
             z:100
