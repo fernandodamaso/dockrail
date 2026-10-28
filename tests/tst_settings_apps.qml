@@ -47,10 +47,12 @@ TestCase {
         property bool panelVisible:false
         function focused() {}
       }
-      property var settingsActions: ({
-        inFlight:false,status:"idle",installConfirmation:null,
-        cancelInstall:function(){}
-      })
+      property QtObject settingsActions: QtObject {
+        property bool inFlight:false
+        property string status:"idle"
+        property var installConfirmation:null
+        function cancelInstall() {installConfirmation=null}
+      }
       property var sidebarWidgetRegistry: ({})
       property var connectedScreens: []
       property bool settingsDeveloperBuild: false
