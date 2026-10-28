@@ -172,6 +172,11 @@ Item {
     active:false
     DockIconDialog {mutationController:root}
   }
+  function closeAppPickerFromSettings() {
+    // Standalone PopupWindow does not follow KeyboardPanel visibility.
+    // Destroy this Settings-only instance to avoid orphaned dialogs.
+    settingsAppPickerLoader.active=false
+  }
   function openAppPickerFromSettings() {
     if(!settingsPanel.panelOpen || !settingsAnchor) return false
     settingsAppPickerLoader.active=true
@@ -179,6 +184,7 @@ Item {
   }
   function openIconFromSettings(item) {
     if(!settingsPanel.panelOpen || !settingsAnchor || !item || !item.desktopId) return false
+    closeAppPickerFromSettings()
     var options={
       anchorItem:settingsAnchor,position:settingsPanel.anchorPosition,
       desktopId:item.desktopId,appName:item.name||item.desktopId,
