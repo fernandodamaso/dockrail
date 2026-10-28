@@ -30,7 +30,8 @@ Item {
   readonly property var activeSectionView: selectedSection === "layout" ? layoutSection
     : selectedSection === "appearance" ? appearanceSection
     : selectedSection === "behavior" ? behaviorSection
-    : selectedSection === "sidebar-widgets" ? widgetsSection : null
+    : selectedSection === "sidebar-widgets" ? widgetsSection
+    : selectedSection === "apps" ? appsLoader.item : null
   readonly property alias keyCatcher: keyboard
   TextEdit { id: clipboard; visible: false }
 
@@ -66,25 +67,36 @@ Item {
   }
   function close() {
     if (!panelOpen) return
+    dismissAppsPopups()
     if (layoutSection) layoutSection.cancelPending()
     if (appearanceSection) appearanceSection.cancelPending()
     if (behaviorSection) behaviorSection.cancelPending()
     if (widgetsSection) widgetsSection.cancelPending()
+    if (appsLoader.item) appsLoader.item.cancelPending()
     panelOpen = false
     showHelp = false
     if (root.host && root.host.releaseSettingsPanel)
       root.host.releaseSettingsPanel(root)
   }
+  function dismissAppsPopups() {
+    // The confirmation belongs to the persistent KeyboardPanel, not
+    // the Apps Loader. Close both owners before changing sections.
+    showAllConfirm.opened = false
+    if (appsLoader.item) appsLoader.item.awaitingShowAll = false
+    if (host.closeAppPickerFromSettings) host.closeAppPickerFromSettings()
+  }
   function selectSection(id) {
     if (Registry.order.indexOf(id) < 0) return false
+    if (selectedSection === "apps" && id !== selectedSection) dismissAppsPopups()
     if (selectedSection === "sidebar-widgets" && id !== selectedSection) widgetsSection.cancelPending()
+    if (selectedSection === "apps" && id !== selectedSection && appsLoader.item) appsLoader.item.cancelPending()
     selectedSection = id
     focusPane = "sections"
     lastSection = id
     return true
   }
   function sectionImplemented(id) {
-    return ["appearance","layout","behavior","sidebar-widgets"].indexOf(id) >= 0
+    return ["appearance","layout","behavior","sidebar-widgets","apps"].indexOf(id) >= 0
   }
   function reportWrite(outcome) {
     var result = Registry.writeOutcome(outcome)
@@ -334,10 +346,48 @@ Item {
                     settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
                 }
               }
+              // A URL-based Loader creates the Apps file in its own component
+              // context. A nested Component under a Bound panel cannot be
+              // instantiated by Loader on Qt 6.4 (the headless runner).
+              Loader {
+                id:appsLoader
+                width:parent.width
+                height:item ? item.implicitHeight : 0
+                active:root.selectedSection==="apps"
+                visible:active
+                onActiveChanged: {
+                  if(active) setSource(Qt.resolvedUrl("DockSettingsAppsSection.qml"), {
+                    host:root.host,metadata:root.metadata,panelActive:root.panelOpen
+                  })
+                }
+                onLoaded: if(item) item.panelActive=Qt.binding(function(){return root.panelOpen})
+              }
+              Connections {
+                target:appsLoader.item
+                ignoreUnknownSignals:true
+                function onFocusSettings(){root.focusPane="settings"}
+                function onFocusSections(){root.focusPane="sections";keyboard.forceActiveFocus()}
+                function onChanged(){root.rowFeedback=""}
+                function onOpenAppPicker(){
+                  if(!root.host.openAppPickerFromSettings())
+                    root.rowFeedback="The existing app picker is unavailable."
+                }
+                function onRequestIconChange(item){
+                  if(!root.host.openIconFromSettings(item))
+                    root.rowFeedback="The Change Icon dialog is unavailable."
+                }
+                function onRequestShowAll(){showAllConfirm.opened=true}
+                function onReveal(item){
+                  var point=item.mapToItem(layoutHost,0,0)
+                  if(point.y<settingsScroll.contentY)settingsScroll.contentY=point.y
+                  else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
+                    settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
+                }
+              }
               Text {
                 visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
                   && root.selectedSection !== "behavior"
-                  && root.selectedSection !== "sidebar-widgets"
+                  && root.selectedSection !== "sidebar-widgets" && root.selectedSection !== "apps"
                 width: parent.width
                 text: "This section is reserved for the next Settings implementation ticket."
                 wrapMode: Text.WordWrap
@@ -347,11 +397,27 @@ Item {
               Ui.Button {
                 visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
                   && root.selectedSection !== "behavior"
-                  && root.selectedSection !== "sidebar-widgets"
+                  && root.selectedSection !== "sidebar-widgets" && root.selectedSection !== "apps"
                 text: "Open Layout"
                 onClicked: root.selectSection("layout")
               }
             }
+          }
+          // Native Omarchy confirmation covers the section column while the
+          // selected host's list snapshot is held; no broad mutation on cancel.
+          Ui.ConfirmDialog {
+            id:showAllConfirm
+            objectName:"apps-show-all-confirm"
+            parent:keyboard
+            anchors.fill:parent
+            z:100
+            opened:false
+            focus:opened
+            message:"Show all hidden applications? This will make every hidden app visible without changing pinned apps."
+            confirmText:"Show all"
+            Keys.onPressed:function(event){if(handleKey(event))event.accepted=true}
+            onCanceled:{root.dismissAppsPopups();keyboard.forceActiveFocus()}
+            onConfirmed:{opened=false;if(appsLoader.item)appsLoader.item.confirmShowAll();keyboard.forceActiveFocus()}
           }
         }
       }
