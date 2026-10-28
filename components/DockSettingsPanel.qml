@@ -340,7 +340,7 @@ Item {
               Loader {
                 id:appsLoader
                 width:parent.width
-                implicitHeight:item ? item.implicitHeight : 0
+                height:item ? item.implicitHeight : 0
                 active:root.selectedSection==="apps"
                 visible:active
                 sourceComponent:Component {
