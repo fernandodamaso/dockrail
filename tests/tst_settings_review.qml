@@ -179,8 +179,14 @@ TestCase {
     compare(row.host.settings.backgroundColor,"")
     compare(row.host.settings.backgroundColorEnabled,true)
   }
+  function kids(item) {
+    var out=[]
+    var list=item.children || []
+    for (var i=0;i<list.length;i++) out.push(list[i])
+    return out
+  }
   function pairedChooser(row) {
-    return row.children.filter(function(item) {return item.options && item.open && item.close})[0]
+    return kids(row).filter(function(item) {return item.options && item.open && item.close})[0]
   }
   function test_panel_content_respects_native_insets() {
     var host=createTemporaryObject(hostFactory,testCase)
@@ -238,7 +244,7 @@ TestCase {
   }
   function test_row_uses_semantic_text_color() {
     var row=makeRow("margin")
-    var label=row.children.filter(function(item){return item.text==="Margin" && item.font && item.font.bold})[0]
+    var label=kids(row).filter(function(item){return item.text==="Margin" && item.font && item.font.bold})[0]
     compare(String(label.color),"#f0f2f8")
   }
   function test_paired_hex_blur_commits_once() {
@@ -294,14 +300,14 @@ TestCase {
   }
   function test_border_width_displays_its_value() {
     var row=makePaired("borderWidth","borderWidthEnabled")
-    verify(row.children.some(function(item){return item.visible && item.text==="4px"}))
+    verify(kids(row).some(function(item){return item.visible && item.text==="4px"}))
   }
   function test_theme_width_does_not_claim_zero_pixels() {
     var row=makePaired("borderWidth","borderWidthEnabled")
     row.host.themeOwned=true
     row.host.settings=Object.assign({},row.host.settings,{borderWidthEnabled:false})
-    verify(row.children.some(function(item){return item.visible && item.text && item.text.indexOf("Theme width")>=0}))
-    verify(!row.children.some(function(item){return item.visible && item.text && item.text.indexOf("shows 0px")>=0}))
+    verify(kids(row).some(function(item){return item.visible && item.text && item.text.indexOf("Theme width")>=0}))
+    verify(!kids(row).some(function(item){return item.visible && item.text && item.text.indexOf("shows 0px")>=0}))
   }
   function test_disabled_row_keeps_help_readable() {
     var row=makeRow("reserveSpace")
@@ -331,7 +337,7 @@ TestCase {
   }
   function test_pointer_takes_over_pending_width_keyboard_draft() {
     var row=makePaired("borderWidth","borderWidthEnabled")
-    var slider=row.children.filter(function(item){return item.minimum!==undefined && item.released})[0]
+    var slider=kids(row).filter(function(item){return item.minimum!==undefined && item.released})[0]
     row.adjust(1)
     slider.dragging=true;slider.moved(6)
     wait(450)
@@ -375,9 +381,9 @@ TestCase {
     wait(0)
   }
   function pairedRecoveryButtons(row) {
-    return row.children.filter(function(item) {
+    return kids(row).filter(function(item) {
       return item.visible !== undefined && item.children
-        && item.children.some(function(child) { return child.text === "Reload" })
+        && kids(item).some(function(child) { return child.text === "Reload" })
     })[0]
   }
   function test_paired_conflict_keyboard_recovery() {
@@ -396,8 +402,8 @@ TestCase {
     row.activate()
     var recovery=pairedRecoveryButtons(row)
     verify(!!recovery)
-    var reload=recovery.children.filter(function(child){return child.text==="Reload"})[0]
-    var keep=recovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    var reload=kids(recovery).filter(function(child){return child.text==="Reload"})[0]
+    var keep=kids(recovery).filter(function(child){return child.text==="Keep editing"})[0]
     tryVerify(function(){return reload.activeFocus})
     keyClick(Qt.Key_Return)
     tryVerify(function(){return !row.conflict})
@@ -419,8 +425,8 @@ TestCase {
     verify(keepRow.conflict)
     keepRow.activate()
     var keepRecovery=pairedRecoveryButtons(keepRow)
-    var keepReload=keepRecovery.children.filter(function(child){return child.text==="Reload"})[0]
-    var keepButton=keepRecovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    var keepReload=kids(keepRecovery).filter(function(child){return child.text==="Reload"})[0]
+    var keepButton=kids(keepRecovery).filter(function(child){return child.text==="Keep editing"})[0]
     tryVerify(function(){return keepReload.activeFocus})
     keyClick(Qt.Key_Tab)
     tryVerify(function(){return keepButton.activeFocus})
@@ -438,12 +444,12 @@ TestCase {
     verify(!row.commitDraft())
     verify(row.conflict)
     row.activate()
-    var recovery=row.children.filter(function(item) {
-      return item.children && item.children.some(function(child){return child.text==="Reload"})
+    var recovery=kids(row).filter(function(item) {
+      return item.children && kids(item).some(function(child){return child.text==="Reload"})
     })[0]
     verify(!!recovery)
-    var reload=recovery.children.filter(function(child){return child.text==="Reload"})[0]
-    var keep=recovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    var reload=kids(recovery).filter(function(child){return child.text==="Reload"})[0]
+    var keep=kids(recovery).filter(function(child){return child.text==="Keep editing"})[0]
     tryVerify(function(){return reload.activeFocus})
     keyClick(Qt.Key_Return)
     tryVerify(function(){return !row.conflict})
@@ -458,11 +464,11 @@ TestCase {
     verify(!keepRow.commitDraft())
     verify(keepRow.conflict)
     keepRow.activate()
-    var keepRecovery=keepRow.children.filter(function(item) {
-      return item.children && item.children.some(function(child){return child.text==="Reload"})
+    var keepRecovery=kids(keepRow).filter(function(item) {
+      return item.children && kids(item).some(function(child){return child.text==="Reload"})
     })[0]
-    var keepReload=keepRecovery.children.filter(function(child){return child.text==="Reload"})[0]
-    var keepButton=keepRecovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    var keepReload=kids(keepRecovery).filter(function(child){return child.text==="Reload"})[0]
+    var keepButton=kids(keepRecovery).filter(function(child){return child.text==="Keep editing"})[0]
     tryVerify(function(){return keepReload.activeFocus})
     keyClick(Qt.Key_Tab)
     tryVerify(function(){return keepButton.activeFocus})
