@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 import "DockSettingsAppsModel.js" as Apps
+import "DockIconModel.js" as IconModel
 
 // The Apps section is a view over the canonical schema homes and host intents.
 // No QML file writes, direct executable invocation or replacement settings array.
@@ -62,10 +63,8 @@ Item {
     })
     return result
   }
-  readonly property var selectedTarget: {
-    var item=targets.filter(function(target) {return target.appId && target.appId === selectedAppId})[0]
-    return item || (targets.length ? targets[Math.max(0,Math.min(cursor,targets.length-1))] : null)
-  }
+  readonly property var selectedTarget: targets.length
+    ? targets[Math.max(0,Math.min(cursor,targets.length-1))] : null
   readonly property bool editorFocused: commandField.activeFocus
   readonly property bool popupOpen: mutedSelect.popupOpen || awaitingShowAll
   signal changed()
@@ -135,6 +134,7 @@ Item {
   function activate() {
     if(selectedTarget && selectedTarget.activate)selectedTarget.activate()
     else if(selectedTarget && selectedTarget.clicked)selectedTarget.clicked()
+    else if(selectedTarget && selectedTarget.open)selectedTarget.open()
     else if(selectedTarget)selectedTarget.forceActiveFocus()
   }
   function reorderSelected(delta) {
@@ -184,8 +184,8 @@ Item {
     // existing Change Icon dialog. Never mutate the whole overrides collection.
     var target=item.kind==="window"
       ? {kind:"window",key:host.windowIconTargetKey(item.appId,item.titlePattern),
-        appId:item.appId,titlePattern:item.titlePattern,source:item.source}
-      : {kind:item.kind,key:item.key,source:item.source}
+        appId:item.appId,titlePattern:item.titlePattern,source:IconModel.normalizeSource(item.source)}
+      : {kind:item.kind,key:item.key,source:IconModel.normalizeSource(item.source)}
     return notify(host.saveIconChange({remove:target,set:null}))
   }
   function reloadCommand() {
@@ -464,6 +464,7 @@ Item {
           id:badgeToggle
           width:parent.width;row:root.rowFor("browserProfileBadgesEnabled")
           host:root.host;hasCursor:root.selectedTarget===this&&root.cursorActive
+          enabled:root.chromeReady || root.host.settings.browserProfileBadgesEnabled === true
           onHovered:root.hovered(badgeToggle)
           onEdited:root.changed()
         }
@@ -471,15 +472,16 @@ Item {
           id:tabsToggle
           width:parent.width;row:root.rowFor("sidebarBrowserTabsEnabled")
           host:root.host;hasCursor:root.selectedTarget===this&&root.cursorActive
+          enabled:root.chromeReady || root.host.settings.sidebarBrowserTabsEnabled === true
           onHovered:root.hovered(tabsToggle)
           onEdited:root.changed()
         }
         Column {
           width:parent.width;spacing:Style.space(4)
-          Text {text:"Muted unread services";color:Commons.Color.foreground;font.bold:true}
+          Text {text:root.rowFor("browserActivityMutedServices").ui.label;color:Commons.Color.foreground;font.bold:true}
           Text {
             width:parent.width;wrapMode:Text.WordWrap
-            text:"Still listed, but left out of unread totals."
+            text:root.rowFor("browserActivityMutedServices").ui.help
             color:Commons.Color.foreground;opacity:0.9
           }
           Ui.MultiSelect {
@@ -487,7 +489,7 @@ Item {
             width:parent.width;showLabel:false
             options:Apps.muteOptions(root.host.settings.browserActivityMutedServices)
             values:root.host.settings.browserActivityMutedServices || []
-            enabled:!root.busy
+            enabled:!root.busy && root.chromeReady
             onChanged:function(values) {
               root.write("browserActivityMutedServices",values)
               mutedSelect.values=Qt.binding(function(){return root.host.settings.browserActivityMutedServices||[]})
@@ -532,10 +534,11 @@ Item {
           Text {text:"Advanced";font.bold:true;color:Commons.Color.foreground}
         }
         Text {
-          text:"App launcher command";font.bold:true;color:Commons.Color.foreground
+          text:root.rowFor("controlCommand").ui.label;font.bold:true;color:Commons.Color.foreground
         }
         Text {
-          text:"Runs only when you choose Open App Launcher on the dock. Settings never executes this command."
+          text:root.rowFor("controlCommand").ui.help
+            + " Settings never executes this command."
           width:parent.width;wrapMode:Text.WordWrap;color:Commons.Color.foreground;opacity:0.9
         }
         Ui.TextField {
