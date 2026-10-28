@@ -356,7 +356,7 @@ Item {
                       if(!root.host.openAppPickerFromSettings())
                         root.rowFeedback="The existing app picker is unavailable."
                     }
-                    onOpenIconEditor:function(item) {
+                    onRequestIconChange:function(item) {
                       if(!root.host.openIconFromSettings(item))
                         root.rowFeedback="The Change Icon dialog is unavailable."
                     }
