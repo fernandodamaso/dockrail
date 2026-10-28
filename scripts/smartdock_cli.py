@@ -585,12 +585,14 @@ def feature_readiness(status_data, settings, probes=None):
         'herdr': 'Herdr', 'omp': 'Oh My Pi', 'commandcode': 'Command Code',
         'kilo': 'Kilo Code', 'cline': 'Cline',
     }
-    agent_rows = [
-        {'label': agent_labels[command], 'command': command,
-         'found': bool(probes.which(command)),
-         'launcherInstalled': launcher not in missing_launchers}
-        for command, launcher in zip(AGENT_COMMANDS, AGENT_LAUNCHERS)
-    ]
+    agent_rows = []
+    for command, launcher in zip(AGENT_COMMANDS, AGENT_LAUNCHERS):
+        found = bool(probes.which(command))
+        agent_rows.append({
+            'label': agent_labels[command], 'command': command,
+            'found': found,
+            'launcherInstalled': found and launcher not in missing_launchers,
+        })
     # Show the frozen design's eight-agent order, independent of PATH order.
     agent_order = ['claude', 'pi', 'cursor-agent', 'herdr',
                    'omp', 'commandcode', 'kilo', 'cline']
