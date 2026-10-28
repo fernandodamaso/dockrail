@@ -157,6 +157,8 @@ Item {
       delegate:Ui.BorderSurface {
         id:card
         required property var modelData
+        required property int index
+        objectName:"feature-card-"+modelData.id
         readonly property var probe:root.readiness ? root.readiness[modelData.key] : null
         readonly property var feature:Features.aggregate(root.metadata,modelData.id)
         readonly property string state:feature ? Features.shortcutState(root.host.settings,feature) : "unavailable"
@@ -180,8 +182,6 @@ Item {
         HoverHandler {
           onHoveredChanged:if(hovered){root.focusTarget(card.index);root.focusSettings()}
         }
-        // Repeater index is used only for keyboard position, never as identity.
-        readonly property int index:Features.cards.indexOf(modelData)
         Column {
           id:cardBody
           x:Style.space(12)
@@ -246,6 +246,7 @@ Item {
             }
             Ui.ToggleSwitch {
               id:switchControl
+              objectName:"feature-toggle-"+card.modelData.id
               checked:card.state==="on"
               interactive:false
               busy:root.busy
@@ -335,6 +336,7 @@ Item {
           }
           Ui.Button {
             visible:card.modelData.id!=="agent-launchers" && card.status!=="Ready"
+            objectName:"feature-copy-"+card.modelData.id
             text:"Copy setup command"
             onClicked:root.copyText(card.command())
           }
@@ -414,11 +416,13 @@ Item {
             visible:card.modelData.id==="agent-launchers"
             spacing:Style.space(8)
             Ui.Button {
+              objectName:"feature-launchers-add"
               text:"Add launchers"
               enabled:root.panelActive&&!root.busy
               onClicked:root.manageLaunchers(true)
             }
             Ui.Button {
+              objectName:"feature-launchers-remove"
               text:"Remove launchers"
               enabled:root.panelActive&&!root.busy
               onClicked:root.manageLaunchers(false)
