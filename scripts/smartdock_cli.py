@@ -1578,11 +1578,17 @@ def manage_local_launchers(action):
     if spec is None or spec.loader is None:
         raise CliError('E_SETUP', 'Bundled launcher manager is unavailable.')
     manager = importlib.util.module_from_spec(spec)
+    # A selected plugin tree is read-only deployment state. Prevent importlib
+    # from materializing __pycache__ under the plugin's scripts directory.
+    previous = sys.dont_write_bytecode
     try:
+        sys.dont_write_bytecode = True
         spec.loader.exec_module(manager)
         return envelope(manager.manage(action, bundle=BUNDLE))
     except (OSError, ValueError, manager.LauncherError) as error:
         raise CliError('E_SETUP', str(error)) from error
+    finally:
+        sys.dont_write_bytecode = previous
 
 
 def execute(args):
