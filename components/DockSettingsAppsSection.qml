@@ -134,7 +134,7 @@ Item {
       var row=pinnedList.itemAt(i)
       if(!row)continue
       last=row.pinnedId
-      if(center<row.mapToItem(pinnedBody,0,row.height/2).y)return last
+      if(center<=row.mapToItem(pinnedBody,0,row.height/2).y)return last
     }
     return last
   }
@@ -364,10 +364,11 @@ Item {
                 }
                 onReleased:{
                   var active=root.dragId===pinRow.pinnedId
+                  var moved=Math.abs(grip.y)>Style.space(8)
                   var target=root.draggedPinTarget(grip)
                   var expected=root.dragExpected
                   root.cancelDrag()
-                  if(active && target && target!==pinRow.pinnedId)
+                  if(active && moved && target && target!==pinRow.pinnedId)
                     root.dropPinned(pinRow.pinnedId,target,expected)
                 }
                 onCanceled:root.cancelDrag()
