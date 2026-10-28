@@ -350,6 +350,7 @@ Item {
             HoverHandler{onHoveredChanged:if(hovered)root.hovered(pinRow)}
             Item {
               id:grip
+              objectName:"apps-pin-grip"
               width:Style.space(24);height:Style.space(34)
               Text {anchors.centerIn:parent;text:"↕";color:Commons.Color.foreground}
               MouseArea {
@@ -382,7 +383,7 @@ Item {
               Text {text:pinRow.pinnedId;textFormat:Text.PlainText;width:parent.width;wrapMode:Text.WrapAnywhere;color:Commons.Color.foreground;opacity:0.8;font.pixelSize:Style.font.caption}
             }
             Ui.Button {
-              id:unpinButton;text:"Unpin";focusable:true;enabled:!root.busy
+              id:unpinButton;objectName:"apps-unpin-button";text:"Unpin";focusable:true;enabled:!root.busy
               onHovered:function(value){if(value)root.hovered(pinRow)}
               onClicked:root.notify(root.host.unpinApplication(pinRow.pinnedId))
             }
