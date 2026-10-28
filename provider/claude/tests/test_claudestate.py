@@ -77,6 +77,87 @@ class ClaudeStateTests(unittest.TestCase):
                                           self.proc_root)
         self.assertEqual(chain, [self.utility, self.desktop])
 
+    def test_joined_cmdline_helper_is_not_main(self) -> None:
+        exe = "/usr/lib/claude-desktop/claude-desktop"
+        self.proc.add(210, "claude-desktop", 20, 2100, [
+            exe + " --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-US"],
+            exe=exe)
+        self.proc.add(211, "claude-desktop", 20, 2110, [
+            exe + " --type=renderer --lang=en-US /usr/lib/claude-desktop/resources/app.asar"],
+            exe=exe)
+        self.assertEqual(claudestate.is_desktop_process(210, self.proc_root), (True, False))
+        self.assertEqual(claudestate.is_desktop_process(211, self.proc_root), (True, False))
+
+    def test_arguments_mentioning_desktop_do_not_match(self) -> None:
+        self.proc.add(220, "bash", 10, 2200,
+                      ["/usr/bin/bash", "--init-file",
+                       "/usr/lib/claude-desktop/resources/claude-desktop.bash"],
+                      exe="/usr/bin/bash")
+        self.proc.add(221, "code", 10, 2210,
+                      ["/usr/bin/code", "/home/me/Projects/dockrail-claude-desktop"],
+                      exe="/usr/bin/code")
+        # A shared Electron runtime is matched by its app path, not later arguments.
+        self.proc.add(222, "electron", 10, 2220,
+                      ["/usr/lib/electron/electron", "/usr/lib/code/out/cli.js",
+                       "/home/me/Projects/dockrail-claude-desktop"])
+        # Electron mains usually arrive with the command line joined into argv[0].
+        self.proc.add(223, "code", 10, 2230,
+                      ["/usr/lib/code/code --ozone-platform=wayland "
+                       "/home/me/Projects/dockrail-claude-desktop"],
+                      exe="/usr/lib/code/code")
+        self.proc.add(224, "electron", 10, 2240,
+                      ["/usr/lib/electron/electron /usr/lib/code/out/cli.js "
+                       "/home/me/Projects/dockrail-claude-desktop"],
+                      exe="/usr/lib/electron/electron")
+        for pid in (220, 221, 222, 223, 224):
+            self.assertEqual(claudestate.is_desktop_process(pid, self.proc_root),
+                             (False, False), pid)
+
+    def test_joined_cmdline_main_matches(self) -> None:
+        exe = "/usr/lib/claude-desktop/claude-desktop"
+        self.proc.add(225, "claude-desktop", 10, 2250,
+                      [exe + " --ozone-platform=wayland --user-data-dir=/home/me/.config/claude"],
+                      exe=exe)
+        self.proc.add(226, "Claude", 10, 2260,
+                      ["/opt/Claude Desktop/Claude --ozone-platform=wayland"],
+                      exe="/opt/Claude Desktop/Claude")
+        self.proc.add(227, "electron", 10, 2270,
+                      ["/usr/lib/electron/electron /usr/lib/claude-desktop/app.asar"],
+                      exe="/usr/lib/electron/electron")
+        for pid in (225, 226, 227):
+            self.assertEqual(claudestate.is_desktop_process(pid, self.proc_root),
+                             (True, True), pid)
+
+    def test_appimage_wrapper_and_main(self) -> None:
+        self.proc.add(230, "disclaimer", 231, 2300,
+                      ["/tmp/.mount_ClaudeAb12/resources/disclaimer"])
+        self.proc.add(231, "claude-desktop", 10, 2310,
+                      ["/tmp/.mount_ClaudeAb12/claude-desktop"])
+        self.assertEqual(claudestate.is_desktop_process(230, self.proc_root), (True, False))
+        self.assertEqual(claudestate.is_desktop_process(231, self.proc_root), (True, True))
+
+    def test_disclaimer_wrapper_is_not_the_main_process(self) -> None:
+        claude = "/home/admin/.config/Claude/claude-code/2.1.308/f8b3641a8d36/claude"
+        cli = self.proc.add(200, "claude", 201, 2000,
+                            [claude, "--output-format", "stream-json"])
+        wrapper = self.proc.add(
+            201, "disclaimer", 202, 2010,
+            ["/usr/lib/claude-desktop/resources/disclaimer", "--pgroup", "--", claude,
+             "--output-format", "stream-json"])
+        main = self.proc.add(
+            202, "claude-desktop", 203, 2020,
+            ["/usr/lib/claude-desktop/claude-desktop", "--ozone-platform=wayland",
+             "--password-store=gnome-libsecret"])
+        init = self.proc.add(203, "systemd", 1, 2030, ["/usr/lib/systemd/systemd", "--user"])
+        self.assertEqual(claudestate.is_desktop_process(201, self.proc_root), (True, False))
+        self.assertEqual(claudestate.is_desktop_process(202, self.proc_root), (True, True))
+        chain = claudestate.desktop_chain([wrapper, main, init], self.proc_root)
+        self.assertEqual(chain, [wrapper, main])
+        records = [record("cli", "working", cli, [wrapper, main, init])]
+        sessions, clients = claudestate.collect_sessions(records, self.proc_root, NOW_MS)
+        self.assertEqual([s["sessionId"] for s in sessions], ["cli"])
+        self.assertEqual(clients, [{"pid": 202, "startTime": 2020, "ancestors": []}])
+
     def test_terminal_cli_session_is_not_a_desktop_session(self) -> None:
         self.assertIsNone(claudestate.desktop_chain([self.cli_shell, self.terminal],
                                                     self.proc_root))

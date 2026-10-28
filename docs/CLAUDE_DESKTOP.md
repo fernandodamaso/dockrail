@@ -29,7 +29,8 @@ ends in `|| true`, so a removed Dockrail install can never block a prompt.
 ## Data path
 
 ```text
-Claude Desktop -> claude (Claude Code session) -> hook: dockrail claude hook
+Claude Desktop -> [disclaimer wrapper] -> claude (Claude Code session)
+  -> hook: dockrail claude hook
   -> ${XDG_RUNTIME_DIR}/dockrail/claude/sessions/<hash>.json
      (fallback ${XDG_STATE_HOME:-~/.local/state}/dockrail/claude/sessions)
   -> provider/claude/bin/dockrail-claude-provider
@@ -56,13 +57,20 @@ twice a second and:
 - shows a turn as idle when its transcript's last record is a user
   interrupt (Esc does not fire `Stop`), or when nothing touched it for
   20 minutes;
-- keeps a finished turn's done mark for up to 30 minutes after the session
-  process exits and drops anything else whose process is gone.
+- keeps a finished turn's done mark while the session stays open; when the
+  session process exits the record is dropped (a done mark can outlive the
+  process for up to 30 minutes only when every recorded ancestor up to Claude
+  Desktop is still running).
 
 Claude Desktop is recognized by a process named `Claude`, or by
 `claude-desktop`/`claude_desktop`/`Claude Desktop`/AppImage paths in its
-executable or command line (Electron builds such as `claude-desktop-debian`).
-The lowercase `claude` CLI binary never counts.
+executable path or program name (argv[0]), or in the app path a shared
+`electron` runtime is started with; later arguments are ignored, also when
+Chromium joins the command line into one argument (Electron builds such as
+`claude-desktop-debian`). The lowercase `claude` CLI binary never counts.
+Electron helpers with `--type=` and launcher wrappers in the app's
+`resources/` directory (such as `disclaimer`) are skipped when attributing a
+session.
 
 ## Limits
 

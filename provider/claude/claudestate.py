@@ -33,8 +33,9 @@ STALE_WORKING_MS = 20 * 60 * 1000
 STATUSES = ("working", "blocked", "done", "idle")
 INTERRUPT_MARKER = "[Request interrupted by user"
 
-# Executable/argv fragments that identify a Claude Desktop process. The Claude
-# Code CLI itself (`claude`) never qualifies.
+# Fragments that identify a Claude Desktop process, matched against its comm,
+# executable path and argv[0] only. The Claude Code CLI itself (`claude`)
+# never qualifies.
 DESKTOP_MARKERS = (
     "claude-desktop",
     "claude_desktop",
@@ -148,18 +149,35 @@ def process_text(pid: int, proc_root: Path) -> tuple[str, str, list[str]]:
 def is_desktop_process(pid: int, proc_root: Path) -> tuple[bool, bool]:
     """Return ``(isClaudeDesktop, isMainProcess)`` for one process.
 
-    Electron helpers (renderer/GPU/utility) carry ``--type=`` and share the
-    main process's executable, so they match but are not the window owner.
+    Electron helpers (renderer/GPU/utility/zygote) carry ``--type=`` (possibly
+    inside one space-joined cmdline) and launcher wrappers such as
+    ``disclaimer`` live in the app's ``resources/`` directory. Both match but
+    are not the window owner.
     """
     comm, exe, argv = process_text(pid, proc_root)
-    names = {comm, Path(exe).name, Path(argv[0]).name if argv else ""}
+    if len(argv) == 1 and " " in argv[0]:
+        # Chromium rewrites its command line into one space-joined argument;
+        # split it after the executable so a path with spaces stays whole.
+        head = exe if exe and argv[0].startswith(exe + " ") else ""
+        argv = [head] + argv[0][len(head):].split() if head else argv[0].split()
+    program = argv[0] if argv else ""
+    names = {comm, Path(exe).name, Path(program).name}
     if "claude" in names:
         # The lowercase `claude` binary is the Claude Code CLI, never the window.
         return False, False
-    haystack = " ".join([comm, exe] + argv).lower()
+    # Match the program itself, not its arguments: a shell or editor whose
+    # arguments mention a claude-desktop path is not Claude Desktop. A shared
+    # Electron runtime is identified by its app path, the first non-option
+    # argument (`electron /usr/lib/claude-desktop/app.asar`).
+    identity = [comm, exe, program]
+    if any(name.startswith("electron") for name in names):
+        identity += [arg for arg in argv[1:] if not arg.startswith("-")][:1]
+    haystack = " ".join(identity).lower()
     if "Claude" not in names and not any(m in haystack for m in DESKTOP_MARKERS):
         return False, False
     main = not any(arg.startswith("--type=") for arg in argv)
+    if Path(exe or program).parent.name == "resources":
+        main = False
     return True, main
 
 

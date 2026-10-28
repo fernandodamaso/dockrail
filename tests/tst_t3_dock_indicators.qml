@@ -34,7 +34,7 @@ TestCase {
     throw new Error("Unclosed Dock.qml function: " + name)
   }
 
-  function facade(herdrOn, t3On, bridge) {
+  function facade(herdrOn, t3On, bridge, claudeOn) {
     var names = ["emptyHerdrSummary", "sourceIndicatorsEnabled", "herdrSummaryFor",
       "herdrServerLabel", "herdrServerForPreview", "herdrPreviewProductFor",
       "herdrPreviewFocusHintFor", "herdrPreviewAgentsFor", "herdrPreviewLabelFor",
@@ -45,6 +45,9 @@ TestCase {
       + 'QtObject { id: root\n'
       + 'property bool dockHerdrIndicators: ' + (herdrOn ? "true" : "false") + '\n'
       + 'property bool dockT3Indicators: ' + (t3On ? "true" : "false") + '\n'
+      + 'property bool dockClaudeIndicators: ' + (claudeOn ? "true" : "false") + '\n'
+      + 'readonly property bool anyAgentIndicators: dockHerdrIndicators || dockT3Indicators\n'
+      + '  || dockClaudeIndicators\n'
       + 'property var herdrWindowAgents\n'
       + functions.join("\n") + '\n}'
     var item = Qt.createQmlObject(code, testCase, Qt.resolvedUrl("DockFacade.qml"))
@@ -129,6 +132,25 @@ TestCase {
     compare(value.bridge.summaryArgs.length, 1)
     compare(value.bridge.summaryArgs[0].length, 0)
     compare(summary.count, 0)
+  }
+
+  function test_claudeBadgeGatedByClaudeSetting() {
+    var winClaude = createTemporaryObject(toplevelFactory, testCase, { key: "win:claude" })
+    var bridge = createTemporaryObject(bridgeFactory, testCase)
+    bridge.snapshot = { servers: [{ id: "claude:local", source: "claude", product: "Claude",
+      label: "Claude" }] }
+    bridge.herdrAssociations = { byWindowKey: { "win:claude": "claude:local" } }
+    var item = { toplevels: [winClaude] }
+    var claudeOnly = facade(false, false, bridge, true)
+    claudeOnly.herdrSummaryFor(item)
+    compare(bridge.summaryArgs.length, 1)
+    compare(bridge.summaryArgs[0].length, 1)
+    compare(bridge.summaryArgs[0][0], winClaude)
+    bridge.summaryArgs = []
+    var claudeOff = facade(true, true, bridge, false)
+    claudeOff.herdrSummaryFor(item)
+    compare(bridge.summaryArgs.length, 1)
+    compare(bridge.summaryArgs[0].length, 0)
   }
 
   function test_sourceIndicatorsEnabledMapping() {
