@@ -271,7 +271,9 @@ class ProviderProcessTests(unittest.TestCase):
         finally:
             handle.close()
 
-        resolved = resolve_window_identities([self_pid, self_pid, 1])
+        # PID 1 is rejected only when another user owns it (not as root).
+        foreign = [1] if os.stat("/proc/1").st_uid != os.getuid() else []
+        resolved = resolve_window_identities([self_pid, self_pid] + foreign)
         self.assertEqual(len(resolved), 1)
         self.assertEqual(resolved[0]["pid"], self_pid)
         self.assertEqual(resolved[0]["startTime"], expected_start)

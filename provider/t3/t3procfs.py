@@ -52,13 +52,28 @@ def _is_loopback_or_any(address: str) -> bool:
     return False
 
 
+def _net_table_lines(name: str, proc_root: Path) -> list[str]:
+    """Return the lines of ``/proc/net/<name>``.
+
+    A kernel booted with ``ipv6.disable=1`` has no ``tcp6`` table, which means
+    no IPv6 listeners exist; that case reads as an empty table. Every other
+    failure, including a missing ``tcp`` table, still raises ``OSError``.
+    """
+    try:
+        with open(proc_root / "net" / name, "r", encoding="utf-8") as handle:
+            return handle.read().splitlines()
+    except FileNotFoundError:
+        if name == "tcp6" and (proc_root / "net").is_dir():
+            return []
+        raise
+
+
 def _listen_rows(port: int, proc_root: Path) -> list[list[str]]:
     wanted = f"{port:04X}"
     rows: list[list[str]] = []
     for name in ("tcp", "tcp6"):
         try:
-            with open(proc_root / "net" / name, "r", encoding="utf-8") as handle:
-                lines = handle.read().splitlines()
+            lines = _net_table_lines(name, proc_root)
         except (OSError, ValueError, UnicodeError):
             raise ProcfsError("unreadable")
         for line in lines[1:]:
@@ -237,8 +252,7 @@ def peer_listener_uid(
         listener_uid: int | None = None
         for name in ("tcp", "tcp6"):
             try:
-                with open(proc_root / "net" / name, "r", encoding="utf-8") as handle:
-                    lines = handle.read().splitlines()
+                lines = _net_table_lines(name, proc_root)
             except (OSError, ValueError, UnicodeError):
                 return None
             for line in lines[1:]:
