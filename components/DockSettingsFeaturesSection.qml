@@ -132,9 +132,9 @@ Item {
       }
     }
     Text {
-      visible:root.host.featureReadinessBridge.lastError!==""
+      visible:!!root.host.featureReadinessBridge.lastError
       width:parent.width
-      text:root.host.featureReadinessBridge.lastError
+      text:root.host.featureReadinessBridge.lastError || ""
       textFormat:Text.PlainText
       wrapMode:Text.WordWrap
       font.family:Style.font.family
@@ -264,7 +264,7 @@ Item {
           Text {
             visible:!!card.probe && card.status!=="Ready" && card.modelData.id!=="agent-launchers"
             width:parent.width
-            text:card.probe ? card.probe.nextAction.text : ""
+            text:card.probe && card.probe.nextAction ? card.probe.nextAction.text || "" : ""
             textFormat:Text.PlainText
             wrapMode:Text.WordWrap
             color:Commons.Color.foreground
@@ -317,7 +317,7 @@ Item {
           Text {
             visible:card.modelData.id==="coding-agents" && card.detailsOpen
             width:parent.width
-            text:card.probe ? card.probe.reason : ""
+            text:card.probe ? card.probe.reason || "" : ""
             textFormat:Text.PlainText
             wrapMode:Text.WordWrap
             color:Commons.Color.foreground
