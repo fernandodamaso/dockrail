@@ -197,6 +197,15 @@ TestCase {
     compare(host.settings.pinned,["app.long","app.short","app.third"])
   }
 
+  function test_keyboard_reorder_keeps_selected_application() {
+    var row=pinnedRows()[0]
+    section.focusTarget(section.targets.indexOf(row))
+    section.reorderSelected(1)
+    compare(host.settings.pinned,["app.long","app.short","app.third"])
+    wait(0)
+    compare(section.selectedTarget.pinnedId,"app.short")
+  }
+
   function test_drag_stale_snapshot_refuses_mutation() {
     var expected=host.settings.pinned.slice()
     host.settings=Object.assign({},host.settings,{pinned:["app.third","app.short","app.long"]})
