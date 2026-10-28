@@ -218,6 +218,7 @@ All **59 settings** appear below. The plan's four reversals and moved homes over
 | `urgentWindowAnimationEnabled` | Behavior | Attention on the dock | Urgent nudge |
 | `dockHerdrIndicators` | Behavior | Attention on the dock | Agent state on terminal icons |
 | `dockT3Indicators` | Behavior | Attention on the dock | T3 Code threads on dock icons |
+| `dockClaudeIndicators` | Behavior | Attention on the dock | Claude Desktop sessions on dock icons |
 | `groupWindows` | Behavior | — | Not shown |
 | `sidebarWidgets` | Sidebar & Widgets | Widgets | Widgets list |
 | `sidebarWidgetCollapsed` | Sidebar & Widgets | — | Not shown |

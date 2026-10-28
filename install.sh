@@ -90,13 +90,14 @@ install_client_bundle() {
     install -m 0644 "$source_dir/scripts/smartdock_dev.py" "$destination/scripts/smartdock_dev.py"
     install -m 0644 "$source_dir/scripts/smartdock_widget.py" "$destination/scripts/smartdock_widget.py"
     install -m 0644 "$source_dir/scripts/dockrail_t3.py" "$destination/scripts/dockrail_t3.py"
+    install -m 0644 "$source_dir/scripts/dockrail_claude.py" "$destination/scripts/dockrail_claude.py"
     install -m 0644 "$source_dir/scripts/smartdock_settings_actions.py" "$destination/scripts/smartdock_settings_actions.py"
     install -m 0644 "$source_dir/scripts/dockrail_paths.py" "$destination/scripts/dockrail_paths.py"
     install -m 0644 "$source_dir/scripts/dockrail_migrate.py" "$destination/scripts/dockrail_migrate.py"
     install -m 0644 "$source_dir/config/settings-schema.json" "$destination/config/settings-schema.json"
     install -m 0644 "$source_dir/config/dock.json" "$destination/config/dock.json"
     local document
-    for document in AGENT_CONFIGURATION.md CLI_REFERENCE.md CONFIGURATION.md CLI_RUNTIME_CHECKS.md DEV_SWITCH.md HERDR_DATA_ACCESS.md T3_DATA_ACCESS.md SIDEBAR_WIDGETS.md WIDGET_COMPONENTS.md WIDGET_PACKAGES.md DOCKRAIL_MIGRATION.md; do
+    for document in AGENT_CONFIGURATION.md CLI_REFERENCE.md CONFIGURATION.md CLI_RUNTIME_CHECKS.md DEV_SWITCH.md HERDR_DATA_ACCESS.md T3_DATA_ACCESS.md CLAUDE_DESKTOP.md SIDEBAR_WIDGETS.md WIDGET_COMPONENTS.md WIDGET_PACKAGES.md DOCKRAIL_MIGRATION.md; do
       install -m 0644 "$source_dir/docs/$document" "$destination/docs/$document"
     done
     install -m 0755 "$source_dir/uninstall.sh" "$destination/uninstall.sh"
@@ -181,6 +182,7 @@ if [[ "$source_dir" != "$app_dir" ]]; then
   rm -rf -- "$app_dir/assets"
   rm -rf -- "$app_dir/provider/herdr"
   rm -rf -- "$app_dir/provider/t3"
+  rm -rf -- "$app_dir/provider/claude"
   install -d "$app_dir/provider"
   cp -R -- "$source_dir/components" "$app_dir/components"
   cp -R -- "$source_dir/SmartDock" "$app_dir/SmartDock"
@@ -188,9 +190,11 @@ if [[ "$source_dir" != "$app_dir" ]]; then
   cp -R -- "$source_dir/assets" "$app_dir/assets"
   cp -R -- "$source_dir/provider/herdr" "$app_dir/provider/herdr"
   cp -R -- "$source_dir/provider/t3" "$app_dir/provider/t3"
+  cp -R -- "$source_dir/provider/claude" "$app_dir/provider/claude"
   chmod 0755 "$app_dir/provider/herdr/bin/smartdock-herdr-helper" \
     "$app_dir/provider/herdr/bin/smartdock-herdr-provider"
   chmod 0755 "$app_dir/provider/t3/bin/dockrail-t3-provider"
+  chmod 0755 "$app_dir/provider/claude/bin/dockrail-claude-provider"
   install -m 0644 "$source_dir/shell.qml" "$app_dir/shell.qml"
   install -m 0644 "$source_dir/DockHost.qml" "$app_dir/DockHost.qml"
   install -m 0644 "$source_dir/LICENSE" "$app_dir/LICENSE"

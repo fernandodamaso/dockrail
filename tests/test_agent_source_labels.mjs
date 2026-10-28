@@ -23,4 +23,17 @@ for (const candidate of [t3Server, t3Bare]) {
 
 assert.equal(Model.serverProduct({ source: 't3', product: '  ' }), 'T3 Code')
 
+for (const candidate of [{ source: 'claude', product: 'Claude' }, { source: 'claude' }]) {
+  assert.equal(Model.serverSource(candidate), 'claude')
+  assert.equal(Model.serverProduct(candidate), 'Claude')
+  assert.equal(Model.agentNoun(candidate), 'session')
+  assert.equal(Model.serverFocusAgentSupported(
+    Object.assign({ capabilities: { focusAgent: false } }, candidate)), false)
+}
+
+const SourceModel = loadModel('DockAgentSourceModel')
+assert.equal(SourceModel.sourceIdForServerId('claude:desktop'), 'claude')
+assert.equal(SourceModel.sourceIdForServerId('t3:env'), 't3')
+assert.equal(SourceModel.sourceIdForServerId('local-a'), 'herdr')
+
 console.log('test_agent_source_labels: all assertions passed')

@@ -15,6 +15,7 @@ Item {
   readonly property var browserProfileService: browserLoader.item
   readonly property var herdrService: herdrLoader.item
   readonly property var t3Service: t3Loader.item
+  readonly property var claudeService: claudeLoader.item
 
   DockMigrationBootstrap {
     id: migration
@@ -55,6 +56,16 @@ Item {
     sourceComponent: Component {
       DockHerdrService {
         providerRelativePath: "../provider/t3/bin/dockrail-t3-provider"
+      }
+    }
+  }
+
+  Loader {
+    id: claudeLoader
+    active: migration.ready
+    sourceComponent: Component {
+      DockHerdrService {
+        providerRelativePath: "../provider/claude/bin/dockrail-claude-provider"
       }
     }
   }

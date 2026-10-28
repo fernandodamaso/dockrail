@@ -822,7 +822,8 @@ function project(input) {
       ? herdrServerForDisplay(herdrSnapshot, serverId) : null
     var displaySource = displayServer ? HerdrModel.serverSource(displayServer) : "herdr"
     var verifiedSources = input.herdrVerifiedSources
-    if (typeof serverId !== "string" || !serverId
+    // Claude Desktop sessions are dock-only; the sidebar has no Claude widget.
+    if (typeof serverId !== "string" || !serverId || displaySource === "claude"
         || (displaySource === "t3" && verifiedSources
             && verifiedSources.t3Present !== true)) {
       window.herdrAssociated = false

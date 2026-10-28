@@ -31,6 +31,7 @@ Item {
         browserProfileService: root.pluginService.browserProfileService
         herdrService: root.pluginService.herdrService
         t3Service: root.pluginService.t3Service
+        claudeService: root.pluginService.claudeService
       }
     }
   }

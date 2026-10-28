@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""Demand-driven Dockrail-owned Claude Desktop session provider.
+
+Started only while a Dockrail consumer is active. Polls the per-session
+records written by ``dockrail claude hook`` (Claude Code hooks), keeps the
+sessions Claude Desktop started, and emits versioned normalized JSON lines in
+the Herdr provider contract (schema v1).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import queue
+import select
+import signal
+import sys
+import threading
+import time
+import uuid
+from pathlib import Path
+from typing import Any
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+sys.path.insert(0, str(ROOT))
+
+import claudestate  # noqa: E402
+
+POLL_EVERY = 0.5
+SAFETY_EMIT_EVERY = 60.0
+OUTPUT_TIMEOUT = 2.0
+MAX_STDIN_LINE = 4096
+
+
+def parse_window_processes_command(raw: bytes) -> dict[str, Any] | None:
+    """Parse a bounded window-processes stdin command (Herdr contract)."""
+    if len(raw) > MAX_STDIN_LINE:
+        return None
+    try:
+        message = json.loads(raw)
+    except (ValueError, UnicodeError):
+        return None
+    if not isinstance(message, dict) or set(message) - {"kind", "revision", "pids"}:
+        return None
+    if message.get("kind") != "window-processes":
+        return None
+    revision = message.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+        return None
+    pids = message.get("pids")
+    if not isinstance(pids, list):
+        return None
+    normalized: list[int] = []
+    for value in pids:
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            return None
+        if value not in normalized:
+            normalized.append(value)
+    if len(normalized) > claudestate.MAX_WINDOW_PIDS:
+        return None
+    return {"revision": revision, "pids": normalized}
+
+
+class Provider:
+    def __init__(self, state_dirs: list[Path], proc_root: Path) -> None:
+        self.state_dirs = state_dirs
+        self.proc_root = proc_root
+        self.events: queue.Queue[tuple[str, Any]] = queue.Queue()
+        self.epoch = uuid.uuid4().hex
+        self.revision = 0
+        self.stopping = False
+        self.last_emit = 0.0
+        self.last_fingerprint = ""
+        self.wp_revision = 0
+        self.wp_identities: list[dict[str, int]] = []
+
+    def _stdin(self) -> None:
+        for raw in sys.stdin.buffer:
+            command = raw.strip()
+            if command in (b"refresh", b"quit"):
+                self.events.put(("command", command.decode("ascii")))
+                if command == b"quit":
+                    return
+                continue
+            parsed = parse_window_processes_command(command)
+            if parsed is not None:
+                self.events.put(("window-processes", parsed))
+            # focus-agent and unknown commands are not supported: the dock
+            # only shows Claude Desktop state, it never drives sessions.
+        self.events.put(("command", "quit"))
+
+    def build(self) -> dict[str, Any]:
+        now_ms = int(time.time() * 1000)
+        records = claudestate.read_records(self.state_dirs)
+        sessions, clients = claudestate.collect_sessions(records, self.proc_root, now_ms)
+        state = claudestate.BuildState(
+            epoch=self.epoch,
+            revision=self.revision + 1,
+            wp_revision=self.wp_revision,
+            wp_identities=list(self.wp_identities),
+            now_ms=now_ms,
+        )
+        return claudestate.build_snapshot(state, sessions, clients)
+
+    def emit(self, force: bool = False) -> None:
+        snapshot = self.build()
+        fingerprint = claudestate.snapshot_fingerprint(snapshot)
+        if not force and fingerprint == self.last_fingerprint:
+            return
+        self.revision += 1
+        snapshot["revision"] = self.revision
+        frame = (json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
+        view = memoryview(frame)
+        deadline = time.monotonic() + OUTPUT_TIMEOUT
+        while view:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([], [sys.stdout], [], remaining)[1]:
+                raise BrokenPipeError("provider output unavailable")
+            written = os.write(sys.stdout.fileno(), view[:65536])
+            if written <= 0:
+                raise BrokenPipeError("provider output unavailable")
+            view = view[written:]
+        self.last_fingerprint = fingerprint
+        self.last_emit = time.monotonic()
+
+    def apply(self, event: tuple[str, Any]) -> bool:
+        """Apply one event; return True when the next emit must be forced."""
+        kind, payload = event
+        if kind == "command" and payload == "quit":
+            self.stopping = True
+            return False
+        if kind == "command" and payload == "refresh":
+            return True
+        if kind == "window-processes":
+            self.wp_revision = payload["revision"]
+            self.wp_identities = claudestate.resolve_window_identities(
+                payload["pids"], self.proc_root
+            )
+            return True
+        return False
+
+    def run(self) -> None:
+        threading.Thread(target=self._stdin, daemon=True).start()
+        self.emit(force=True)
+        next_poll = time.monotonic() + POLL_EVERY
+        while not self.stopping:
+            force = False
+            timeout = max(0.0, next_poll - time.monotonic())
+            try:
+                force = self.apply(self.events.get(timeout=timeout))
+                while True:
+                    force = self.apply(self.events.get_nowait()) or force
+            except queue.Empty:
+                pass
+            if self.stopping:
+                break
+            now = time.monotonic()
+            if force or now >= next_poll:
+                next_poll = now + POLL_EVERY
+                self.emit(force=force or now - self.last_emit >= SAFETY_EMIT_EVERY)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--state-dir", action="append", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--proc-root", default=None, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    dirs = [Path(d) for d in args.state_dir] if args.state_dir else claudestate.state_dirs()
+    proc_root = Path(args.proc_root) if args.proc_root else Path("/proc")
+    provider = Provider(dirs, proc_root)
+
+    def stop(_signum: int, _frame: object) -> None:
+        provider.stopping = True
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    try:
+        provider.run()
+    except (BrokenPipeError, KeyboardInterrupt):
+        provider.stopping = True
+
+
+if __name__ == "__main__":
+    main()

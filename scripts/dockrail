@@ -50,6 +50,10 @@ case "${1:-}" in
               shift
               exec python3 -B "$(dirname -- "$adapter")/dockrail_t3.py" "$@"
               ;;
+            claude)
+              shift
+              exec python3 -B "$(dirname -- "$adapter")/dockrail_claude.py" "$@"
+              ;;
           esac
           exec python3 -B "$adapter" "$@"
         fi

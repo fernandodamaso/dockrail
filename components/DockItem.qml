@@ -696,7 +696,8 @@ Item {
     if (root.runningCount > 0)
       name += " · " + root.runningCount + (root.runningCount === 1 ? " window" : " windows")
     if (root.herdrAgentCount > 0) {
-      var noun = root.previewHerdrProduct === "T3 Code" ? "thread" : "agent"
+      var noun = root.previewHerdrProduct === "T3 Code" ? "thread"
+        : root.previewHerdrProduct === "Claude" ? "session" : "agent"
       name += " · " + root.herdrAgentCount
         + (root.herdrAgentCount === 1 ? " " + noun : " " + noun + "s")
     }

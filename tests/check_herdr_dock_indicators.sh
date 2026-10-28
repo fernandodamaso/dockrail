@@ -14,7 +14,7 @@ bridge=components/DockHerdrWindowAgents.qml
 
 grep -Fq 'function herdrSummaryFor(item)' "$dock" \
   || fail 'Dock summary projection missing'
-grep -Fq '!(root.dockHerdrIndicators || root.dockT3Indicators)' "$dock" \
+grep -Fq '!root.anyAgentIndicators' "$dock" \
   || fail 'Dock summary must be setting-gated'
 grep -Fq 'summaryForToplevels((item.toplevels || []).filter(root.sourceIndicatorsEnabled))' "$dock" \
   || fail 'Dock summary must use only item toplevels'

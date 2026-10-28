@@ -55,6 +55,7 @@
   "browserProfileBadgesEnabled": true,
   "dockHerdrIndicators": false,
   "dockT3Indicators": false,
+  "dockClaudeIndicators": false,
   "browserActivityMutedServices": [],
   "hiddenApplications": [],
   "pinned": [

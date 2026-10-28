@@ -122,6 +122,11 @@ jobs:
         shell: bash
         run: python3 -B -m unittest discover -s provider/t3/tests -p 'test_*.py' -v
 
+      - name: Run Claude Desktop provider tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 -B -m unittest discover -s provider/claude/tests -p 'test_*.py' -v
+
       - name: Run pure QML tests
         if: ${{ !cancelled() }}
         shell: bash
