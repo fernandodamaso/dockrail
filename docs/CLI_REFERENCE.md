@@ -109,10 +109,30 @@ Feature behavior is intentionally bounded:
 
 - **Herdr:** `--feature herdr --yes` requires `herdr` on `PATH`, appends `herdr.agents` through the host writer, and warns when the detected version is below 0.9.1 because click-to-focus is unavailable. If Herdr is absent, it prints the 0.9.1+ install prerequisite and changes nothing. Setup does not start, stop, or alter the Herdr provider lifecycle.
 - **Chrome:** `--feature chrome --yes` installs the browser-profile provider from the selected running Dockrail tree when missing. It prints, but never writes, the required `chrome-flags.conf` lines: a separate absolute `--user-data-dir=...` and `--remote-debugging-port=9222`. That is a fresh Chrome profile. While the localhost DevTools port is open, any local process can control that profile and read its pages and cookies. Setup never edits Chrome flags or restarts Chrome. Existing Dockrail Chrome display preferences are preserved rather than silently re-enabled.
-- **Agent launchers:** `--feature agent-launchers --yes` runs the existing `install.sh --agent-assets-only` path from the selected running Dockrail tree. It does not launch an agent.
+- **Agent launchers:** `--feature agent-launchers --yes` runs the ownership-aware `install.sh --agent-assets-only` path from the selected running Dockrail tree. It does not launch an agent.
 - **Launcher counts:** `--feature launcher-counts --yes` is guidance-only. Before offering the installed-plugin-tree `scripts/build-launcher-badge-provider` command, setup checks for `cmake` and a C++ compiler (`c++`, `g++`, or `clang++`) on `PATH`. If either is missing, it reports the missing tools and prints one Omarchy/Arch prerequisite command: `sudo pacman -S --needed cmake gcc qt6-base`. It does not offer the build command while prerequisites are missing. The manual build still requires a C++20 compiler and Qt 6.6+ Core/DBus; setup never starts even a partial provider build automatically.
 
 Setup never runs `controlCommand`, starts a host, changes Chrome flags, restarts Chrome, restarts the Omarchy shell, or performs an automatic launcher-count build. Installer failures return `E_SETUP` (exit 5). Human output ends with a fresh doctor summary and, only when newly installed assets require it, one `omarchy restart shell` instruction. Chrome restart remains a separate manual step after the user edits Chrome flags.
+
+## Local terminal-agent launchers
+
+The commands `launchers add` and `launchers remove` are local-only.
+
+`dockrail launchers add [--json]` installs launchers for supported commands
+currently on `PATH`: `pi`, `omp`, `commandcode`, `cursor-agent`,
+`claude`, `kilo`, `cline`, and `herdr`. `dockrail launchers remove [--json]`
+removes **only files matching their recorded SHA-256**, including their icon
+assets. Both work offline without a running host and never modify `dock.json`.
+
+Files are installed under `XDG_DATA_HOME` and tracked in
+`XDG_STATE_HOME/dockrail/terminal-agent-launchers.json` (standard XDG fallbacks).
+Untracked, edited, symlinked or foreign files are preserved; JSON responses
+list them under `preserved`. Old assets from before INF-4 are **not silently
+adopted**; remove a known old file manually before adding a managed version.
+The existing installer and uninstaller `--agent-assets-only` flags use this
+manager. No agent installation or launcher creation occurs automatically.
+Doctor only requires launchers for supported agent commands detected on `PATH`;
+launcher installation remains independent from agent command availability.
 
 ## Configuration commands
 

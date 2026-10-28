@@ -2,6 +2,7 @@
 """Dockrail's stdlib-only IPC client. Never starts a host or edits its config."""
 import argparse
 import hashlib
+import importlib.util
 import http.client
 import json
 import math
@@ -32,6 +33,10 @@ Read-only commands (never launch or restart the dock):
   config schema [KEY]          Describe settings; bundled fallback when offline
   config get [KEY] [--effective]
                                Read requested or normalized live settings
+
+Local terminal-agent launchers (no host required):
+  launchers add | launchers remove
+                                Own only matching recorded files
 
 Guided setup (requires one selected running host):
   setup                        Interactive readiness + optional feature setup on a TTY
@@ -114,7 +119,9 @@ AGENT_LAUNCHERS = (
     'smartdock-agent-claude-code',
     'smartdock-agent-kilo-code',
     'smartdock-agent-cline',
+    'smartdock-agent-herdr',
 )
+AGENT_COMMANDS = ('pi', 'omp', 'commandcode', 'cursor-agent', 'claude', 'kilo', 'cline', 'herdr')
 SETUP_FEATURES = ('chrome', 'herdr', 'launcher-counts', 'agent-launchers')
 LAUNCHER_COUNTS_ARCH_PREREQUISITES = 'sudo pacman -S --needed cmake gcc qt6-base'
 
@@ -236,7 +243,9 @@ class ReadinessProbes:
             if path is not None and path not in data_roots:
                 data_roots.append(path)
         missing = []
-        for launcher in AGENT_LAUNCHERS:
+        for command, launcher in zip(AGENT_COMMANDS, AGENT_LAUNCHERS):
+            if not self.which(command):
+                continue
             if not any((root / 'applications' / (launcher + '.desktop')).is_file()
                        for root in data_roots):
                 missing.append(launcher)
@@ -497,7 +506,7 @@ def feature_readiness(status_data, settings, probes=None):
     else:
         features['agentLaunchers'] = readiness(
             'ready',
-            'All Dockrail terminal-agent desktop entries are installed.',
+            'All detected terminal agents have Dockrail desktop entries.',
             'No action needed.')
 
     runtime = status_data.get('runtime')
@@ -569,8 +578,7 @@ def feature_readiness(status_data, settings, probes=None):
            'ready' if counts_installed else 'unavailable',
            'install' if not counts_installed else 'learn-more',
            features['launcherCounts']['nextStep'])
-    # INF-4 will make this probe selective/ownership-aware. Keep its current
-    # seven-launcher semantics and legacy summary until that ticket lands.
+    # Installation is checked for detected agents only; runtime remains independent.
     launchers_installed = not missing_launchers
     enrich('agentLaunchers', 'on' if launchers_installed else 'off',
            'installed' if launchers_installed else 'missing',
@@ -1349,6 +1357,9 @@ def build_parser():
     commands = parser.add_subparsers(dest='group')
     for name in ('help', 'agent-guide', 'status', 'doctor', 'settings'):
         child_parser(commands, name)
+    launchers = child_parser(commands, 'launchers').add_subparsers(dest='action')
+    child_parser(launchers, 'add')
+    child_parser(launchers, 'remove')
     setup = child_parser(commands, 'setup')
     setup.add_argument('--feature', choices=SETUP_FEATURES)
     setup.add_argument('--yes', action='store_true')
@@ -1561,9 +1572,32 @@ def app_icon_request(transport, instance, args):
     return validate_mutation(reply, instance)
 
 
+def manage_local_launchers(action):
+    spec = importlib.util.spec_from_file_location(
+        'dockrail_launcher_manager', BUNDLE / 'scripts/smartdock_launchers.py')
+    if spec is None or spec.loader is None:
+        raise CliError('E_SETUP', 'Bundled launcher manager is unavailable.')
+    manager = importlib.util.module_from_spec(spec)
+    # A selected plugin tree is read-only deployment state. Prevent importlib
+    # from materializing __pycache__ under the plugin's scripts directory.
+    previous = sys.dont_write_bytecode
+    try:
+        sys.dont_write_bytecode = True
+        spec.loader.exec_module(manager)
+        return envelope(manager.manage(action, bundle=BUNDLE))
+    except (OSError, ValueError, manager.LauncherError) as error:
+        raise CliError('E_SETUP', str(error)) from error
+    finally:
+        sys.dont_write_bytecode = previous
+
+
 def execute(args):
     if getattr(args, 'help_requested', False) or args.group in (None, 'help'):
         return envelope({'text': HELP})
+    if args.group == 'launchers':
+        if args.action is None:
+            raise CliError('E_USAGE', 'launchers requires add or remove.')
+        return manage_local_launchers(args.action)
     if args.group == 'agent-guide':
         try:
             return envelope({'text': (BUNDLE / 'docs/AGENT_CONFIGURATION.md').read_text(encoding='utf-8')})
