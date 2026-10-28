@@ -83,6 +83,7 @@ class SelectiveLauncherTests(unittest.TestCase):
         foreign.write_text("foreign")
         result = self.action("remove")
         self.assertIn("applications/smartdock-agent-claude-code.desktop", result["preserved"])
+        self.assertIn("applications/smartdock-agent-pi.desktop", result["preserved"])
         self.assertEqual(foreign.read_text(), "foreign")
         self.assertIn("customized", modified.read_text())
         self.assertFalse((self.data / "icons/hicolor/scalable/apps/smartdock-agent-claude-code.svg").exists())
