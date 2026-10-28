@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Herdr agent">
+  <defs>
+    <linearGradient id="rail" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#50d4c5"/>
+      <stop offset="1" stop-color="#4d7ef2"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#142334"/>
+  <path d="M38 34v60m52-60v60M38 64h52" fill="none" stroke="url(#rail)" stroke-linecap="round" stroke-width="13"/>
+  <path d="M54 25l10-7 10 7" fill="none" stroke="#f5faff" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+</svg>
