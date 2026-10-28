@@ -31,7 +31,7 @@ Item {
     : selectedSection === "appearance" ? appearanceSection
     : selectedSection === "behavior" ? behaviorSection
     : selectedSection === "sidebar-widgets" ? widgetsSection
-    : selectedSection === "apps" ? appsSection : null
+    : selectedSection === "apps" ? appsLoader.item : null
   readonly property alias keyCatcher: keyboard
   TextEdit { id: clipboard; visible: false }
 
@@ -71,7 +71,7 @@ Item {
     if (appearanceSection) appearanceSection.cancelPending()
     if (behaviorSection) behaviorSection.cancelPending()
     if (widgetsSection) widgetsSection.cancelPending()
-    if (appsSection) appsSection.cancelPending()
+    if (appsLoader.item) appsLoader.item.cancelPending()
     panelOpen = false
     showHelp = false
     if (root.host && root.host.releaseSettingsPanel)
@@ -80,7 +80,7 @@ Item {
   function selectSection(id) {
     if (Registry.order.indexOf(id) < 0) return false
     if (selectedSection === "sidebar-widgets" && id !== selectedSection) widgetsSection.cancelPending()
-    if (selectedSection === "apps" && id !== selectedSection) appsSection.cancelPending()
+    if (selectedSection === "apps" && id !== selectedSection && appsLoader.item) appsLoader.item.cancelPending()
     selectedSection = id
     focusPane = "sections"
     lastSection = id
@@ -337,30 +337,37 @@ Item {
                     settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
                 }
               }
-              DockSettingsAppsSection {
-                id:appsSection
+              Loader {
+                id:appsLoader
                 width:parent.width
-                panelActive:root.panelOpen
-                visible:root.selectedSection==="apps"
-                host:root.host
-                metadata:root.metadata
-                onFocusSettings:root.focusPane="settings"
-                onFocusSections:{root.focusPane="sections";keyboard.forceActiveFocus()}
-                onChanged:root.rowFeedback=""
-                onOpenAppPicker: {
-                  if(!root.host.openAppPickerFromSettings())
-                    root.rowFeedback="The existing app picker is unavailable."
-                }
-                onOpenIconEditor:function(item) {
-                  if(!root.host.openIconFromSettings(item))
-                    root.rowFeedback="The Change Icon dialog is unavailable."
-                }
-                onRequestShowAll:showAllConfirm.opened=true
-                onReveal:function(item) {
-                  var point=item.mapToItem(layoutHost,0,0)
-                  if(point.y<settingsScroll.contentY)settingsScroll.contentY=point.y
-                  else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
-                    settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
+                implicitHeight:item ? item.implicitHeight : 0
+                active:root.selectedSection==="apps"
+                visible:active
+                sourceComponent:Component {
+                  DockSettingsAppsSection {
+                    width:appsLoader.width
+                    panelActive:root.panelOpen
+                    host:root.host
+                    metadata:root.metadata
+                    onFocusSettings:root.focusPane="settings"
+                    onFocusSections:{root.focusPane="sections";keyboard.forceActiveFocus()}
+                    onChanged:root.rowFeedback=""
+                    onOpenAppPicker: {
+                      if(!root.host.openAppPickerFromSettings())
+                        root.rowFeedback="The existing app picker is unavailable."
+                    }
+                    onOpenIconEditor:function(item) {
+                      if(!root.host.openIconFromSettings(item))
+                        root.rowFeedback="The Change Icon dialog is unavailable."
+                    }
+                    onRequestShowAll:showAllConfirm.opened=true
+                    onReveal:function(item) {
+                      var point=item.mapToItem(layoutHost,0,0)
+                      if(point.y<settingsScroll.contentY)settingsScroll.contentY=point.y
+                      else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
+                        settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
+                    }
+                  }
                 }
               }
               Text {
@@ -394,8 +401,8 @@ Item {
             message:"Show all hidden applications? This will make every hidden app visible without changing pinned apps."
             confirmText:"Show all"
             Keys.onPressed:function(event){if(handleKey(event))event.accepted=true}
-            onCanceled:{opened=false;appsSection.awaitingShowAll=false;keyboard.forceActiveFocus()}
-            onConfirmed:{opened=false;appsSection.confirmShowAll();keyboard.forceActiveFocus()}
+            onCanceled:{opened=false;if(appsLoader.item)appsLoader.item.awaitingShowAll=false;keyboard.forceActiveFocus()}
+            onConfirmed:{opened=false;if(appsLoader.item)appsLoader.item.confirmShowAll();keyboard.forceActiveFocus()}
           }
         }
       }
