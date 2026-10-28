@@ -126,7 +126,12 @@ class FeatureReadinessTests(unittest.TestCase):
         features = CLI.feature_readiness(status(), settings(), probes)
         self.assertEqual(list(features), list(CLI.FEATURE_ORDER))
         for value in features.values():
-            self.assertEqual(set(value), {'status', 'reason', 'nextStep', 'configuration', 'installation', 'runtime', 'nextAction'})
+            expected = {'status', 'reason', 'nextStep', 'configuration',
+                        'installation', 'runtime', 'nextAction'}
+            if 'agents' in value:
+                self.assertIs(value, features['agentLaunchers'])
+                expected.add('agents')
+            self.assertEqual(set(value), expected)
             self.assertEqual(value['status'], 'ready')
             self.assertTrue(value['reason'])
             self.assertTrue(value['nextStep'])
@@ -172,6 +177,24 @@ class FeatureReadinessTests(unittest.TestCase):
         self.assertEqual(missing['herdrAgents']['nextAction']['kind'], 'install')
         self.assertEqual(missing['chromeProfilesTabs']['installation'], 'missing')
         self.assertEqual(missing['chromeProfilesTabs']['runtime'], 'unavailable')
+
+    def test_agent_list_is_read_only_and_ordered_from_shared_probes(self):
+        probes = FakeProbes()
+        probes.missing_launchers = ['smartdock-agent-herdr']
+        features = CLI.feature_readiness(status(), settings(), probes)
+        rows = features['agentLaunchers']['agents']
+        self.assertEqual([row['command'] for row in rows], [
+            'claude', 'pi', 'cursor-agent', 'herdr',
+            'omp', 'commandcode', 'kilo', 'cline'])
+        self.assertEqual([row['label'] for row in rows], [
+            'Claude Code', 'Pi', 'Cursor Agent', 'Herdr',
+            'Oh My Pi', 'Command Code', 'Kilo Code', 'Cline'])
+        self.assertEqual(len(rows), 8)
+        self.assertEqual(sum(row['found'] for row in rows), 1)
+        self.assertEqual(rows[3]['found'], True)
+        self.assertEqual(rows[3]['launcherInstalled'], False)
+        self.assertTrue(all(not row['launcherInstalled'] for i, row in enumerate(rows) if i != 3))
+        self.assertEqual(features['agentLaunchers']['runtime'], 'unavailable')
 
     def test_sidebar_missing_and_degraded(self):
         probes = FakeProbes()
@@ -341,7 +364,12 @@ class DoctorIntegrationTests(unittest.TestCase):
         self.assertTrue(value['ok'])
         self.assertEqual(list(value['data']['features']), list(CLI.FEATURE_ORDER))
         for feature in value['data']['features'].values():
-            self.assertEqual(set(feature), {'status', 'reason', 'nextStep', 'configuration', 'installation', 'runtime', 'nextAction'})
+            expected = {'status', 'reason', 'nextStep', 'configuration',
+                        'installation', 'runtime', 'nextAction'}
+            if 'agents' in feature:
+                self.assertIs(feature, value['data']['features']['agentLaunchers'])
+                expected.add('agents')
+            self.assertEqual(set(feature), expected)
             self.assertIn(feature['status'], ('ready', 'missing', 'degraded'))
 
 
