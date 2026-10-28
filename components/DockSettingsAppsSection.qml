@@ -142,7 +142,17 @@ Item {
   }
   function copyCommand() {
     if(selectedTarget && selectedTarget.command)return selectedTarget.command()
-    return Registry.cliCommand("pinned",host.settings.pinned)
+    if(selectedTarget===mutedSelect)
+      return Registry.cliCommand("browserActivityMutedServices",host.settings.browserActivityMutedServices)
+    if(selectedTarget===badgeToggle)
+      return Registry.cliCommand("browserProfileBadgesEnabled",host.settings.browserProfileBadgesEnabled)
+    if(selectedTarget===tabsToggle)
+      return Registry.cliCommand("sidebarBrowserTabsEnabled",host.settings.sidebarBrowserTabsEnabled)
+    if(selectedTarget===trashToggle)
+      return Registry.cliCommand("showTrash",host.settings.showTrash)
+    if(selectedTarget===commandField||selectedTarget===commandSave||selectedTarget===commandReset)
+      return Registry.cliCommand("controlCommand",host.settings.controlCommand)
+    return "dockrail apps list --pinned"
   }
   function dismissEditor() {
     if(awaitingShowAll){awaitingShowAll=false;return true}
@@ -289,7 +299,7 @@ Item {
             spacing:Style.space(7)
             Accessible.role:Accessible.ListItem
             Accessible.name:modelData.name+", position "+(index+1)+". Alt Up or Alt Down to reorder."
-            function command(){return "dockrail apps move "+appId}
+            function command(){return "dockrail apps unpin "+Registry.shellQuote(appId)}
             function activate(){root.hovered(pinRow)}
             function adjust(delta){root.movePinned(pinnedId,delta)}
             HoverHandler{onHoveredChanged:if(hovered)root.hovered(pinRow)}
@@ -364,7 +374,7 @@ Item {
             required property var modelData
             readonly property string appId:modelData.id
             width:hiddenBody.width;spacing:Style.space(8)
-            function command(){return "dockrail apps show "+appId}
+            function command(){return "dockrail apps show "+Registry.shellQuote(appId)}
             function activate(){root.notify(root.host.changeApplication("show",{id:appId}))}
             HoverHandler{onHoveredChanged:if(hovered)root.hovered(hiddenRow)}
             Column {
@@ -411,7 +421,12 @@ Item {
             required property var modelData
             readonly property string appId:modelData.desktopId
             width:iconBody.width;spacing:Style.space(5)
-            function command(){return "dockrail icons reset "+appId}
+            function command(){
+              var result="dockrail icons reset "+Registry.shellQuote(appId)
+              if(modelData.kind==="profile")result+=" --profile "+Registry.shellQuote(modelData.profileKey)
+              if(modelData.kind==="window")result+=" --title-pattern "+Registry.shellQuote(modelData.titlePattern)
+              return result
+            }
             function activate(){root.requestIconChange(modelData)}
             HoverHandler{onHoveredChanged:if(hovered)root.hovered(iconRow)}
             Text {
