@@ -176,8 +176,9 @@ Item {
   }
   function closeAppPickerFromSettings() {
     // Standalone PopupWindow does not follow KeyboardPanel visibility.
-    // Destroy this Settings-only instance to avoid orphaned dialogs.
-    settingsAppPickerLoader.active=false
+    // In source-only writer tests the UI Loader is deliberately absent.
+    if(typeof settingsAppPickerLoader !== "undefined" && settingsAppPickerLoader)
+      settingsAppPickerLoader.active=false
   }
   function openAppPickerFromSettings() {
     if(!settingsPanel.panelOpen || !settingsAnchor) return false
