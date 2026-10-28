@@ -73,7 +73,7 @@ Item {
   signal focusSections()
   signal reveal(var item)
   signal openAppPicker()
-  signal openIconEditor(var item)
+  signal requestIconChange(var item)
   signal requestShowAll()
   implicitHeight: stack.implicitHeight
   width: parent ? parent.width : 470
@@ -412,7 +412,7 @@ Item {
             readonly property string appId:modelData.desktopId
             width:iconBody.width;spacing:Style.space(5)
             function command(){return "dockrail icons reset "+appId}
-            function activate(){root.openIconEditor(modelData)}
+            function activate(){root.requestIconChange(modelData)}
             HoverHandler{onHoveredChanged:if(hovered)root.hovered(iconRow)}
             Text {
               text:iconRow.modelData.name;textFormat:Text.PlainText
