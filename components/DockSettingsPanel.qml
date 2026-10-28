@@ -67,6 +67,7 @@ Item {
   }
   function close() {
     if (!panelOpen) return
+    dismissAppsPopups()
     if (layoutSection) layoutSection.cancelPending()
     if (appearanceSection) appearanceSection.cancelPending()
     if (behaviorSection) behaviorSection.cancelPending()
@@ -77,8 +78,16 @@ Item {
     if (root.host && root.host.releaseSettingsPanel)
       root.host.releaseSettingsPanel(root)
   }
+  function dismissAppsPopups() {
+    // The confirmation belongs to the persistent KeyboardPanel, not
+    // the Apps Loader. Close both owners before changing sections.
+    showAllConfirm.opened = false
+    if (appsLoader.item) appsLoader.item.awaitingShowAll = false
+    if (host.closeAppPickerFromSettings) host.closeAppPickerFromSettings()
+  }
   function selectSection(id) {
     if (Registry.order.indexOf(id) < 0) return false
+    if (selectedSection === "apps" && id !== selectedSection) dismissAppsPopups()
     if (selectedSection === "sidebar-widgets" && id !== selectedSection) widgetsSection.cancelPending()
     if (selectedSection === "apps" && id !== selectedSection && appsLoader.item) appsLoader.item.cancelPending()
     selectedSection = id
@@ -401,7 +410,7 @@ Item {
             message:"Show all hidden applications? This will make every hidden app visible without changing pinned apps."
             confirmText:"Show all"
             Keys.onPressed:function(event){if(handleKey(event))event.accepted=true}
-            onCanceled:{opened=false;if(appsLoader.item)appsLoader.item.awaitingShowAll=false;keyboard.forceActiveFocus()}
+            onCanceled:{root.dismissAppsPopups();keyboard.forceActiveFocus()}
             onConfirmed:{opened=false;if(appsLoader.item)appsLoader.item.confirmShowAll();keyboard.forceActiveFocus()}
           }
         }
