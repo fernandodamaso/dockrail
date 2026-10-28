@@ -150,6 +150,49 @@ Item {
   property int iconReloadRevision: 0
   // Menus may cache popup instances, but only one editor owns a live session.
   property var activeIconDialog: null
+
+  // Reuse the exact app picker and Change Icon dialog used by dock menus.
+  // Settings never owns a second artwork editor or application-list writer.
+  LazyLoader {
+    id:settingsAppPickerLoader
+    active:false
+    DockAppPicker {
+      anchorItem:root.settingsAnchor
+      position:root.settingsPanel.anchorPosition
+      pinned:root.settings.pinned || []
+      iconOverrides:root.settings.iconOverrides || ({})
+      iconReloadRevision:root.iconReloadRevision
+      onApplicationSelected:function(desktopId) {
+        root.settingsPanel.reportWrite(root.pinApplication(desktopId))
+      }
+    }
+  }
+  LazyLoader {
+    id:settingsIconDialogLoader
+    active:false
+    DockIconDialog {mutationController:root}
+  }
+  function openAppPickerFromSettings() {
+    if(!settingsPanel.panelOpen || !settingsAnchor) return false
+    settingsAppPickerLoader.active=true
+    return !!settingsAppPickerLoader.item && (settingsAppPickerLoader.item.open(),true)
+  }
+  function openIconFromSettings(item) {
+    if(!settingsPanel.panelOpen || !settingsAnchor || !item || !item.desktopId) return false
+    var options={
+      anchorItem:settingsAnchor,position:settingsPanel.anchorPosition,
+      desktopId:item.desktopId,appName:item.name||item.desktopId,
+      profileKey:item.profileKey||"",profileName:item.profileKey||"",
+      appId:item.appId||"",existingTitlePattern:item.kind==="window"?item.titlePattern:"",
+      specificWindow:false
+    }
+    settingsIconDialogLoader.active=true
+    return !!settingsIconDialogLoader.item && settingsIconDialogLoader.item.openFor(options)
+  }
+  function windowIconTargetKey(appId,pattern) {
+    return DockIconModel.windowRuleKey(appId,pattern)
+  }
+
   readonly property bool iconDialogActive: root.activeIconDialog !== null
     && root.activeIconDialog.dialogActive === true
 
