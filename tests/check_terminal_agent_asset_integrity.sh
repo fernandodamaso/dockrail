@@ -27,10 +27,11 @@ ids=(
   smartdock-agent-claude-code
   smartdock-agent-kilo-code
   smartdock-agent-cline
+  smartdock-agent-herdr
 )
 
-commands=(pi omp commandcode cursor-agent claude kilo cline)
-extensions=(png svg svg svg svg svg svg)
+commands=(pi omp commandcode cursor-agent claude kilo cline herdr)
+extensions=(png svg svg svg svg svg svg svg)
 window_classes=(
   io.github.fernandodamaso.smartdock.agent.pi
   io.github.fernandodamaso.smartdock.agent.oh-my-pi
@@ -39,6 +40,7 @@ window_classes=(
   io.github.fernandodamaso.smartdock.agent.claude-code
   io.github.fernandodamaso.smartdock.agent.kilo-code
   io.github.fernandodamaso.smartdock.agent.cline
+  io.github.fernandodamaso.smartdock.agent.herdr
 )
 
 assert_file "$asset_dir/ATTRIBUTIONS.md"
@@ -50,6 +52,7 @@ assert_contains "$asset_dir/ATTRIBUTIONS.md" 'https://dashboardicons.com/icons/c
 assert_contains "$asset_dir/ATTRIBUTIONS.md" 'https://dashboardicons.com/icons/kilo-code'
 assert_contains "$asset_dir/ATTRIBUTIONS.md" 'https://dashboardicons.com/icons/cline'
 assert_contains "$asset_dir/ATTRIBUTIONS.md" 'redistribution terms are uncertain'
+assert_contains "$asset_dir/ATTRIBUTIONS.md" 'original Dockrail artwork'
 assert_contains "$asset_dir/ATTRIBUTIONS.md" 'trademark'
 
 for i in "${!ids[@]}"; do

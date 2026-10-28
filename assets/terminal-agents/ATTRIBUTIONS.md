@@ -99,6 +99,15 @@ respective owners. These launchers do not imply sponsorship or endorsement.
 - Cline and related names/marks may be trademarks of their respective owners.
   This bundle does not imply endorsement.
 
+## Herdr
+
+- Bundled file: `smartdock-agent-herdr.svg`
+- The geometric H/rail emblem is original Dockrail artwork created for this
+  launcher, not traced from a Herdr product logo.
+- Distributed under this repository's license.
+- Herdr's name and marks remain the property of their respective owners; this
+  launcher does not imply endorsement.
+
 ## General caveat
 
 License information above describes the source repository or catalogue where it
