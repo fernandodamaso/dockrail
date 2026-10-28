@@ -18,7 +18,7 @@ function canonicalApplicationId(value) {
   return DockIconModel.normalizeKey(value)
 }
 
-function valueError(value, spec) {
+function valueError(value, spec, retainedIds) {
   if (spec.type === "boolean" && typeof value !== "boolean") return "Expected a boolean"
   if (spec.type === "string") {
     if (typeof value !== "string") return "Expected a string"
@@ -40,7 +40,7 @@ function valueError(value, spec) {
   if (spec.type === "array") {
     if (!Array.isArray(value)) return "Expected an array"
     if (spec.format === "sidebar-widget-ids")
-      return SidebarWidgetModel.idsError(value, spec.registeredIds)
+      return SidebarWidgetModel.idsError(value, spec.registeredIds, retainedIds)
     if (spec.format === "workspace-groups")
       return DockWorkspaceGroupModel.workspaceGroupsError(value)
     if (spec.format === "application-ids") {
@@ -126,7 +126,7 @@ function valueError(value, spec) {
   return ""
 }
 
-function validatePatch(patch, schema) {
+function validatePatch(patch, schema, current) {
   var errors = []
   if (!isObject(patch)) return { ok: false, errors: [{ key: "", message: "Patch must be a JSON object" }] }
   var keys = Object.keys(patch)
@@ -137,7 +137,8 @@ function validatePatch(patch, schema) {
         || !own(schema.settings, key)) error = "Unknown or reserved setting"
     else if (key === "groupWindows" && patch[key] === true)
       error = "Global grouping is deprecated and inactive; use workspaceGroups or the local Group Windows action"
-    else error = valueError(patch[key], schema.settings[key])
+    else error = valueError(patch[key], schema.settings[key],
+      key === "sidebarWidgets" && current ? current.sidebarWidgets : undefined)
     if (error) errors.push({ key: key, message: error })
   }
   return { ok: errors.length === 0, errors: errors }
@@ -156,7 +157,7 @@ function withPatch(current, patch) {
 }
 
 function applyPatch(current, patch, schema) {
-  var result = validatePatch(patch, schema)
+  var result = validatePatch(patch, schema, current)
   if (result.ok) return withPatch(current, patch)
   result.changedKeys = []
   return result

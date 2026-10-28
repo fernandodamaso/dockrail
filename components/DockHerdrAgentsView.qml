@@ -1,7 +1,9 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "DockSidebarModel.js" as SidebarModel
 import "DockHerdrModel.js" as HerdrModel
+import "DockSidebarWidgetModel.js" as WidgetModel
 
 // Snapshot-only presentation. It never acquires a provider, starts a process,
 // subscribes to Herdr or emits desktop notifications. Matched sessions (live or
@@ -39,14 +41,14 @@ Item {
     return set
   }
   readonly property var servers: {
-    var all = snapshot && Array.isArray(snapshot.servers) ? snapshot.servers : []
+    var all = WidgetModel.listLike(snapshot.servers) || []
     return all.filter(function(server) {
       return server && typeof server === "object"
         && root.matchedIdSet[String(server.id || "")] !== true
     })
   }
   readonly property var agents: {
-    var all = snapshot && Array.isArray(snapshot.agents) ? snapshot.agents : []
+    var all = WidgetModel.listLike(snapshot.agents) || []
     return all.filter(function(agent) {
       return agent && typeof agent === "object"
         && root.matchedIdSet[String(agent.serverId || "")] !== true
@@ -180,7 +182,7 @@ Item {
       width: 8
       height: 8
       radius: 4
-      color: Color.foreground
+      color: Commons.Color.foreground
       opacity: root.unmatchedBlocked > 0 ? 1.0 : 0.55
     }
 
@@ -190,7 +192,7 @@ Item {
       width: Math.max(0, parent.width - 42)
       text: root.summary()
       textFormat: Text.PlainText
-      color: Color.foreground
+      color: Commons.Color.foreground
       font.family: Style.font.family
       font.pixelSize: Style.font.body
       elide: Text.ElideRight
@@ -221,7 +223,7 @@ Item {
           width: Math.max(0, parent.width - 20)
           text: root.summary()
           textFormat: Text.PlainText
-          color: Color.foreground
+          color: Commons.Color.foreground
           font.family: Style.font.family
           font.pixelSize: Style.font.body
           font.weight: Font.DemiBold
@@ -250,7 +252,7 @@ Item {
             width: 7
             height: 7
             radius: 4
-            color: Color.foreground
+            color: Commons.Color.foreground
             opacity: root.dotOpacity(modelData.status)
           }
 
@@ -266,7 +268,7 @@ Item {
               anchors.fill: parent
               visible: detailRow.animatedWorking
               active: visible
-              tint: Color.accent
+              tint: Commons.Color.accent
             }
 
             Rectangle {
@@ -275,7 +277,7 @@ Item {
               width: 7
               height: 7
               radius: 4
-              color: Color.foreground
+              color: Commons.Color.foreground
               opacity: root.dotOpacity(modelData.status)
             }
           }
@@ -290,7 +292,7 @@ Item {
               width: parent.width
               text: modelData.title
               textFormat: Text.PlainText
-              color: Color.foreground
+              color: Commons.Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.body
               font.weight: modelData.kind === "session"
@@ -303,7 +305,7 @@ Item {
               width: parent.width
               text: modelData.detail
               textFormat: Text.PlainText
-              color: Color.foreground
+              color: Commons.Color.foreground
               opacity: 0.6
               font.family: Style.font.family
               font.pixelSize: Math.max(10, Style.font.body - 2)

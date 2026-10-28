@@ -19,8 +19,11 @@ function argumentsFor(action, data) {
   // name, shell string or unvalidated input can be supplied by an editor.
   if (action === "create" && validId(args.id) && validName(args.name))
     return ["create","--id",args.id,"--name",args.name]
-  if (["prepare-install","install"].indexOf(action) >= 0 && validSource(args.source))
+  if (action === "prepare-install" && validSource(args.source))
     return [action,"--source",args.source]
+  if (action === "install" && validSource(args.source) && args.manifest
+      && validId(args.manifest.id) && validName(args.manifest.name))
+    return [action,"--source",args.source,"--expected-manifest",JSON.stringify(args.manifest)]
   if (["launchers-add","launchers-remove"].indexOf(action) >= 0)
     return [action]
   return null

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: root
@@ -41,9 +42,9 @@ Item {
     radius: Math.min(7, Style.cornerRadius)
     color: root.kind === "error" ? semanticPalette.surface("danger", 0.063)
       : root.kind === "stale" ? semanticPalette.surface("warning", 0.063)
-      : Util.alpha(Color.foreground, 0.025)
+      : Util.alpha(Commons.Color.foreground, 0.025)
     border.width: 1
-    border.color: Util.alpha(Color.foreground, 0.08)
+    border.color: Util.alpha(Commons.Color.foreground, 0.08)
   }
 
   Column {

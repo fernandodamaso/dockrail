@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import QtQuick.Shapes
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "DockSidebarInteractionModel.js" as InteractionModel
 
@@ -359,10 +360,10 @@ Item {
           Rectangle {
             anchors.fill: parent
             radius: root.appearance.cardRadius
-            color: pinPress.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
+            color: pinPress.pressed ? Style.pressedFillFor(Commons.Color.foreground, Commons.Color.accent)
               : (pinHover.hovered
                   || (pinCell.activeFocus && !pinCell.mouseFocused))
-                ? Style.hoverFillFor(Color.foreground, Color.accent)
+                ? Style.hoverFillFor(Commons.Color.foreground, Commons.Color.accent)
                 : Style.normalFill
             Behavior on color {
               enabled: root.animationsEnabled
@@ -489,13 +490,13 @@ Item {
         height: 13
         iconName: "plus"
         iconSize: 13
-        tint: Color.foreground
+        tint: Commons.Color.foreground
       }
       Shape {
         anchors.fill: parent
         enabled: false
         ShapePath {
-          strokeColor: Util.alpha(Color.foreground, 0.28)
+          strokeColor: Util.alpha(Commons.Color.foreground, 0.28)
           strokeWidth: 1
           strokeStyle: ShapePath.DashLine
           dashPattern: [4, 3]
@@ -543,7 +544,7 @@ Item {
     Ui.BorderSurface {
       id: overflowSurface
       anchors.fill: parent
-      color: Color.menu.background
+      color: Commons.Color.menu.background
       borderSpec: Border.none()
       radius: Style.cornerRadius
       clip: true
@@ -603,7 +604,7 @@ Item {
                 width: Style.space(18)
                 height: width
                 roundedArtwork: false
-                badgeRingColor: Color.menu.background
+                badgeRingColor: Commons.Color.menu.background
                 desktopId: hiddenPin.desktopId
                 desktopIcon: hiddenPin.entry ? String(hiddenPin.entry.icon || "") : ""
                 iconOverrides: root.controller.settings.iconOverrides || ({})
@@ -619,7 +620,7 @@ Item {
                 text: String(hiddenPin.modelData.label || hiddenPin.desktopId)
                 textFormat: Text.PlainText
                 elide: Text.ElideRight
-                color: Color.menu.text
+                color: Commons.Color.menu.text
                 font.family: Style.font.family
                 font.pixelSize: Style.font.bodySmall
               }

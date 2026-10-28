@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import TestCase, mock
 import tempfile
+import json
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location(
@@ -28,8 +29,10 @@ class FakeStore:
     def create(self, widget_id, name):
         self.calls.append(('create', widget_id, name))
         return {'id': widget_id, 'name': name, 'sourcePath': str(self.base / widget_id)}
-    def install(self, source):
-        self.calls.append(('install', source))
+    def install(self, source, *, expected_manifest=None):
+        if (self.root / expected_manifest['id']).exists():
+            raise actions.WidgetError('E_CONFLICT','Already installed')
+        self.calls.append(('install', source, expected_manifest))
         return {'id': 'sample.widget', 'name': 'Sample', 'enabled': False}
 
 
@@ -59,16 +62,16 @@ class SettingsTypedActionsTests(TestCase):
                 self.assertEqual(confirmation['source'], source)
                 self.assertTrue(confirmation['requiresConfirmation'])
                 self.assertFalse(confirmation['replacesExisting'])
-                outcome = actions.execute('install', source=source, store=store)
+                outcome = actions.execute('install', source=source, expected_manifest=confirmation['manifest'], store=store)
                 self.assertFalse(outcome['data']['enabledBySettings'])
-                self.assertIn(('install',source),store.calls)
+                self.assertIn(('install',source,confirmation['manifest']),store.calls)
                 store.root.mkdir()
                 (store.root / 'sample.widget').mkdir()
                 blocked = actions.execute('prepare-install', source=source, store=store)['data']['confirmation']
                 self.assertTrue(blocked['replacesExisting'])
                 self.assertFalse(blocked['canInstall'])
                 with self.assertRaises(actions.WidgetError) as rejection:
-                    actions.execute('install', source=source, store=store)
+                    actions.execute('install', source=source, expected_manifest=confirmation['manifest'], store=store)
                 self.assertEqual(rejection.exception.code, 'E_CONFLICT')
             for source in ('widget', '/tmp/new\nother', '--delete-all'):
                 with self.assertRaises(actions.WidgetError):
@@ -95,3 +98,36 @@ class SettingsTypedActionsTests(TestCase):
             self.assertEqual(err.exception.code,'E_UNAVAILABLE')
             with self.assertRaises(actions.WidgetError):
                 actions.execute('sh -c evil',store=store,launcher_runner=runner)
+
+
+class SettingsInstallReviewTests(TestCase):
+    def test_install_without_review_is_rejected(self):
+        with tempfile.TemporaryDirectory() as base:
+            with self.assertRaises(actions.WidgetError) as caught:
+                actions.execute('install', source=base, store=FakeStore(base))
+            self.assertEqual(caught.exception.code, 'E_CONFIRMATION')
+
+    def test_changed_manifest_requires_new_review_without_installing(self):
+        with tempfile.TemporaryDirectory() as base:
+            root = Path(base)
+            source = root / 'source'
+            source.mkdir()
+            manifest = {'apiVersion':1,'id':'sample.widget','name':'Sample',
+                        'version':'0.1.0','entry':'Widget.qml','icon':'cloud'}
+            (source / 'Widget.qml').write_text('import QtQuick\nItem { property var widgetContext: ({}) }\n')
+            (source / 'widget.json').write_text(json.dumps(manifest))
+            store = actions.Store(bundle=ROOT, home=root/'home', data_home=root/'data',
+                                  config_home=root/'config', qml_import_paths=[ROOT/'tests/qml-imports'])
+            reviewed = actions.execute('prepare-install', source=str(source), store=store)['data']['confirmation']
+            manifest['id'] = 'different.widget'
+            (source / 'widget.json').write_text(json.dumps(manifest))
+            with self.assertRaises(actions.WidgetError) as caught:
+                actions.execute('install', source=str(source), expected_manifest=reviewed['manifest'], store=store)
+            self.assertEqual(caught.exception.code, 'E_STALE')
+            self.assertFalse((store.root/'different.widget').exists())
+            self.assertFalse((store.root/'sample.widget').exists())
+            (source / 'widget.json').write_text(json.dumps(reviewed['manifest']))
+            installed = actions.execute('install', source=str(source), expected_manifest=reviewed['manifest'], store=store)
+            self.assertTrue(installed['ok'])
+            self.assertFalse(installed['data']['package']['enabled'])
+            self.assertTrue((store.root/'sample.widget').is_dir())

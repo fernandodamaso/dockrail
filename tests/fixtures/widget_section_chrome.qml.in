@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "@@COMPONENTS@@"
 import "@@COMPONENTS@@/widgets"

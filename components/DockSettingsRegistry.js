@@ -116,3 +116,12 @@ function shellQuote(value) { return "'" + String(value).replace(/'/g, "'\\''") +
 function cliCommand(key, value) {
   return "dockrail config set " + key + " " + shellQuote(JSON.stringify(value))
 }
+
+function displayValue(ui, value) {
+  if (typeof value !== "number" || !isFinite(value))
+    return String(value === undefined ? "" : value) + ((ui && ui.unit) || "")
+  var scale = ui && typeof ui.displayScale === "number" ? ui.displayScale : 1
+  var scaled = Math.round(value * scale * 1000) / 1000
+  return (ui && ui.unit === "×" ? scaled.toFixed(2) : String(scaled))
+    + ((ui && ui.unit) || "")
+}

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Ui as Ui
 import qs.Commons
+import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 import "DockScreenPresentationModel.js" as ScreenModel
 
@@ -119,7 +120,7 @@ Item {
     id: stack
     width: parent.width
     spacing: Style.space(14)
-    Text { text:"Layout"; font.family:Style.font.family; font.pixelSize:Style.font.title; font.bold:true; color:Color.foreground }
+    Text { text:"Layout"; font.family:Style.font.family; font.pixelSize:Style.font.title; font.bold:true; color:Commons.Color.foreground }
     Repeater {
       id: cards
       onItemAdded: root.navigationRevision++
@@ -138,8 +139,8 @@ Item {
         property alias singleRail: singleRail
         width: stack.width
         height: cardBody.implicitHeight + Style.space(24)
-        color: Qt.tint(Color.background, Util.alpha(Color.foreground,0.035))
-        borderSpec: Border.surfaceSpec("popups","border",Util.alpha(Color.foreground,0.15),1)
+        color: Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground,0.035))
+        borderSpec: Border.surfaceSpec("popups","border",Util.alpha(Commons.Color.foreground,0.15),1)
         radius: Style.cornerRadius
         Column {
           id: cardBody
@@ -149,13 +150,13 @@ Item {
           Row {
             width:parent.width
             spacing:Style.space(8)
-            DockLucideIcon { width:18; height:18; iconSize:18; tint:Color.foreground; iconName:card.isDisplays?"monitor":card.isSidebar?"panel-left-open":"panel-bottom" }
+            DockLucideIcon { width:18; height:18; iconSize:18; tint:Commons.Color.foreground; iconName:card.isDisplays?"monitor":card.isSidebar?"panel-left-open":"panel-bottom" }
             Text {
               width:parent.width-Style.space(112)
               text: card.isDisplays?"Displays":card.isSidebar?"Sidebar":"Classic dock"
-              wrapMode:Text.WordWrap; color:Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body; font.bold:true
+              wrapMode:Text.WordWrap; color:Commons.Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body; font.bold:true
             }
-            Text {text:card.isClassic&&!root.classicUsed?"Not in use":""; width:Style.space(70); horizontalAlignment:Text.AlignRight; color:Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.caption}
+            Text {text:card.isClassic&&!root.classicUsed?"Not in use":""; width:Style.space(70); horizontalAlignment:Text.AlignRight; color:Commons.Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.caption}
           }
           Repeater {
             id: monitors
@@ -182,7 +183,7 @@ Item {
               }
               function activate() {adjust(1)}
               function command() {return Registry.cliCommand("presentationModeByMonitor",root.host.settings.presentationModeByMonitor)}
-              Text { text:monitor.entry.connector; color:root.selectedTarget===monitor&&root.cursorActive?Color.accent:Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body }
+              Text { text:monitor.entry.connector; color:root.selectedTarget===monitor&&root.cursorActive?Commons.Color.accent:Commons.Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body }
               Ui.ButtonGroup {
                 value:root.monitorCount===1?monitor.entry.mode:Registry.monitorChoice(root.host.settings,monitor.entry.connector)
                 options:root.monitorCount===1?[{value:"classic",label:"Classic dock"},{value:"sidebar",label:"Sidebar"}]:[{value:"default",label:"Default"},{value:"classic",label:"Classic dock"},{value:"sidebar",label:"Sidebar"}]
@@ -191,7 +192,7 @@ Item {
                 onActiveFocusChanged: if(activeFocus) monitor.beginEdit()
                 onChanged: mode => monitor.choose(mode)
               }
-              Text {visible:root.monitorCount>=2&&Registry.monitorChoice(root.host.settings,monitor.entry.connector)==="default"; text:"Default → "+monitor.entry.mode; color:Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.caption}
+              Text {visible:root.monitorCount>=2&&Registry.monitorChoice(root.host.settings,monitor.entry.connector)==="default"; text:"Default → "+monitor.entry.mode; color:Commons.Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.caption}
               Ui.Toggle {
                 id:rail
                 width:parent.width
@@ -284,7 +285,7 @@ Item {
               Item {
                 id:grip
                 width:Style.space(30); height:parent.height
-                Text {anchors.centerIn:parent; text:"↕"; color:Color.foreground}
+                Text {anchors.centerIn:parent; text:"↕"; color:Commons.Color.foreground}
                 MouseArea {
                   anchors.fill:parent
                   cursorShape:Qt.SizeVerCursor
@@ -300,6 +301,6 @@ Item {
         }
       }
     }
-    Text {visible:root.feedback!==""; width:parent.width; text:root.feedback; wrapMode:Text.WordWrap; color:Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.caption}
+    Text {visible:root.feedback!==""; width:parent.width; text:root.feedback; wrapMode:Text.WordWrap; color:Commons.Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.caption}
   }
 }

@@ -263,8 +263,12 @@ assert.match(managerSource, /Ui\.PopupCard\s*\{[\s\S]*?id:\s*managerPopup/,
 assert.match(managerSource, /triggerMode:\s*"click"/,
   'Widget manager must use Omarchy outside-click dismissal');
 assert.match(managerSource,
-  /WidgetModel\.manageableRows\(\s*controller\.widgetRegistry, controller\.widgetIds\)/,
-  'manager must retain enabled unavailable integrations for removal');
+  /SettingsWidgets\.rows\(\s*controller\.widgetRegistry, controller\.widgetIds/,
+  'manager must use the ordered Settings inventory, retaining enabled unavailable integrations');
+assert.match(managerSource, /return row\.registered/,
+  'manager shows registered Widgets only, never a synthetic unknown installation');
+assert.doesNotMatch(managerSource, /WidgetModel\.manageableRows\(\s*controller\.widgetRegistry/,
+  'installed but initially disabled Herdr must remain visible for discoverability');
 assert.match(managerSource, /contentHeight:\s*managerPopup\.fittedContentHeight/,
   'Widget manager must size to content instead of reserving a fixed tall window');
 assert.match(managerSource, /Ui\.ToggleSwitch\s*\{/,

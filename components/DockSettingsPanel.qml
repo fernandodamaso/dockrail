@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Ui as Ui
 import qs.Commons
+import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 
 // One host-owned KeyboardPanel, never a delegate-owned preferences editor.
@@ -26,6 +27,10 @@ Item {
   property int savedRevision: 0
   property string focusPane: "sections"
   readonly property alias layoutView: layoutSection
+  readonly property var activeSectionView: selectedSection === "layout" ? layoutSection
+    : selectedSection === "appearance" ? appearanceSection
+    : selectedSection === "behavior" ? behaviorSection
+    : selectedSection === "sidebar-widgets" ? widgetsSection : null
   readonly property alias keyCatcher: keyboard
   TextEdit { id: clipboard; visible: false }
 
@@ -61,7 +66,10 @@ Item {
   }
   function close() {
     if (!panelOpen) return
-    if (layoutSection && layoutSection.cancelPending) layoutSection.cancelPending()
+    if (layoutSection) layoutSection.cancelPending()
+    if (appearanceSection) appearanceSection.cancelPending()
+    if (behaviorSection) behaviorSection.cancelPending()
+    if (widgetsSection) widgetsSection.cancelPending()
     panelOpen = false
     showHelp = false
     if (root.host && root.host.releaseSettingsPanel)
@@ -69,10 +77,14 @@ Item {
   }
   function selectSection(id) {
     if (Registry.order.indexOf(id) < 0) return false
+    if (selectedSection === "sidebar-widgets" && id !== selectedSection) widgetsSection.cancelPending()
     selectedSection = id
     focusPane = "sections"
     lastSection = id
     return true
+  }
+  function sectionImplemented(id) {
+    return ["appearance","layout","behavior","sidebar-widgets"].indexOf(id) >= 0
   }
   function reportWrite(outcome) {
     var result = Registry.writeOutcome(outcome)
@@ -116,13 +128,12 @@ Item {
     focusTarget: keyboard
     Ui.PanelKeyCatcher {
       id: keyboard
-      Shortcut { sequence: "Alt+Up"; enabled: root.panelOpen && root.selectedSection === "layout" && root.focusPane === "settings"; onActivated: layoutSection.reorderSelected(-1) }
-      Shortcut { sequence: "Alt+Down"; enabled: root.panelOpen && root.selectedSection === "layout" && root.focusPane === "settings"; onActivated: layoutSection.reorderSelected(1) }
-      width: panel.contentWidth
-      height: panel.contentHeight
-      blocked: layoutSection.popupOpen || layoutSection.editorFocused
+      Shortcut { sequence: "Alt+Up"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(-1) }
+      Shortcut { sequence: "Alt+Down"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(1) }
+      anchors.fill: parent
+      blocked: !!root.activeSectionView && (root.activeSectionView.popupOpen || root.activeSectionView.editorFocused)
       onCloseRequested: {
-        if (layoutSection.dismissEditor()) return
+        if (root.activeSectionView && root.activeSectionView.dismissEditor()) return
         if (root.showHelp) {root.showHelp=false;return}
         root.close()
       }
@@ -132,20 +143,21 @@ Item {
             var next = Registry.order.indexOf(root.selectedSection) + dy
             root.selectSection(Registry.order[Math.max(0,Math.min(Registry.order.length-1,next))])
           }
-        } else if (root.selectedSection === "layout") {
-          if (dy) layoutSection.moveCursor(dy)
-          else layoutSection.adjust(dx)
+        } else if (root.activeSectionView) {
+          if (dy) root.activeSectionView.moveCursor(dy)
+          else root.activeSectionView.adjust(dx)
         }
       }
-      onActivateRequested: if (root.focusPane === "settings" && root.selectedSection === "layout") layoutSection.activate()
+      onActivateRequested: if (root.focusPane === "settings" && root.activeSectionView) root.activeSectionView.activate()
       onTabRequested: function(direction) {
         root.focusPane = root.focusPane === "sections" ? "settings" : "sections"
-        if(root.focusPane === "settings") layoutSection.focusTarget(layoutSection.cursor)
+        if(root.focusPane === "settings" && root.activeSectionView)
+          root.activeSectionView.focusTarget(root.activeSectionView.cursor)
       }
       onTextKey: function(key) {
         if (key === "?") root.showHelp = !root.showHelp
-        else if (key === "c" && root.focusPane === "settings" && root.selectedSection === "layout") {
-          clipboard.text = layoutSection.copyCommand()
+        else if (key === "c" && root.focusPane === "settings" && root.activeSectionView) {
+          clipboard.text = root.activeSectionView.copyCommand()
           clipboard.selectAll(); clipboard.copy()
         } else if (key === "/") root.rowFeedback = "Search will be available in SET-08."
       }
@@ -162,7 +174,7 @@ Item {
             font.family: Style.font.family
             font.pixelSize: Style.font.title
             font.bold: true
-            color: Color.foreground
+            color: Commons.Color.foreground
             width: navigation.width
             wrapMode: Text.WordWrap
           }
@@ -197,7 +209,7 @@ Item {
             spacing: Style.space(12)
             Text {
               text: root.saveLabel === "Saved" && root.savedRevision === 0 ? "" : root.saveLabel
-              color: Color.foreground
+              color: Commons.Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
             }
@@ -217,7 +229,7 @@ Item {
             width: parent.width
             text: "Configuration is invalid. Repair it outside Settings before editing."
             wrapMode: Text.WordWrap
-            color: Color.foreground
+            color: Commons.Color.foreground
           }
           Text {
             id: feedbackText
@@ -225,7 +237,7 @@ Item {
             text: root.rowFeedback
             wrapMode: Text.WordWrap
             width: parent.width
-            color: Color.foreground
+            color: Commons.Color.foreground
           }
           Text {
             id: helpText
@@ -238,7 +250,7 @@ Item {
             width: parent.width
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
-            color: Color.foreground
+            color: Commons.Color.foreground
           }
           Flickable {
             id: settingsScroll
@@ -268,18 +280,74 @@ Item {
                     settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
                 }
               }
-              Text {
-                visible: root.selectedSection !== "layout"
+              DockSettingsGeneralSection {
+                id: appearanceSection
+                section: "appearance"
+                panelActive: root.panelOpen
                 width: parent.width
-                text: root.selectedSection === "sidebar-widgets"
-                  ? "Sidebar & Widgets controls will be added in SET-05. Layout is available now."
-                  : "This section is reserved for the next Settings implementation ticket."
+                visible: root.selectedSection === "appearance"
+                host: root.host
+                metadata: root.metadata
+                onFocusSettings: root.focusPane = "settings"
+                onFocusSections: { root.focusPane = "sections"; keyboard.forceActiveFocus() }
+                onChanged: root.rowFeedback = ""
+                onReveal: function(item) {
+                  var point = item.mapToItem(layoutHost,0,0)
+                  if (point.y < settingsScroll.contentY) settingsScroll.contentY = point.y
+                  else if (point.y + item.height > settingsScroll.contentY + settingsScroll.height)
+                    settingsScroll.contentY = Math.max(0, point.y + item.height - settingsScroll.height)
+                }
+              }
+              DockSettingsGeneralSection {
+                id: behaviorSection
+                section: "behavior"
+                panelActive: root.panelOpen
+                width: parent.width
+                visible: root.selectedSection === "behavior"
+                host: root.host
+                metadata: root.metadata
+                onFocusSettings: root.focusPane = "settings"
+                onFocusSections: { root.focusPane = "sections"; keyboard.forceActiveFocus() }
+                onChanged: root.rowFeedback = ""
+                onReveal: function(item) {
+                  var point = item.mapToItem(layoutHost,0,0)
+                  if (point.y < settingsScroll.contentY) settingsScroll.contentY = point.y
+                  else if (point.y + item.height > settingsScroll.contentY + settingsScroll.height)
+                    settingsScroll.contentY = Math.max(0, point.y + item.height - settingsScroll.height)
+                }
+              }
+              DockSettingsWidgetsSection {
+                id:widgetsSection
+                width:parent.width
+                panelActive:root.panelOpen
+                visible:root.selectedSection === "sidebar-widgets"
+                host:root.host
+                metadata:root.metadata
+                onFocusSettings:root.focusPane="settings"
+                onFocusSections:{root.focusPane="sections";keyboard.forceActiveFocus()}
+                onChanged:root.rowFeedback=""
+                onOpenFeatures:root.selectSection("features")
+                onReveal:function(item) {
+                  var point=item.mapToItem(layoutHost,0,0)
+                  if(point.y<settingsScroll.contentY) settingsScroll.contentY=point.y
+                  else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
+                    settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
+                }
+              }
+              Text {
+                visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
+                  && root.selectedSection !== "behavior"
+                  && root.selectedSection !== "sidebar-widgets"
+                width: parent.width
+                text: "This section is reserved for the next Settings implementation ticket."
                 wrapMode: Text.WordWrap
                 font.family: Style.font.family
-                color: Color.foreground
+                color: Commons.Color.foreground
               }
               Ui.Button {
-                visible: root.selectedSection !== "layout"
+                visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
+                  && root.selectedSection !== "behavior"
+                  && root.selectedSection !== "sidebar-widgets"
                 text: "Open Layout"
                 onClicked: root.selectSection("layout")
               }

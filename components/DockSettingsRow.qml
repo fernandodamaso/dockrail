@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Ui as Ui
 import qs.Commons
+import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 
 // A canonical schema row. Drafts are interaction snapshots, never preview state.
@@ -28,6 +29,7 @@ Column {
   readonly property var shown: host.shownSetting(key)
   readonly property bool popupOpen: dropdown.popupOpen
   readonly property bool textFocused: number.visible && number.field.activeFocus
+  readonly property bool recoveryFocused: reloadAction.activeFocus || keepAction.activeFocus
   property bool editing: false
   property var expected: null
   property var draft: null
@@ -42,7 +44,6 @@ Column {
   signal hovered()
   signal focusSections()
   spacing: Style.space(6)
-  opacity: editable ? 1 : 0.6
   Accessible.role: Accessible.Grouping
   Accessible.name: ui.label + (conflict ? ", changed while editing" : changedElsewhere ? ", changed elsewhere" : "")
   onCurrentChanged: {
@@ -75,6 +76,7 @@ Column {
     feedback = ""
   }
   function commitDraft() {
+    keyboardCommit.stop()
     if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
     if (!editable && !conflict) return false
     if (!editing) beginEdit()
@@ -85,6 +87,7 @@ Column {
     if (outcome.accepted) {
       editing = false
       conflict = false
+      changedElsewhere = false
       feedback = ""
       edited()
     } else {
@@ -100,18 +103,20 @@ Column {
   }
   function resetToDefault() {
     if (!resettable || defaultValue === undefined) return false
+    keyboardCommit.stop()
     if (!editing) beginEdit()
     if (conflict) { feedback = "Changed while editing. Reload or keep editing."; return false }
     if (writerBusy) { feedback = "Saving… wait for readback before changing another value."; return false }
+    localWrite = true
     var resetIntent = host.resetSettingIntent
       ? host.resetSettingIntent(key, expected)
       : host.saveSettingIntent(key, defaultValue, expected)
-    localWrite = true
     var outcome = Registry.writeOutcome(resetIntent)
     localWrite = false
     if (outcome.accepted) {
       editing = false
       conflict = false
+      changedElsewhere = false
       feedback = ""
       edited()
     } else {
@@ -126,6 +131,7 @@ Column {
     if (editing) reloadDraft()
   }
   function adjust(delta) {
+    if (conflict) return
     if (!editable || writerBusy) return
     beginEdit()
     if (ui.control === "toggle") { draft = delta > 0; commitDraft(); return }
@@ -141,8 +147,8 @@ Column {
     }
   }
   function activate() {
+    if (conflict) { reloadAction.forceActiveFocus(); return }
     if (!editable || writerBusy) return
-    if (conflict) return
     if (ui.control === "toggle") commitValue(!current)
     else if (ui.control === "dropdown") { beginEdit(); dropdown.open() }
     else if (ui.control === "number") { beginEdit(); number.field.forceActiveFocus() }
@@ -155,7 +161,8 @@ Column {
   }
   function options() {
     return (spec.enum || []).map(function(value) { return {value:value,
-      label:ui.optionLabels && ui.optionLabels[value] || value} })
+      label:(ui.optionLabels && ui.optionLabels[value] || value)
+        + (ui.destructiveOptions && ui.destructiveOptions.indexOf(value) >= 0 ? " · destructive" : "")} })
   }
   Timer { id: highlight; interval:3000; onTriggered: root.changedElsewhere = false }
   Timer { id: keyboardCommit; interval:400; onTriggered: root.commitDraft() }
@@ -167,37 +174,39 @@ Column {
   }
   Text {
     width: parent.width
+    visible: root.ui.control !== "toggle"
     text: root.ui.label
     wrapMode: Text.WordWrap
     font.family: Style.font.family
     font.pixelSize: Style.font.body
     font.bold: true
-    color: root.hasCursor ? Color.accent : Color.foreground
+    color: root.hasCursor ? Commons.Color.accent : Commons.Color.foreground
   }
   Text {
     width: parent.width
-    visible: text !== ""
+    visible: text !== "" && root.ui.control !== "toggle"
     text: root.ui.help || ""
     wrapMode: Text.WordWrap
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
-    color: Color.foreground
+    color: Commons.Color.foreground
   }
   Text {
     width: parent.width
     visible: !root.dependency.enabled || JSON.stringify(root.current) !== JSON.stringify(root.shown)
     text: !root.dependency.enabled ? root.dependency.reason + "; your choice is kept."
-      : String(root.current) + (root.ui.unit || "") + " → shows " + String(root.shown) + (root.ui.unit || "")
+      : Registry.displayValue(root.ui, root.current) + " → shows " + Registry.displayValue(root.ui, root.shown)
     wrapMode: Text.WordWrap
     font.italic: true
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
-    color: Color.foreground
+    color: Commons.Color.foreground
   }
   Ui.Toggle {
     width: parent.width
     visible: root.ui.control === "toggle"
     label: root.ui.label
+    description: root.ui.help || ""
     checked: root.current === true
     enabled: root.editable
     hasCursor: root.hasCursor
@@ -232,8 +241,8 @@ Column {
           anchors.centerIn: parent
           width: parent.width - Style.space(12)
           spacing: Style.space(8)
-          DockLucideIcon { anchors.horizontalCenter: parent.horizontalCenter; iconName: modelData.icon; iconSize:24; width:24; height:24; tint:Color.foreground }
-          Text { width:parent.width; text:modelData.label; horizontalAlignment:Text.AlignHCenter; wrapMode:Text.WordWrap; color:Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body }
+          DockLucideIcon { anchors.horizontalCenter: parent.horizontalCenter; iconName: modelData.icon; iconSize:24; width:24; height:24; tint:Commons.Color.foreground }
+          Text { width:parent.width; text:modelData.label; horizontalAlignment:Text.AlignHCenter; wrapMode:Text.WordWrap; color:Commons.Color.foreground; font.family:Style.font.family; font.pixelSize:Style.font.body }
         }
       }
     }
@@ -247,7 +256,10 @@ Column {
     value: String(root.current)
     enabled: root.editable
     hasCursor: root.hasCursor
-    onPopupOpenChanged: if (popupOpen) root.beginEdit()
+    onPopupOpenChanged: {
+      if (popupOpen) root.beginEdit()
+      else if (root.editing && !root.conflict) root.reloadDraft()
+    }
     onChanged: value => {
       root.commitValue(value)
       // The native Dropdown assigns its own value during selection.
@@ -288,16 +300,26 @@ Column {
     step: root.spec.effectiveStep || (root.spec.type === "integer" ? 1 : 0.05)
     integer: root.spec.type === "integer"
     enabled: root.editable
-    onDraggingChanged: if (dragging) root.beginEdit()
-    onMoved: value => { root.beginEdit(); root.draft = value }
+    onDraggingChanged: if (dragging) { keyboardCommit.stop(); root.beginEdit() }
+    onMoved: value => { keyboardCommit.stop(); root.beginEdit(); root.draft = value }
     onReleased: value => { root.beginEdit(); root.draft = value; root.commitDraft() }
+  }
+  Text {
+    visible: root.ui.control === "slider"
+    width: parent.width
+    text: Registry.displayValue(root.ui, Number(root.editing ? root.draft : root.current))
+    color: Commons.Color.foreground
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    Accessible.role: Accessible.StaticText
+    Accessible.name: root.ui.label + ": " + text
   }
   Text {
     visible: root.changedElsewhere || root.feedback !== "" || root.writerBusy
     width: parent.width
     text: root.feedback || (root.writerBusy ? "Saving…" : "Changed elsewhere")
     wrapMode: Text.WordWrap
-    color: Color.foreground
+    color: Commons.Color.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     Accessible.role: Accessible.StaticText
@@ -317,7 +339,7 @@ Column {
       text: "Default: " + String(root.defaultValue)
       font.family: Style.font.family
       font.pixelSize: Style.font.caption
-      color: Color.foreground
+      color: Commons.Color.foreground
       wrapMode: Text.WordWrap
       width: Math.max(0, root.width - Style.space(80))
       anchors.verticalCenter: parent.verticalCenter
@@ -326,7 +348,21 @@ Column {
   Row {
     visible: root.conflict
     spacing: Style.space(8)
-    Ui.Button { text:"Reload"; focusable:true; onClicked:root.reloadDraft() }
-    Ui.Button { text:"Keep editing"; focusable:true; onClicked:root.keepEditing() }
+    Ui.Button {
+      id: reloadAction
+      objectName: "row-reload"
+      text: "Reload"
+      focusable: true
+      onClicked: { root.reloadDraft(); root.forceActiveFocus() }
+      Keys.onEscapePressed: { root.reloadDraft(); root.forceActiveFocus() }
+    }
+    Ui.Button {
+      id: keepAction
+      objectName: "row-keep"
+      text: "Keep editing"
+      focusable: true
+      onClicked: { root.keepEditing(); root.forceActiveFocus() }
+      Keys.onEscapePressed: { root.reloadDraft(); root.forceActiveFocus() }
+    }
   }
 }

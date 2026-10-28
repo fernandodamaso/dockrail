@@ -44,9 +44,15 @@ Item {
     if (!item || !item.visible || item.width <= 0 || item.height <= 0) return false
     var window = item.QsWindow.window
     if (!window || !window.screen) return false
-    var connector = entry.connector || window.screen.name
+    var connector = root.settingsAnchorConnector(entry)
     var screen = ScreenPresentationModel.entryFor(currentPresentation(),connector)
     return !!screen && (!entry.mode || screen.mode === entry.mode)
+  }
+  function settingsAnchorConnector(entry) {
+    var item = entry && entry.item
+    var window = item ? item.QsWindow.window : null
+    // The surface Loader assigns its owner after child completion/registration.
+    return window && window.screen ? window.screen.name : String(entry && entry.connector || "")
   }
   // Focused output for keyboard/CLI/IPC summon. Hyprland monitor names match
   // Quickshell screen connectors; fall back to the remembered connector.
@@ -72,6 +78,7 @@ Item {
   }
   function openSettings(anchor, connector, section) {
     var candidates = settingsAnchors.filter(function(entry) { return usableSettingsAnchor(entry) })
+      .map(function(entry) {return {item:entry.item,mode:entry.mode,connector:root.settingsAnchorConnector(entry)}})
     var chosen = null
     if (anchor) {
       chosen = candidates.filter(function(entry) {return entry.item === anchor})[0]
@@ -120,6 +127,9 @@ Item {
   function releaseSettingsPanel(panel) {
     if (panel === settingsSurface) settingsSurface.panelOpen = false
   }
+  // Demo.* entries are visible in Settings only for an explicit development session.
+  readonly property bool settingsDeveloperBuild: typeof Quickshell.env === "function"
+    && String(Quickshell.env("DOCKRAIL_DEV_BUILD") || "") === "1"
   readonly property alias settingsActions: settingsActionBroker
   DockSettingsActions {
     id: settingsActionBroker
@@ -182,7 +192,7 @@ Item {
   // providers. Neither accepts commands, paths, or credentials from settings.
   readonly property var sidebarWidgetRegistry: {
     var registry = {}
-    var demoDescriptors = demoWidgetRegistry.descriptors
+    var demoDescriptors = root.settingsDeveloperBuild ? demoWidgetRegistry.descriptors : ({})
     Object.keys(demoDescriptors).forEach(function(widgetId) {
       registry[widgetId] = demoDescriptors[widgetId]
     })
