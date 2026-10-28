@@ -42,11 +42,11 @@ TestCase {
         sidebarWidgets:[],workspaceLayout:"flat",presentationMode:"classic",
         presentationModeByMonitor:{},sidebarCollapsedByMonitor:{},workspaceMonitorOrder:[]
       })
-      property var featureReadinessBridge: ({
-        lastGoodFeatures:{chromeProfilesTabs:{installation:"installed",runtime:"ready"}},
-        panelVisible:false,
-        focused:function(){}
-      })
+      property QtObject featureReadinessBridge: QtObject {
+        property var lastGoodFeatures: ({chromeProfilesTabs:{installation:"installed",runtime:"ready"}})
+        property bool panelVisible:false
+        function focused() {}
+      }
       property var settingsActions: ({
         inFlight:false,status:"idle",installConfirmation:null,
         cancelInstall:function(){}
