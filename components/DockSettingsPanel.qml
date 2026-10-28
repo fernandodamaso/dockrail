@@ -346,37 +346,42 @@ Item {
                     settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
                 }
               }
+              // A URL-based Loader creates the Apps file in its own component
+              // context. A nested Component under a Bound panel cannot be
+              // instantiated by Loader on Qt 6.4 (the headless runner).
               Loader {
                 id:appsLoader
                 width:parent.width
                 height:item ? item.implicitHeight : 0
                 active:root.selectedSection==="apps"
                 visible:active
-                sourceComponent:Component {
-                  DockSettingsAppsSection {
-                    width:appsLoader.width
-                    panelActive:root.panelOpen
-                    host:root.host
-                    metadata:root.metadata
-                    onFocusSettings:root.focusPane="settings"
-                    onFocusSections:{root.focusPane="sections";keyboard.forceActiveFocus()}
-                    onChanged:root.rowFeedback=""
-                    onOpenAppPicker: {
-                      if(!root.host.openAppPickerFromSettings())
-                        root.rowFeedback="The existing app picker is unavailable."
-                    }
-                    onRequestIconChange:function(item) {
-                      if(!root.host.openIconFromSettings(item))
-                        root.rowFeedback="The Change Icon dialog is unavailable."
-                    }
-                    onRequestShowAll:showAllConfirm.opened=true
-                    onReveal:function(item) {
-                      var point=item.mapToItem(layoutHost,0,0)
-                      if(point.y<settingsScroll.contentY)settingsScroll.contentY=point.y
-                      else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
-                        settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
-                    }
-                  }
+                onActiveChanged: {
+                  if(active) setSource(Qt.resolvedUrl("DockSettingsAppsSection.qml"), {
+                    host:root.host,metadata:root.metadata,panelActive:root.panelOpen
+                  })
+                }
+                onLoaded: if(item) item.panelActive=Qt.binding(function(){return root.panelOpen})
+              }
+              Connections {
+                target:appsLoader.item
+                ignoreUnknownSignals:true
+                function onFocusSettings(){root.focusPane="settings"}
+                function onFocusSections(){root.focusPane="sections";keyboard.forceActiveFocus()}
+                function onChanged(){root.rowFeedback=""}
+                function onOpenAppPicker(){
+                  if(!root.host.openAppPickerFromSettings())
+                    root.rowFeedback="The existing app picker is unavailable."
+                }
+                function onRequestIconChange(item){
+                  if(!root.host.openIconFromSettings(item))
+                    root.rowFeedback="The Change Icon dialog is unavailable."
+                }
+                function onRequestShowAll(){showAllConfirm.opened=true}
+                function onReveal(item){
+                  var point=item.mapToItem(layoutHost,0,0)
+                  if(point.y<settingsScroll.contentY)settingsScroll.contentY=point.y
+                  else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
+                    settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
                 }
               }
               Text {
