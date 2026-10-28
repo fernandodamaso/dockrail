@@ -22,6 +22,7 @@ Item {
   property string dragId: ""
   property var dragExpected: null
   property var dragGrip: null
+  property var muteExpected: null
   property bool reordering: false
   property var confirmSnapshot: []
   property bool awaitingShowAll: false
@@ -42,6 +43,10 @@ Item {
     && host.featureReadinessBridge.lastGoodFeatures.chromeProfilesTabs || ({})
   readonly property bool chromeReady: chromeReadiness.installation === "installed"
     && chromeReadiness.runtime === "ready"
+  readonly property string chromeStatus: !host.featureReadinessBridge.lastGoodFeatures
+    ? "Checking readiness" : chromeReadiness.installation === "missing"
+    ? "Not installed" : chromeReadiness.runtime === "ready" ? "Ready"
+    : chromeReadiness.runtime === "limited" ? "Limited" : "Unavailable"
   readonly property var targets: {
     navigationRevision
     var result = []
@@ -88,9 +93,10 @@ Item {
     if(outcome.accepted) changed()
     return outcome.accepted
   }
-  function write(key,value) {
+  function write(key,value,expected) {
     if(busy) return false
-    return notify(host.saveSettingIntent(key,value,host.settings[key]))
+    return notify(host.saveSettingIntent(key,value,
+      expected === undefined ? host.settings[key] : expected))
   }
   function movePinned(id,delta,expected) {
     if(busy) return false
@@ -113,7 +119,24 @@ Item {
     var args=Apps.dragArguments(host.settings.pinned,id,target)
     if(!args)return false
     selectedAppId=id
-    return notify(host.changeApplication("move",args))
+    reordering=true
+    var accepted=notify(host.changeApplication("move",args))
+    Qt.callLater(function(){root.selectedAppId=id;root.syncCursor();root.reordering=false})
+    return accepted
+  }
+  // Compare actual delegate centers: wrapped names and missing IDs make
+  // pinned rows different heights, so a source-row delta is insufficient.
+  function draggedPinTarget(grip) {
+    if(!grip || !pinnedList.count)return ""
+    var center=grip.mapToItem(pinnedBody,grip.width/2,grip.height/2).y
+    var last=""
+    for(var i=0;i<pinnedList.count;++i) {
+      var row=pinnedList.itemAt(i)
+      if(!row)continue
+      last=row.pinnedId
+      if(center<row.mapToItem(pinnedBody,0,row.height/2).y)return last
+    }
+    return last
   }
   function cancelDrag() {
     if(dragGrip)dragGrip.y=0
@@ -202,6 +225,12 @@ Item {
     commandEditing=false;commandConflict=false;commandFeedback=""
     commandExpected=String(host.settings.controlCommand || "")
     commandDraft=commandExpected
+    // Typing into the native field can break its text binding. Reload,
+    // Reset, and Save must restore canonical host readback visibly.
+    commandField.text=Qt.binding(function(){
+      return root.commandEditing ? root.commandDraft
+        : String(root.host.settings.controlCommand || "")
+    })
   }
   function beginCommand() {
     if(commandEditing)return
@@ -215,24 +244,40 @@ Item {
       commandFeedback="Changed elsewhere. Reload or keep editing."
       return false
     }
+    committingCommand=true
     var result=Registry.writeOutcome(host.saveSettingIntent("controlCommand",
       commandDraft,commandExpected))
+    committingCommand=false
     var error=result.reply && result.reply.error
     if(!result.accepted) {
       commandFeedback=error?error.code+": "+error.message:"Could not save."
       if(error && error.code==="E_STALE")commandConflict=true
       return false
     }
-    committingCommand=true
     reloadCommand()
-    committingCommand=false
     changed()
     return true
   }
   function resetCommand() {
-    if(busy)return false
-    var expected=String(host.settings.controlCommand || "")
-    return notify(host.resetSettingIntent("controlCommand",expected))
+    if(busy || commandConflict) {
+      if(commandConflict)commandFeedback="Changed elsewhere. Reload or keep editing."
+      return false
+    }
+    // Draft reset checks the value seen at edit start, not a newer CLI write.
+    var expected=commandEditing ? commandExpected
+      : String(host.settings.controlCommand || "")
+    committingCommand=true
+    var outcome=Registry.writeOutcome(host.resetSettingIntent("controlCommand",expected))
+    committingCommand=false
+    if(!outcome.accepted) {
+      var error=outcome.reply && outcome.reply.error
+      commandFeedback=error?error.code+": "+error.message:"Could not reset."
+      if(error && error.code==="E_STALE")commandConflict=true
+      return false
+    }
+    reloadCommand()
+    changed()
+    return true
   }
   onPinsChanged: {
     if(dragId)cancelDrag()
@@ -298,9 +343,9 @@ Item {
             width:pinnedBody.width
             spacing:Style.space(7)
             Accessible.role:Accessible.ListItem
-            Accessible.name:modelData.name+", position "+(index+1)+". Alt Up or Alt Down to reorder."
+            Accessible.name:modelData.name+", position "+(index+1)+". Alt Up or Alt Down to reorder. Enter focuses Unpin."
             function command(){return "dockrail apps unpin "+Registry.shellQuote(appId)}
-            function activate(){root.hovered(pinRow)}
+            function activate(){if(unpinButton.enabled)unpinButton.forceActiveFocus()}
             function adjust(delta){root.movePinned(pinnedId,delta)}
             HoverHandler{onHoveredChanged:if(hovered)root.hovered(pinRow)}
             Item {
@@ -318,10 +363,11 @@ Item {
                 }
                 onReleased:{
                   var active=root.dragId===pinRow.pinnedId
-                  var delta=Math.round(grip.y/Math.max(1,pinRow.height))
+                  var target=root.draggedPinTarget(grip)
                   var expected=root.dragExpected
                   root.cancelDrag()
-                  if(active && delta)root.movePinned(pinRow.pinnedId,delta,expected)
+                  if(active && target && target!==pinRow.pinnedId)
+                    root.dropPinned(pinRow.pinnedId,target,expected)
                 }
                 onCanceled:root.cancelDrag()
               }
@@ -466,7 +512,7 @@ Item {
           DockLucideIcon {iconName:"globe";iconSize:16;width:16;height:16;tint:Commons.Color.foreground}
           Text {text:"Chrome";font.bold:true;color:Commons.Color.foreground}
           Text {
-            text:root.chromeReady?"Ready":"Not ready"
+            text:root.chromeStatus
             color:Commons.Color.foreground;opacity:0.9
           }
         }
@@ -505,8 +551,20 @@ Item {
             options:Apps.muteOptions(root.host.settings.browserActivityMutedServices)
             values:root.host.settings.browserActivityMutedServices || []
             enabled:!root.busy && root.chromeReady
+            onPopupOpenChanged: {
+              root.muteExpected=popupOpen
+                ? (root.host.settings.browserActivityMutedServices||[]).slice() : null
+            }
             onChanged:function(values) {
-              root.write("browserActivityMutedServices",values)
+              var expected=root.muteExpected===null
+                ? root.host.settings.browserActivityMutedServices||[] : root.muteExpected
+              if(JSON.stringify(expected)!==JSON.stringify(root.host.settings.browserActivityMutedServices)) {
+                root.feedback="Muted services changed elsewhere. Reopen the list."
+                mutedSelect.close()
+              } else if(root.write("browserActivityMutedServices",values,expected))
+                root.muteExpected=(root.host.settings.browserActivityMutedServices||[]).slice()
+              // MultiSelect changes its own values before emitting changed.
+              // Rebind to the host on either acceptance or rejection.
               mutedSelect.values=Qt.binding(function(){return root.host.settings.browserActivityMutedServices||[]})
             }
           }
@@ -562,7 +620,10 @@ Item {
           enabled:!root.busy
           Accessible.name:"App launcher command"
           onActiveFocusChanged:if(activeFocus){root.beginCommand();root.hovered(commandField)}
-          onTextEdited:root.commandDraft=text
+          onTextEdited:{
+            if(!root.commandEditing)root.beginCommand()
+            root.commandDraft=text
+          }
           onAccepted:root.saveCommand()
         }
         Text {
@@ -589,7 +650,7 @@ Item {
               root.commandConflict=false;root.commandFeedback=""
             }
           }
-          Ui.Button {id:commandReset;text:"Reset";enabled:!root.busy;onClicked:root.resetCommand()}
+          Ui.Button {id:commandReset;text:"Reset";enabled:!root.busy&&!root.commandConflict;onClicked:root.resetCommand()}
         }
         Text {
           text:"Default: "+String(root.host.defaultSetting("controlCommand"))
