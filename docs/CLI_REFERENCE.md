@@ -116,6 +116,8 @@ Setup never runs `controlCommand`, starts a host, changes Chrome flags, restarts
 
 ## Local terminal-agent launchers
 
+The commands `launchers add` and `launchers remove` are local-only.
+
 `dockrail launchers add [--json]` installs launchers for supported commands
 currently on `PATH`: `pi`, `omp`, `commandcode`, `cursor-agent`,
 `claude`, `kilo`, `cline`, and `herdr`. `dockrail launchers remove [--json]`
