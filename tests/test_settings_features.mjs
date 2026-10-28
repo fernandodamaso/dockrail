@@ -59,7 +59,7 @@ assert.equal(model.summary(fake),'1 ready · 1 limited · 2 not set up')
 assert.equal(model.agentSummary(fake.agentLaunchers),'1 of 2 found on this computer')
 assert.equal(model.badge({runtime:'ready',installation:'missing'}),'Not set up')
 assert.equal(model.summary(null),'Checking integrations…')
-assert.deepEqual(model.cards.slice(0,3).map(card=>card.setup),[
+assert.deepEqual(plain(model.cards.slice(0,3).map(card=>card.setup)),[
   'dockrail setup --feature chrome','dockrail setup --feature herdr',
   'dockrail setup --feature launcher-counts'
 ])
