@@ -52,6 +52,15 @@ class WidgetPackagesTest(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_new_packages_use_canonical_root_even_with_legacy_state(self):
+        legacy = self.data / "smartdock/widgets"
+        legacy.mkdir(parents=True)
+        (legacy / ".package.lock").touch()
+        store = widget.Store(bundle=ROOT, home=self.home, data_home=self.data,
+                             config_home=self.config)
+        self.assertEqual(store.root, self.data / "dockrail/widgets")
+        self.assertTrue((legacy / ".package.lock").exists())
+
     def test_manifest_validation(self):
         source = make_package(self.base / "source")
         manifest = widget.validate_manifest(source)

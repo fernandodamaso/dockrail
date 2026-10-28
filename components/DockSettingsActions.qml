@@ -15,6 +15,7 @@ Item {
   property string errorText: ""
   property var result: null
   property var installConfirmation: null
+  property bool installReviewCancelled: false
   property var executor: actionProcess
   readonly property string scriptPath: decodeURIComponent(
     String(Qt.resolvedUrl("../scripts/smartdock_settings_actions.py")).replace(/^file:\/\//, ""))
@@ -36,15 +37,24 @@ Item {
     return {accepted:true, action:actionName}
   }
   function prepareInstall(source) {
+    if (inFlight) return {accepted:false,error:{code:"E_BUSY",message:"An action is already running."}}
+    installReviewCancelled = false
     installConfirmation = null
     return start("prepare-install", {source:source})
   }
+  function cancelInstall() {
+    installConfirmation = null
+    if (inFlight && action === "prepare-install") installReviewCancelled = true
+    if (!inFlight) status = "idle"
+  }
   function confirmInstall(source, confirmed) {
+    if (inFlight) return {accepted:false,error:{code:"E_BUSY",message:"An action is already running."}}
     if (confirmed !== true || !installConfirmation
         || source !== installConfirmation.source || !installConfirmation.canInstall)
       return {accepted:false,error:{code:"E_CONFIRMATION",message:"Install requires the reviewed source confirmation."}}
-    installConfirmation = null
-    return start("install", {source:source})
+    var outcome = start("install", {source:source,manifest:installConfirmation.manifest})
+    if (outcome.accepted) installConfirmation = null
+    return outcome
   }
   function createWidget(id, name) { return start("create", {id:id, name:name}) }
   function manageLaunchers(add) { return start(add ? "launchers-add" : "launchers-remove", {}) }
@@ -56,21 +66,26 @@ Item {
     action = ""
     result = Actions.replyFrom(output, exitCode)
     if (!result.ok) {
-      status = "error"
       errorCode = result.error ? result.error.code : "E_ACTION"
       errorText = result.error ? result.error.message : "Action failed"
+      status = "error"
       return false
     }
-    status = "success"
     if (previousAction === "prepare-install") {
+      if (installReviewCancelled) {
+        installReviewCancelled = false
+        status = "idle"
+        return true
+      }
       installConfirmation = result.data ? result.data.confirmation || null : null
       if (!installConfirmation) {
-        status = "error"
         errorCode = "E_PROTOCOL"
+        errorText = "Install review did not return a confirmation."
+        status = "error"
         return false
       }
       status = "awaiting-confirmation"
-    }
+    } else status = "success"
     return true
   }
   Process {

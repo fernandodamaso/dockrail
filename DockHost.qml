@@ -127,6 +127,9 @@ Item {
   function releaseSettingsPanel(panel) {
     if (panel === settingsSurface) settingsSurface.panelOpen = false
   }
+  // Demo.* entries are visible in Settings only for an explicit development session.
+  readonly property bool settingsDeveloperBuild: typeof Quickshell.env === "function"
+    && String(Quickshell.env("DOCKRAIL_DEV_BUILD") || "") === "1"
   readonly property alias settingsActions: settingsActionBroker
   DockSettingsActions {
     id: settingsActionBroker
@@ -189,7 +192,7 @@ Item {
   // providers. Neither accepts commands, paths, or credentials from settings.
   readonly property var sidebarWidgetRegistry: {
     var registry = {}
-    var demoDescriptors = demoWidgetRegistry.descriptors
+    var demoDescriptors = root.settingsDeveloperBuild ? demoWidgetRegistry.descriptors : ({})
     Object.keys(demoDescriptors).forEach(function(widgetId) {
       registry[widgetId] = demoDescriptors[widgetId]
     })

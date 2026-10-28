@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtTest
 import qs.Commons
+import qs.Commons as Commons
 import "../components/widgets"
 import "widget-gallery" as Gallery
 
@@ -267,26 +268,26 @@ TestCase {
   }
 
   function test_sidebar_token_bindings_follow_live_theme() {
-    var originalMuted = Color.muted
-    var originalForeground = Color.foreground
-    var originalUrgent = Color.urgent
+    var originalMuted = Commons.Color.muted
+    var originalForeground = Commons.Color.foreground
+    var originalUrgent = Commons.Color.urgent
     var component = Qt.createComponent(Qt.resolvedUrl("../components/widgets/WidgetSemanticPalette.qml"))
     compare(component.status, Component.Ready, component.errorString())
     var palette = createTemporaryObject(component, testCase)
     var text = make("WidgetText", {text: "Secondary", muted: true})
     verify(palette !== null)
     try {
-      Color.muted = "#667788"
-      Color.foreground = "#ddeeff"
-      Color.urgent = "#ff3355"
+      Commons.Color.muted = "#667788"
+      Commons.Color.foreground = "#ddeeff"
+      Commons.Color.urgent = "#ff3355"
       wait(0)
-      compare(String(palette.mutedTextBase), String(Color.muted))
-      compare(String(palette.danger), String(Color.urgent))
-      compare(String(text.color), String(Color.foreground))
+      compare(String(palette.mutedTextBase), String(Commons.Color.muted))
+      compare(String(palette.danger), String(Commons.Color.urgent))
+      compare(String(text.color), String(Commons.Color.foreground))
     } finally {
-      Color.muted = originalMuted
-      Color.foreground = originalForeground
-      Color.urgent = originalUrgent
+      Commons.Color.muted = originalMuted
+      Commons.Color.foreground = originalForeground
+      Commons.Color.urgent = originalUrgent
     }
   }
 

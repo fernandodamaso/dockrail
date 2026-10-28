@@ -12,3 +12,4 @@ KeyboardPanel 1.0 KeyboardPanel.qml
 PanelKeyCatcher 1.0 PanelKeyCatcher.qml
 SearchableDropdown 1.0 SearchableDropdown.qml
 TextField 1.0 TextField.qml
+ToggleSwitch 1.0 ToggleSwitch.qml

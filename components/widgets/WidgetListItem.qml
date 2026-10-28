@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: root
@@ -30,9 +31,9 @@ Item {
     radius: Math.min(6, Style.cornerRadius)
     color: root.attention === "urgent" || root.attention === "overdue"
       ? semanticPalette.surface("danger", 0.086)
-      : hover.hovered && root.interactive ? Util.alpha(Color.foreground, 0.05) : "transparent"
+      : hover.hovered && root.interactive ? Util.alpha(Commons.Color.foreground, 0.05) : "transparent"
     border.width: root.activeFocus ? 1 : 0
-    border.color: Color.accent
+    border.color: Commons.Color.accent
   }
 
   HoverHandler { id: hover }
@@ -99,7 +100,7 @@ Item {
       text: root.trailing
       role: "caption"
       muted: root.attention === "none"
-      color: root.attention === "urgent" || root.attention === "overdue" ? semanticPalette.danger : Color.foreground
+      color: root.attention === "urgent" || root.attention === "overdue" ? semanticPalette.danger : Commons.Color.foreground
       allowWrap: false
     }
   }

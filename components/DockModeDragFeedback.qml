@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 
 // Non-interactive drag hint for the background mode gesture: the directional
@@ -37,8 +38,8 @@ Item {
   Ui.BorderSurface {
     anchors.fill: parent
     radius: Style.cornerRadius
-    color: Color.menu.background
-    borderSpec: Border.surfaceSpec("menu", "border", Color.menu.border, Style.normalBorderWidth)
+    color: Commons.Color.menu.background
+    borderSpec: Border.surfaceSpec("menu", "border", Commons.Color.menu.border, Style.normalBorderWidth)
 
     Text {
       id: label
@@ -46,7 +47,7 @@ Item {
       anchors.centerIn: parent
       text: root.text
       textFormat: Text.PlainText
-      color: Color.menu.text
+      color: Commons.Color.menu.text
       font.family: Style.font.family
       font.pixelSize: Style.font.bodySmall
       horizontalAlignment: Text.AlignHCenter

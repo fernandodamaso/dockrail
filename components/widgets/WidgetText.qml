@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Text {
   id: root
@@ -10,7 +11,7 @@ Text {
   property int maxLines: 0
 
   textFormat: Text.PlainText
-  color: root.muted ? semanticPalette.mutedText : Color.foreground
+  color: root.muted ? semanticPalette.mutedText : Commons.Color.foreground
   font.family: Style.font.family
   font.pixelSize: root.role === "title" ? Style.font.body
     : root.role === "caption" ? Style.font.caption : Style.font.bodySmall

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: root
@@ -15,7 +16,7 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: height / 2
-    color: Util.alpha(Color.foreground, 0.10)
+    color: Util.alpha(Commons.Color.foreground, 0.10)
   }
 
   Rectangle {

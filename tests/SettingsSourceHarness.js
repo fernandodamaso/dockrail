@@ -50,7 +50,18 @@ function createHost(parent) {
     property string settingsConnector:""
     property var activeIconDialog:null
     property bool iconDialogActive:activeIconDialog!==null && activeIconDialog.dialogActive
-    property var featureReadinessBridge:null
+    property QtObject featureReadinessBridge: QtObject {
+      property var lastGoodFeatures: ({})
+      property bool lastGoodHerdrLimited:false
+      property bool panelVisible:false
+      function focused() {}
+    }
+    property QtObject settingsActions: QtObject {
+      property bool inFlight:false
+      property var installConfirmation:null
+      property string status:"idle"
+      function cancelInstall() { installConfirmation=null }
+    }
     property alias settingsPanel:settingsSurface
     property alias control:dockControl
     property alias file:configFile

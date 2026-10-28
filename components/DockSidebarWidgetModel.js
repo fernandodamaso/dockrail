@@ -29,7 +29,8 @@ function requestedIds(value) {
     return true
   })
 }
-function idsError(value, registered) {
+function idsError(value, registered, retained) {
+  var keep = requestedIds(retained)
   var list = listLike(value)
   if (!list) return "Expected an array of registered widget IDs"
   var seen = Object.create(null)
@@ -38,7 +39,7 @@ function idsError(value, registered) {
     if (!validId(id)) return "Invalid widget ID at index " + i
     if (own(seen, id)) return "Duplicate widget ID at index " + i
     seen[id] = true
-    if (!Array.isArray(registered) || registered.indexOf(id) < 0)
+    if ((!Array.isArray(registered) || registered.indexOf(id) < 0) && keep.indexOf(id) < 0)
       return "Unregistered widget ID at index " + i
   }
   return ""
