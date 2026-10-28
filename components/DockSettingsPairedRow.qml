@@ -23,6 +23,7 @@ Column {
   readonly property bool editable: host.settingsLoadState !== "invalid" && !writerBusy
   readonly property bool popupOpen: chooser.popupOpen
   readonly property bool textFocused: customHex.activeFocus
+  readonly property bool recoveryFocused: reloadAction.activeFocus || keepAction.activeFocus
   readonly property string selection: flag ? (isWidth ? "custom" : (String(current).charAt(0) === "@" ? String(current) : "custom")) : "default"
   readonly property var shownValue: host.shownSetting ? host.shownSetting(key) : current
   readonly property var defaultValue: host.defaultSetting ? host.defaultSetting(key) : undefined
@@ -173,6 +174,7 @@ Column {
     return saved
   }
   function adjust(delta) {
+    if (conflict) return
     if (!editable) return
     if (isWidth) {
       beginEdit()
@@ -180,7 +182,10 @@ Column {
       keyboardCommit.restart()
     } else if (!flag) commitPair(current, true)
   }
-  function activate() { if (isWidth) choose(flag ? "default" : "custom"); else chooser.open() }
+  function activate() {
+    if (conflict) { reloadAction.forceActiveFocus(); return }
+    if (isWidth) choose(flag ? "default" : "custom"); else chooser.open()
+  }
   function dismissEditor() {
     if (popupOpen) { chooser.close(); return true }
     if (customOpen || editing) { reloadDraft(); return true }
@@ -328,7 +333,21 @@ Column {
   Row {
     visible: root.conflict
     spacing: Style.space(8)
-    Ui.Button {text:"Reload"; onClicked:root.reloadDraft()}
-    Ui.Button {text:"Keep editing"; onClicked:root.keepEditing()}
+    Ui.Button {
+      id: reloadAction
+      objectName: "paired-reload"
+      text: "Reload"
+      focusable: true
+      onClicked: { root.reloadDraft(); root.forceActiveFocus() }
+      Keys.onEscapePressed: { root.reloadDraft(); root.forceActiveFocus() }
+    }
+    Ui.Button {
+      id: keepAction
+      objectName: "paired-keep"
+      text: "Keep editing"
+      focusable: true
+      onClicked: { root.keepEditing(); root.forceActiveFocus() }
+      Keys.onEscapePressed: { root.reloadDraft(); root.forceActiveFocus() }
+    }
   }
 }

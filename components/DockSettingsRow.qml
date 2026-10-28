@@ -29,6 +29,7 @@ Column {
   readonly property var shown: host.shownSetting(key)
   readonly property bool popupOpen: dropdown.popupOpen
   readonly property bool textFocused: number.visible && number.field.activeFocus
+  readonly property bool recoveryFocused: reloadAction.activeFocus || keepAction.activeFocus
   property bool editing: false
   property var expected: null
   property var draft: null
@@ -130,6 +131,7 @@ Column {
     if (editing) reloadDraft()
   }
   function adjust(delta) {
+    if (conflict) return
     if (!editable || writerBusy) return
     beginEdit()
     if (ui.control === "toggle") { draft = delta > 0; commitDraft(); return }
@@ -145,8 +147,8 @@ Column {
     }
   }
   function activate() {
+    if (conflict) { reloadAction.forceActiveFocus(); return }
     if (!editable || writerBusy) return
-    if (conflict) return
     if (ui.control === "toggle") commitValue(!current)
     else if (ui.control === "dropdown") { beginEdit(); dropdown.open() }
     else if (ui.control === "number") { beginEdit(); number.field.forceActiveFocus() }
@@ -346,7 +348,21 @@ Column {
   Row {
     visible: root.conflict
     spacing: Style.space(8)
-    Ui.Button { text:"Reload"; focusable:true; onClicked:root.reloadDraft() }
-    Ui.Button { text:"Keep editing"; focusable:true; onClicked:root.keepEditing() }
+    Ui.Button {
+      id: reloadAction
+      objectName: "row-reload"
+      text: "Reload"
+      focusable: true
+      onClicked: { root.reloadDraft(); root.forceActiveFocus() }
+      Keys.onEscapePressed: { root.reloadDraft(); root.forceActiveFocus() }
+    }
+    Ui.Button {
+      id: keepAction
+      objectName: "row-keep"
+      text: "Keep editing"
+      focusable: true
+      onClicked: { root.keepEditing(); root.forceActiveFocus() }
+      Keys.onEscapePressed: { root.reloadDraft(); root.forceActiveFocus() }
+    }
   }
 }

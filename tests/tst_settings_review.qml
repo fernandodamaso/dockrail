@@ -374,5 +374,102 @@ TestCase {
     section.destroy()
     wait(0)
   }
+  function pairedRecoveryButtons(row) {
+    return row.children.filter(function(item) {
+      return item.visible !== undefined && item.children
+        && item.children.some(function(child) { return child.text === "Reload" })
+    })[0]
+  }
+  function test_paired_conflict_keyboard_recovery() {
+    var row=makePaired("backgroundColor","backgroundColorEnabled")
+    row.choose("custom")
+    tryVerify(function(){return row.textFocused})
+    var field=findChild(row,"paired-hex")
+    field.forceActiveFocus()
+    field.selectAll()
+    for (var character of "#abcdef") keyClick(character)
+    compare(field.text,"#abcdef")
+    row.host.settings=Object.assign({},row.host.settings,{backgroundColor:"#445566"})
+    verify(!row.saveHex())
+    verify(row.conflict)
+    compare(row.host.settings.backgroundColor,"#445566")
+    row.activate()
+    var recovery=pairedRecoveryButtons(row)
+    verify(!!recovery)
+    var reload=recovery.children.filter(function(child){return child.text==="Reload"})[0]
+    var keep=recovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    tryVerify(function(){return reload.activeFocus})
+    keyClick(Qt.Key_Return)
+    tryVerify(function(){return !row.conflict})
+    compare(row.host.settings.backgroundColor,"#445566")
+    verify(!row.editing)
+    compare(field.text,"#445566")
+    row.destroy()
+    wait(0)
+    var keepRow=makePaired("backgroundColor","backgroundColorEnabled")
+    keepRow.choose("custom")
+    tryVerify(function(){return keepRow.textFocused})
+    var keepField=findChild(keepRow,"paired-hex")
+    keepField.forceActiveFocus()
+    keepField.selectAll()
+    for (var keepCharacter of "#123456") keyClick(keepCharacter)
+    compare(keepField.text,"#123456")
+    keepRow.host.settings=Object.assign({},keepRow.host.settings,{backgroundColor:"#445566"})
+    verify(!keepRow.saveHex())
+    verify(keepRow.conflict)
+    keepRow.activate()
+    var keepRecovery=pairedRecoveryButtons(keepRow)
+    var keepReload=keepRecovery.children.filter(function(child){return child.text==="Reload"})[0]
+    var keepButton=keepRecovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    tryVerify(function(){return keepReload.activeFocus})
+    keyClick(Qt.Key_Tab)
+    tryVerify(function(){return keepButton.activeFocus})
+    keyClick(Qt.Key_Return)
+    tryVerify(function(){return !keepRow.conflict})
+    compare(keepRow.host.settings.backgroundColor,"#445566")
+    compare(keepField.text,"#123456")
+    verify(keepRow.editing)
+  }
+  function test_row_conflict_keyboard_recovery() {
+    var row=makeRow("margin")
+    row.beginEdit()
+    row.draft=22
+    row.host.settings=Object.assign({},row.host.settings,{margin:15})
+    verify(!row.commitDraft())
+    verify(row.conflict)
+    row.activate()
+    var recovery=row.children.filter(function(item) {
+      return item.children && item.children.some(function(child){return child.text==="Reload"})
+    })[0]
+    verify(!!recovery)
+    var reload=recovery.children.filter(function(child){return child.text==="Reload"})[0]
+    var keep=recovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    tryVerify(function(){return reload.activeFocus})
+    keyClick(Qt.Key_Return)
+    tryVerify(function(){return !row.conflict})
+    compare(row.draft,15)
+    compare(row.host.settings.margin,15)
+    row.destroy()
+    wait(0)
+    var keepRow=makeRow("margin")
+    keepRow.beginEdit()
+    keepRow.draft=22
+    keepRow.host.settings=Object.assign({},keepRow.host.settings,{margin:15})
+    verify(!keepRow.commitDraft())
+    verify(keepRow.conflict)
+    keepRow.activate()
+    var keepRecovery=keepRow.children.filter(function(item) {
+      return item.children && item.children.some(function(child){return child.text==="Reload"})
+    })[0]
+    var keepReload=keepRecovery.children.filter(function(child){return child.text==="Reload"})[0]
+    var keepButton=keepRecovery.children.filter(function(child){return child.text==="Keep editing"})[0]
+    tryVerify(function(){return keepReload.activeFocus})
+    keyClick(Qt.Key_Tab)
+    tryVerify(function(){return keepButton.activeFocus})
+    keyClick(Qt.Key_Return)
+    tryVerify(function(){return !keepRow.conflict})
+    compare(keepRow.draft,22)
+    compare(keepRow.host.settings.margin,15)
+  }
   Component { id: generalFactory; DockSettingsGeneralSection {width:470} }
 }

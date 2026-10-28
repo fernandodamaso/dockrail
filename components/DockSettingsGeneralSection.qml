@@ -42,7 +42,7 @@ Item {
     return values
   }
   readonly property var selectedTarget: targets.length ? targets[Math.min(cursor,targets.length-1)] : null
-  readonly property bool editorFocused: targets.some(function(target) {return target.textFocused})
+  readonly property bool editorFocused: targets.some(function(target) {return target.textFocused || target.recoveryFocused})
   readonly property bool popupOpen: targets.some(function(target) {return target.popupOpen})
   signal changed()
   signal focusSettings()
