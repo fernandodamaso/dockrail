@@ -21,6 +21,16 @@ assert.equal(T3Activation.threadUrl('t3:env-1', 'thread-1'),
   assert.equal(decodeURIComponent(parts[4]), thread, 'thread survives one decode')
 }
 
+// Delegated subagent paneIds are composite keys around ~130 characters and
+// must survive URL construction with an exact one-decode round-trip.
+{
+  const pane = 'thread:delegated-task:command%3Amcp%3A3568125c-36bc-4c51-ad74-c99cfb70b4f3%3Adelegate-task%3A1f065176-dc85-4257-8b42-365890c229f8'
+  assert.equal(pane.length, 129)
+  const url = T3Activation.threadUrl('t3:env-1', pane)
+  assert.ok(url !== '', 'accepts delegated-task composite paneId')
+  assert.equal(decodeURIComponent(url.split('/')[4]), pane, 'pane survives one decode')
+}
+
 for (const bad of [
   ['t3:env-1', ''],
   ['t3:', 'thread-1'],
@@ -36,8 +46,8 @@ for (const bad of [
   ['t3:env-1', 'del\u007Fchar'],
   ['t3:env-1', '\uD800lone'],
   ['t3:env-1', 'trail\uDFFF'],
-  ['t3:env-1', 'x'.repeat(129)],
-  ['t3:' + 'y'.repeat(126), 'thread-1'],
+  ['t3:env-1', 'x'.repeat(513)],
+  ['t3:' + 'y'.repeat(510), 'thread-1'],
 ]) {
   assert.equal(T3Activation.threadUrl(bad[0], bad[1]), '',
     'rejects ' + JSON.stringify(bad))

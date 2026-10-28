@@ -5,7 +5,10 @@
 .pragma library
 
 var T3_SERVER_PREFIX = "t3:"
-var MAX_ID_LENGTH = 128
+// Delegated subagent paneIds are composite keys
+// ("thread:delegated-task:<command>:delegate-task:<uuid>") and reach ~130
+// characters; the bound must clear those with headroom while staying small.
+var MAX_ID_LENGTH = 512
 
 function hasUnpairedSurrogate(value) {
   for (var i = 0; i < value.length; i++) {

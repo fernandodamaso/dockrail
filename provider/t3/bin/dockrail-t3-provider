@@ -138,8 +138,11 @@ def parse_focus_agent_command(raw: bytes) -> dict[str, Any] | None:
     request_id = bounded(message.get("requestId"), 64)
     epoch = bounded(message.get("providerEpoch"), 64)
     server_id = bounded(message.get("serverId"), 128)
-    agent_id = bounded(message.get("agentId"), 192)
-    pane_id = bounded(message.get("paneId"), 128)
+    # Agent ids embed server+generation+pane, and delegated subagent paneIds
+    # are composite keys ("thread:delegated-task:<command>:delegate-task:<uuid>")
+    # around ~130 characters, so both bounds clear those with headroom.
+    agent_id = bounded(message.get("agentId"), 512)
+    pane_id = bounded(message.get("paneId"), 512)
     if not request_id or not epoch or not server_id or not agent_id or not pane_id:
         return None
     generation = message.get("connectionGeneration")

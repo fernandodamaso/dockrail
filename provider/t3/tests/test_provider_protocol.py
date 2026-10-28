@@ -309,6 +309,49 @@ class ProtocolTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "agent_gone")
 
+    def test_focus_agent_accepts_delegated_pane_length(self) -> None:
+        _fake, provider = self.start_live()
+        snapshot, _ = provider.wait_snapshot(live_predicate())
+        assert snapshot is not None
+        servers = snapshot["servers"]
+        assert isinstance(servers, list)
+        pane = (
+            "thread:delegated-task:command%3Amcp%3A3568125c-36bc-4c51-"
+            "ad74-c99cfb70b4f3%3Adelegate-task%3A1f065176-dc85-4257-"
+            "8b42-365890c229f8"
+        )
+        self.assertEqual(len(pane), 129)
+        agent_id = f"{servers[0]['id']}:{servers[0]['connectionGeneration']}:{pane}"
+        provider.send({
+            "kind": "focus-agent",
+            "requestId": "req-long-pane",
+            "providerEpoch": snapshot["providerEpoch"],
+            "serverId": servers[0]["id"],
+            "connectionGeneration": servers[0]["connectionGeneration"],
+            "agentId": agent_id,
+            "paneId": pane,
+            "terminalId": "",
+        })
+        result = provider.wait_result("req-long-pane")
+        assert result is not None
+        self.assertFalse(result["ok"])
+        # Parsed (not invalid_request); no such agent in the fake inventory.
+        self.assertEqual(result["error"], "agent_gone")
+        provider.send({
+            "kind": "focus-agent",
+            "requestId": "req-too-long",
+            "providerEpoch": snapshot["providerEpoch"],
+            "serverId": servers[0]["id"],
+            "connectionGeneration": servers[0]["connectionGeneration"],
+            "agentId": "x" * 513,
+            "paneId": "x" * 513,
+            "terminalId": "",
+        })
+        result = provider.wait_result("req-too-long")
+        assert result is not None
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "invalid_request")
+
     def test_focus_agent_identity_mismatch(self) -> None:
         _fake, provider = self.start_live()
         snapshot, _ = provider.wait_snapshot(live_predicate())
