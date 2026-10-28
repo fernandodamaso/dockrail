@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Herdr
+Comment=Launch Herdr in Ghostty
+Exec=ghostty --gtk-single-instance=false --class=io.github.fernandodamaso.smartdock.agent.herdr -e herdr
+Icon=smartdock-agent-herdr
+Terminal=false
+Categories=Development;
+Keywords=AI;Agent;Coding;Terminal;
+StartupWMClass=io.github.fernandodamaso.smartdock.agent.herdr
+StartupNotify=true
