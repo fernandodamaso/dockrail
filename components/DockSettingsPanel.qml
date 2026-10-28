@@ -4,6 +4,7 @@ import qs.Ui as Ui
 import qs.Commons
 import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
+import "DockSettingsFeaturesModel.js" as Features
 
 // One host-owned KeyboardPanel, never a delegate-owned preferences editor.
 // Only the host writer mutates requested state; this panel never touches disk.
@@ -31,6 +32,7 @@ Item {
     : selectedSection === "appearance" ? appearanceSection
     : selectedSection === "behavior" ? behaviorSection
     : selectedSection === "sidebar-widgets" ? widgetsSection
+    : selectedSection === "features" ? featuresSection
     : selectedSection === "apps" ? appsLoader.item : null
   readonly property alias keyCatcher: keyboard
   TextEdit { id: clipboard; visible: false }
@@ -72,6 +74,7 @@ Item {
     if (appearanceSection) appearanceSection.cancelPending()
     if (behaviorSection) behaviorSection.cancelPending()
     if (widgetsSection) widgetsSection.cancelPending()
+    if (featuresSection) featuresSection.cancelPending()
     if (appsLoader.item) appsLoader.item.cancelPending()
     panelOpen = false
     showHelp = false
@@ -96,7 +99,12 @@ Item {
     return true
   }
   function sectionImplemented(id) {
-    return ["appearance","layout","behavior","sidebar-widgets","apps"].indexOf(id) >= 0
+    return ["appearance","layout","behavior","sidebar-widgets","features","apps"].indexOf(id) >= 0
+  }
+  function openFeature(id) {
+    if (!selectSection("features")) return false
+    Qt.callLater(function(){featuresSection.focusFeature(id)})
+    return true
   }
   function reportWrite(outcome) {
     var result = Registry.writeOutcome(outcome)
@@ -139,6 +147,8 @@ Item {
       + layoutHost.implicitHeight + Style.space(48)))
     focusTarget: keyboard
     Ui.PanelKeyCatcher {
+      onActiveFocusChanged: if (activeFocus && root.panelOpen && root.host.featureReadinessBridge)
+        root.host.featureReadinessBridge.focused()
       id: keyboard
       Shortcut { sequence: "Alt+Up"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(-1) }
       Shortcut { sequence: "Alt+Down"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(1) }
@@ -196,7 +206,10 @@ Item {
             delegate: Ui.Button {
               required property var modelData
               width: navigation.width
-              text: modelData.label
+              text: modelData.id === "features" && root.host.featureReadinessBridge.lastGoodFeatures
+                ? modelData.label + " · " + (Features.counts(root.host.featureReadinessBridge.lastGoodFeatures).limited
+                    + Features.counts(root.host.featureReadinessBridge.lastGoodFeatures).missing)
+                : modelData.label
               selected: root.selectedSection === modelData.id
               focusable: true
               tooltipText: "Go to " + modelData.label
@@ -346,6 +359,23 @@ Item {
                     settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
                 }
               }
+              DockSettingsFeaturesSection {
+                id:featuresSection
+                width:parent.width
+                panelActive:root.panelOpen
+                visible:root.selectedSection==="features"
+                host:root.host
+                metadata:root.metadata
+                onFocusSettings:root.focusPane="settings"
+                onFocusSections:{root.focusPane="sections";keyboard.forceActiveFocus()}
+                onChanged:root.rowFeedback=""
+                onReveal:function(item){
+                  var point=item.mapToItem(layoutHost,0,0)
+                  if(point.y<settingsScroll.contentY)settingsScroll.contentY=point.y
+                  else if(point.y+item.height>settingsScroll.contentY+settingsScroll.height)
+                    settingsScroll.contentY=Math.max(0,point.y+item.height-settingsScroll.height)
+                }
+              }
               // A URL-based Loader creates the Apps file in its own component
               // context. A nested Component under a Bound panel cannot be
               // instantiated by Loader on Qt 6.4 (the headless runner).
@@ -387,7 +417,7 @@ Item {
               Text {
                 visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
                   && root.selectedSection !== "behavior"
-                  && root.selectedSection !== "sidebar-widgets" && root.selectedSection !== "apps"
+                  && root.selectedSection !== "sidebar-widgets" && root.selectedSection !== "features" && root.selectedSection !== "apps"
                 width: parent.width
                 text: "This section is reserved for the next Settings implementation ticket."
                 wrapMode: Text.WordWrap
@@ -397,7 +427,7 @@ Item {
               Ui.Button {
                 visible: root.selectedSection !== "layout" && root.selectedSection !== "appearance"
                   && root.selectedSection !== "behavior"
-                  && root.selectedSection !== "sidebar-widgets" && root.selectedSection !== "apps"
+                  && root.selectedSection !== "sidebar-widgets" && root.selectedSection !== "features" && root.selectedSection !== "apps"
                 text: "Open Layout"
                 onClicked: root.selectSection("layout")
               }
