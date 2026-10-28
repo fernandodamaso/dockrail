@@ -547,6 +547,7 @@ Item {
           }
           Ui.MultiSelect {
             id:mutedSelect
+            objectName:"apps-muted-select"
             width:parent.width;showLabel:false
             options:Apps.muteOptions(root.host.settings.browserActivityMutedServices)
             values:root.host.settings.browserActivityMutedServices || []
@@ -615,7 +616,7 @@ Item {
           width:parent.width;wrapMode:Text.WordWrap;color:Commons.Color.foreground;opacity:0.9
         }
         Ui.TextField {
-          id:commandField;width:parent.width
+          id:commandField;objectName:"apps-command-field";width:parent.width
           text:root.commandEditing ? root.commandDraft : String(root.host.settings.controlCommand||"")
           enabled:!root.busy
           Accessible.name:"App launcher command"
@@ -650,7 +651,7 @@ Item {
               root.commandConflict=false;root.commandFeedback=""
             }
           }
-          Ui.Button {id:commandReset;text:"Reset";enabled:!root.busy&&!root.commandConflict;onClicked:root.resetCommand()}
+          Ui.Button {id:commandReset;objectName:"apps-command-reset";text:"Reset";enabled:!root.busy&&!root.commandConflict;onClicked:root.resetCommand()}
         }
         Text {
           text:"Default: "+String(root.host.defaultSetting("controlCommand"))
