@@ -37,6 +37,28 @@ class T3LifecycleContractTests(unittest.TestCase):
         self.assertTrue(os.access(provider, os.X_OK))
         self.assertNotEqual(stat.S_IMODE(os.stat(provider).st_mode) & 0o111, 0)
 
+    def test_host_registers_t3_threads_widget(self) -> None:
+        host = self.read("DockHost.qml")
+        block = host[host.index("if (root.t3Service) {"):]
+        block = block[: block.index("}\n    var externalDescriptors")]
+        self.assertIn('"t3.threads"', block)
+        self.assertIn("root.acquireT3Widget", block)
+        self.assertIn("t3ExpandedView", block)
+        self.assertIn("root.t3BinaryInstalled", block)
+        self.assertIn("property var t3Service", host)
+        self.assertIn("agentSourceMux", host)
+
+    def test_service_and_shell_load_t3_provider(self) -> None:
+        service = self.read("Service.qml")
+        self.assertIn("t3Loader", service)
+        self.assertIn("readonly property var t3Service: t3Loader.item", service)
+        self.assertIn("../provider/t3/bin/dockrail-t3-provider", service)
+        standalone = self.read("shell.qml")
+        self.assertIn("t3Loader", standalone)
+        self.assertIn("t3Service: t3Loader.item", standalone)
+        overlay = self.read("Overlay.qml")
+        self.assertIn("t3Service: root.pluginService.t3Service", overlay)
+
     def test_cli_and_provider_keep_token_off_argv(self) -> None:
         cli = self.read("scripts/dockrail_t3.py")
         self.assertIn("capture_output=True", cli)

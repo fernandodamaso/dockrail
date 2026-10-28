@@ -66,6 +66,8 @@ Item {
   property var previewAgents: []
   property bool previewHerdrOnly: false
   property string previewHerdrLabel: ""
+  property string previewHerdrProduct: "Herdr"
+  property string previewHerdrFocusHint: "Click a row to focus its pane."
   property var previewHerdrCounters: []
   property var herdrAgentActions: null
   readonly property var browserProfileEntry: browserProfileKey && browserProfileService
@@ -693,9 +695,11 @@ Item {
     if (profileName) name += " - " + profileName
     if (root.runningCount > 0)
       name += " · " + root.runningCount + (root.runningCount === 1 ? " window" : " windows")
-    if (root.herdrAgentCount > 0)
+    if (root.herdrAgentCount > 0) {
+      var noun = root.previewHerdrProduct === "T3 Code" ? "thread" : "agent"
       name += " · " + root.herdrAgentCount
-        + (root.herdrAgentCount === 1 ? " agent" : " agents")
+        + (root.herdrAgentCount === 1 ? " " + noun : " " + noun + "s")
+    }
     var counters = root.herdrSummary && Array.isArray(root.herdrSummary.counters)
       ? root.herdrSummary.counters : []
     for (var i = 0; i < counters.length; ++i) {

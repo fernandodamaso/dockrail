@@ -192,22 +192,25 @@ PopupWindow {
     if (!actions || agents.length === 0) return []
 
     var ordered = HerdrModel.sortAgentsForDisplay(agents)
+    var product = String(anchor["previewHerdrProduct"] || "Herdr")
     var label = String(anchor["previewHerdrLabel"] || "").trim()
       || root.applicationName
     var header = DockMenuModel.headerRecord(
-      "herdr:header", "Herdr · " + label, "")
+      "herdr:header", product + " · " + label, "")
     header.muted = true
     var records = [header]
     for (var i = 0; i < ordered.length; ++i) {
       var agent = ordered[i]
       var target = actions.captureAgentTarget(agent.toplevel, agent)
       var enabled = agent.focusAgentSupported === true && target !== null
-      records.push(DockMenuModel.agentRecord(
+      var record = DockMenuModel.agentRecord(
         "herdr:" + String(agent.serverId || "") + ":"
           + String(agent.id || i),
         HerdrModel.displayAgentTitle(agent),
         HerdrModel.displayAgentKind(agent.agent || agent.agentKind || ""),
-        agent.status, enabled, target))
+        agent.status, enabled, target)
+      record.product = product
+      records.push(record)
     }
     records.push(DockMenuModel.separatorRecord("herdr:separator"))
     return records
@@ -1362,7 +1365,8 @@ PopupWindow {
                 ? Accessible.Button : Accessible.StaticText
               Accessible.name: String(parent.modelData.title || "")
               Accessible.description: parent.modelData.enabled !== false
-                ? "Focus this Herdr agent pane" : "Remote Herdr agent"
+                ? (String(parent.modelData.product || "Herdr") === "T3 Code"
+                  ? "Open this T3 thread" : "Focus this Herdr agent pane") : "Remote Herdr agent"
               Accessible.onPressAction: if (parent.modelData.enabled !== false)
                 root.dispatchAction(parent.modelData, parent.index)
 

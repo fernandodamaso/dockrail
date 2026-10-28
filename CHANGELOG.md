@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- T3 Code threads (sidebar widget `t3.threads`, dock indicators `dockT3Indicators`, `dockrail t3 pair|status|unpair`).
+
 ### Fixed
 
 - Fresh standalone installs no longer enable the four demo Widgets in the

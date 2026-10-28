@@ -1,5 +1,6 @@
 import QtQuick
 import "DockHerdrModel.js" as HerdrModel
+import "DockT3ActivationModel.js" as T3Activation
 
 // Host-owned exact-capture Herdr focus orchestration. Targets are captured and
 // revalidated against DockHerdrWindowAgents, never sidebar projection rows.
@@ -20,14 +21,28 @@ Item {
       String(target.agentId || ""), String(target.paneId || "")].join("\0")
   }
 
-  function serverFocusSupported(serverId) {
+  function serverForId(serverId) {
     var servers = root.bridge && root.bridge.snapshot && Array.isArray(root.bridge.snapshot.servers)
       ? root.bridge.snapshot.servers : []
     for (var i = 0; i < servers.length; i++) {
       if (servers[i] && String(servers[i].id || "") === String(serverId))
-        return HerdrModel.serverFocusAgentSupported(servers[i])
+        return servers[i]
     }
-    return false
+    return null
+  }
+
+  function serverFocusSupported(serverId) {
+    return HerdrModel.serverFocusAgentSupported(root.serverForId(serverId))
+  }
+
+  function isT3ServerId(serverId) {
+    return HerdrModel.serverSource(root.serverForId(serverId)) === "t3"
+  }
+
+  // Injectable native dispatcher. True means the URL was accepted for
+  // opening, not that T3 navigated. Tests replace this property.
+  property var openT3ThreadUrl: function(url) {
+    return Qt.openUrlExternally(url)
   }
 
   function captureAgentTarget(toplevel, agent) {
@@ -167,12 +182,37 @@ Item {
       if (isLatest) root.setFocusError(pending.key, errorCode || "unsupported")
       return
     }
-    if (!isLatest || !root.targetIsCurrent(pending) || pending.afterRaise) return
-    // The first focus is confirmed. Revalidate before raising, then again before
-    // requesting pane focus because activation can synchronously change state.
-    if (!root.windowActions.activateToplevel(pending.toplevel, true, "", true)) return
+    if (!isLatest || !root.targetIsCurrent(pending)) return
+    if (!pending.afterRaise) {
+      // The first focus is confirmed. Revalidate before raising, then again before
+      // requesting pane focus because activation can synchronously change state.
+      if (!root.windowActions.activateToplevel(pending.toplevel, true, "", true)) return
+      if (!root.targetIsCurrent(pending)) return
+      root.enqueueHerdrFocus(pending, pending.agentKey, true)
+      return
+    }
+    // Second validation success for a current T3 target dispatches one native
+    // thread URL. Herdr's second success returns with no further work.
+    if (!root.isT3ServerId(pending.serverId)) return
     if (!root.targetIsCurrent(pending)) return
-    root.enqueueHerdrFocus(pending, pending.agentKey, true)
+    var url = T3Activation.threadUrl(pending.serverId, pending.paneId)
+    if (!url) {
+      if (isLatest) root.setFocusError(pending.key, "unsupported")
+      return
+    }
+    if (!root.targetIsCurrent(pending)) return
+    var opener = root.openT3ThreadUrl
+    if (typeof opener !== "function") {
+      if (isLatest) root.setFocusError(pending.key, "unsupported")
+      return
+    }
+    var accepted = false
+    try {
+      accepted = opener.call(root, url) === true
+    } catch (e) {
+      accepted = false
+    }
+    if (!accepted && isLatest) root.setFocusError(pending.key, "unsupported")
   }
 
   Connections {

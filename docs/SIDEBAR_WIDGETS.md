@@ -216,6 +216,8 @@ a removal path, and routes add/remove back through the controller. `herdr.agents
 sets `manageable` from a bounded Herdr-binary readiness probe: installed Herdr is
 offered in Add/Manage, while a requested widget stays removable if the binary later
 disappears. This probe never acquires a provider lease or starts the Herdr provider.
+`t3.threads` follows the same pattern with a bounded `t3`-binary probe and the
+local read-only pairing from `dockrail t3 pair` (see `T3_DATA_ACCESS.md`).
 
 `widgetManager.diagnostics()` and CLI `data.presentation.widgets` retain the
 bounded, payload-free lifecycle diagnostics from FDM-967.

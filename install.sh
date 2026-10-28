@@ -98,7 +98,7 @@ install_client_bundle() {
     install -m 0644 "$source_dir/config/settings-schema.json" "$destination/config/settings-schema.json"
     install -m 0644 "$source_dir/config/dock.json" "$destination/config/dock.json"
     local document
-    for document in AGENT_CONFIGURATION.md CLI_REFERENCE.md CONFIGURATION.md CLI_RUNTIME_CHECKS.md DEV_SWITCH.md HERDR_DATA_ACCESS.md SIDEBAR_WIDGETS.md WIDGET_COMPONENTS.md WIDGET_PACKAGES.md DOCKRAIL_MIGRATION.md; do
+    for document in AGENT_CONFIGURATION.md CLI_REFERENCE.md CONFIGURATION.md CLI_RUNTIME_CHECKS.md DEV_SWITCH.md HERDR_DATA_ACCESS.md T3_DATA_ACCESS.md SIDEBAR_WIDGETS.md WIDGET_COMPONENTS.md WIDGET_PACKAGES.md DOCKRAIL_MIGRATION.md; do
       install -m 0644 "$source_dir/docs/$document" "$destination/docs/$document"
     done
     install -m 0755 "$source_dir/uninstall.sh" "$destination/uninstall.sh"

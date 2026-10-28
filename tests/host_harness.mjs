@@ -50,6 +50,10 @@ export function hostHarness(settings, applications = []) {
       id: 'herdr.agents', label: 'Coding agents', available: true,
       acquire() { return { setActive() {}, release() {} }; },
     },
+    't3.threads': {
+      id: 't3.threads', label: 'T3 Code threads', available: true,
+      acquire() { return { setActive() {}, release() {} }; },
+    },
   };
   host = functions('DockHost.qml', { ...shared, configFile, applications, sidebarWidgetRegistry,
     Qt: { callLater() {} }, FileViewError: { FileNotFound: 2, toString: String },

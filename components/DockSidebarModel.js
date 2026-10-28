@@ -3,6 +3,7 @@
 .import "DockWindowModel.js" as WindowModel
 .import "DockWorkspaceModel.js" as WorkspaceModel
 .import "DockHerdrModel.js" as HerdrModel
+.import "DockAgentSourceModel.js" as AgentSourceModel
 
 // Pure, host-session identity. Never identify a window by title, index or address.
 function reconcileHandles(previous, toplevels) {
@@ -550,6 +551,60 @@ function herdrServerById(snapshot, serverId) {
   return null
 }
 
+// Display-only server metadata for retained T3 parents whose server object
+// is temporarily absent (null snapshot or association revalidation). This
+// never enters the provider snapshot and grants no verification, agents or
+// actions; it only keeps the source label stable.
+function herdrServerForDisplay(snapshot, serverId) {
+  var server = herdrServerById(snapshot, serverId)
+  if (server) return server
+  if (typeof serverId === "string" && serverId
+      && AgentSourceModel.sourceIdForServerId(serverId) === "t3")
+    return {
+      id: serverId,
+      source: "t3",
+      product: "T3 Code",
+      label: "T3 Code",
+      health: "unavailable",
+      capabilities: { focusAgent: false }
+    }
+  return null
+}
+
+// Shared pairing guidance for T3 session rows and associated state rows.
+function t3PairingHint(server) {
+  if (!server || typeof server !== "object") return ""
+  if (HerdrModel.serverSource(server) !== "t3") return ""
+  var code = String(server.errorCode || "")
+  if (code === "pairing_required")
+    return "Pair T3 Code: run `dockrail t3 pair`"
+  if (code === "pairing_expired" || code === "authentication_required")
+    return "T3 Code pairing expired: run `dockrail t3 pair`"
+  return ""
+}
+
+// Snapshot filtered to one source for per-widget fallback cards.
+function filterSnapshotBySource(snapshot, source) {
+  if (!snapshot || typeof snapshot !== "object") return snapshot
+  var servers = Array.isArray(snapshot.servers) ? snapshot.servers : []
+  var agents = Array.isArray(snapshot.agents) ? snapshot.agents : []
+  var keptServers = Object.create(null)
+  var filteredServers = servers.filter(function(server) {
+    if (!server || typeof server !== "object") return false
+    if (HerdrModel.serverSource(server) !== source) return false
+    keptServers[String(server.id || "")] = true
+    return true
+  })
+  var filteredAgents = agents.filter(function(agent) {
+    return agent && typeof agent === "object"
+      && keptServers[String(agent.serverId || "")] === true
+  })
+  return Object.assign({}, snapshot, {
+    servers: filteredServers,
+    agents: filteredAgents
+  })
+}
+
 function herdrServerMetadata(server) {
   var source = server && typeof server === "object" ? server : ({})
   var generation = Number(source.connectionGeneration)
@@ -594,20 +649,36 @@ function herdrAgentIdentityValid(agent, server) {
 // Non-actionable child title for an associated parent. Actionable agent rows are
 // only emitted from a live ready snapshot; never reuse prior agents/counts.
 function herdrStateTitle(server, snapshot) {
+  var product = HerdrModel.serverProduct(server)
+  var noAgents = "No active " + HerdrModel.agentNoun(server) + "s"
   if (!snapshot || typeof snapshot !== "object")
-    return "Herdr unavailable"
+    return product + " unavailable"
   var health = server ? String(server.health || "") : ""
   if (health === "connecting")
     return "Reconnecting"
-  if (health === "unavailable" || !server)
-    return "Herdr unavailable"
-  var completeness = snapshot.completeness && typeof snapshot.completeness === "object"
-    ? snapshot.completeness : null
+  if (health === "unavailable" || !server) {
+    var hint = t3PairingHint(server)
+    if (hint) return hint
+    return product + " unavailable"
+  }
+  // Prefer per-source inventory evidence stamped by the mux so one truncated
+  // source never rewrites another window's state copy.
+  var completeness = null
+  var liveCountsKnown = false
+  if (server && typeof server === "object" && "sourceCompleteness" in server) {
+    if (server.sourceCompleteness && typeof server.sourceCompleteness === "object")
+      completeness = server.sourceCompleteness
+    liveCountsKnown = server.sourceLiveCountsKnown === true
+  } else {
+    completeness = snapshot.completeness && typeof snapshot.completeness === "object"
+      ? snapshot.completeness : null
+    liveCountsKnown = snapshot.liveCounts !== null && snapshot.liveCounts !== undefined
+  }
   var completenessState = completeness ? String(completeness.state || "") : ""
-  if (snapshot.liveCounts === null || snapshot.liveCounts === undefined) {
+  if (!liveCountsKnown) {
     if (completenessState === "partial")
       return "Partial inventory"
-    return "Herdr unavailable"
+    return product + " unavailable"
   }
   if (completenessState === "partial"
       || (completeness && (completeness.truncated === true
@@ -615,15 +686,17 @@ function herdrStateTitle(server, snapshot) {
         || completeness.serverTruncated === true)))
     return "Partial inventory"
   if (health === "live")
-    return "No active agents"
-  return "Herdr unavailable"
+    return noAgents
+  return product + " unavailable"
 }
 
-function herdrInventoryPartial(snapshot) {
-  if (!snapshot || typeof snapshot !== "object") return false
-  var completeness = snapshot.completeness && typeof snapshot.completeness === "object"
-    ? snapshot.completeness : null
-  if (!completeness) return false
+function herdrInventoryPartial(snapshot, server) {
+  var completeness = null
+  if (server && typeof server === "object" && "sourceCompleteness" in server)
+    completeness = server.sourceCompleteness
+  else if (snapshot && typeof snapshot === "object")
+    completeness = snapshot.completeness
+  if (!completeness || typeof completeness !== "object") return false
   if (String(completeness.state || "") === "partial") return true
   return completeness.truncated === true
     || completeness.agentTruncated === true
@@ -660,12 +733,13 @@ function herdrFallbackEmptyChild(server, snapshot) {
   if (!server || typeof server !== "object") return null
   if (String(server.health || "") !== "live") return null
   var title = herdrStateTitle(server, snapshot)
+  var noAgents = "No active " + HerdrModel.agentNoun(server) + "s"
   return {
     kind: "empty",
     key: "empty:" + String(server.id || ""),
     title: title,
     detail: "",
-    status: title === "No active agents" ? "idle" : "unknown"
+    status: title === noAgents ? "idle" : "unknown"
   }
 }
 
@@ -674,13 +748,14 @@ function herdrFallbackEmptyChild(server, snapshot) {
 function herdrFallbackStateChild(server, snapshot) {
   if (!server || typeof server !== "object") return null
   var title = herdrStateTitle(server, snapshot)
+  var noAgents = "No active " + HerdrModel.agentNoun(server) + "s"
   var health = String(server.health || "unavailable")
   return {
     kind: "empty",
     key: "state:" + String(server.id || "") + ":" + title,
     title: title,
     detail: "",
-    status: health === "live" && title === "No active agents" ? "idle"
+    status: health === "live" && title === noAgents ? "idle"
       : health === "connecting" ? "connecting" : "unknown"
   }
 }
@@ -741,7 +816,15 @@ function project(input) {
   function attachHerdr(window) {
     var serverId = herdrByWindow[window.key]
     var emptyCounts = HerdrModel.emptyStatusCounts()
-    if (typeof serverId !== "string" || !serverId) {
+    // Recover display-only source metadata before the unassociated guard so
+    // retained T3 parents keep their source while associations revalidate.
+    var displayServer = (typeof serverId === "string" && serverId)
+      ? herdrServerForDisplay(herdrSnapshot, serverId) : null
+    var displaySource = displayServer ? HerdrModel.serverSource(displayServer) : "herdr"
+    var verifiedSources = input.herdrVerifiedSources
+    if (typeof serverId !== "string" || !serverId
+        || (displaySource === "t3" && verifiedSources
+            && verifiedSources.t3Present !== true)) {
       window.herdrAssociated = false
       window.herdrServerId = ""
       window.herdrFoldKey = ""
@@ -757,19 +840,26 @@ function project(input) {
       return window
     }
     var server = herdrServerById(herdrSnapshot, serverId)
-    var serverMeta = herdrServerMetadata(server)
+    var serverMeta = herdrServerMetadata(server || displayServer)
+    var verified = verifiedSources
+      ? verifiedSources[displaySource] === true : herdrAssociationsVerified
     window.herdrAssociated = true
     window.herdrServerId = serverId
     window.herdrTransport = serverMeta.transport
     window.herdrHost = serverMeta.host
     window.herdrSession = serverMeta.session
-    window.herdrDisplayLabel = serverMeta.transport === "remote" ? serverMeta.serverLabel : "Herdr"
+    if (displaySource === "t3")
+      window.herdrDisplayLabel = HerdrModel.serverProduct(displayServer || server)
+    else
+      window.herdrDisplayLabel = serverMeta.transport === "remote" ? serverMeta.serverLabel : "Herdr"
     window.herdrFocusAgentSupported = serverMeta.focusAgentSupported
     window.herdrFoldKey = HerdrModel.herdrFoldKeyForWindow(window.key)
     // Missing fold key => expanded. folds[herdrFoldKey] === true => folded.
     window.herdrFolded = !!window.herdrFoldKey && folds[window.herdrFoldKey] === true
     var agents = []
-    if (herdrAssociationsVerified && herdrSnapshot)
+    // Repaired labels on preserved T3 parents never turn stale rows actionable:
+    // agents still require the real server object for T3 sources.
+    if (verified && herdrSnapshot && (server || displaySource !== "t3"))
       agents = herdrAgentsForServer(herdrSnapshot, serverId)
     var counts = HerdrModel.countAgentStatuses(agents)
     window.herdrStatusCounts = counts
@@ -809,19 +899,26 @@ function project(input) {
     if (window.herdrFolded) return
     var serverId = window.herdrServerId
     var server = herdrServerById(herdrSnapshot, serverId)
-    var serverMeta = herdrServerMetadata(server)
-    var agents = herdrSnapshot ? herdrAgentsForServer(herdrSnapshot, serverId) : []
+    var displayServer = herdrServerForDisplay(herdrSnapshot, serverId)
+    var displaySource = displayServer ? HerdrModel.serverSource(displayServer) : "herdr"
+    var verifiedSources = input.herdrVerifiedSources
+    var verified = verifiedSources
+      ? verifiedSources[displaySource] === true : herdrAssociationsVerified
+    var serverMeta = herdrServerMetadata(server || displayServer)
+    var agents = (verified && herdrSnapshot && (server || displaySource !== "t3"))
+      ? herdrAgentsForServer(herdrSnapshot, serverId) : []
     var epoch = herdrSnapshot && typeof herdrSnapshot.providerEpoch === "string"
       ? herdrSnapshot.providerEpoch : ""
     // Preserved parent labels must not route live inventory before revalidation.
-    if (!herdrAssociationsVerified) {
-      var pendingTitle = server && String(server.health || "") === "connecting"
-        ? "Reconnecting" : "Herdr unavailable"
-      emitHerdrState(window, serverId, server, epoch, pendingTitle)
+    if (!verified) {
+      var lookup = displayServer || server
+      var pendingTitle = lookup && String(lookup.health || "") === "connecting"
+        ? "Reconnecting" : HerdrModel.serverProduct(lookup) + " unavailable"
+      emitHerdrState(window, serverId, lookup, epoch, pendingTitle)
       return
     }
     if (serverMeta.focusUpgradeMessage)
-      emitHerdrState(window, serverId, server, epoch,
+      emitHerdrState(window, serverId, server || displayServer, epoch,
         serverMeta.focusUpgradeMessage, "warning")
     // Actionable agents require verified association + a live ready snapshot.
     // Preserve workspace → tab → pane order while rendering every pane directly
@@ -858,6 +955,7 @@ function project(input) {
           subtitle: HerdrModel.displayAgentSecondary(agentPayload),
           agentKind: agentKind,
           workspaceLabel: agentPayload.workspaceLabel,
+          projectIcon: displaySource === "t3" ? agent.projectIcon || null : null,
           tabTitle: tab.title || agent.tabTitle || "",
           status: HerdrModel.normalizeStatus(agent.status),
           nested: true,
@@ -877,11 +975,11 @@ function project(input) {
           })
         })
       })
-      if (herdrInventoryPartial(herdrSnapshot))
-        emitHerdrState(window, serverId, server, epoch, "Partial inventory", "partial")
+      if (herdrInventoryPartial(herdrSnapshot, server || displayServer))
+        emitHerdrState(window, serverId, server || displayServer, epoch, "Partial inventory", "partial")
       return
     }
-    emitHerdrState(window, serverId, server, epoch, herdrStateTitle(server, herdrSnapshot))
+    emitHerdrState(window, serverId, server || displayServer, epoch, herdrStateTitle(displayServer || server, herdrSnapshot))
   }
   function emitWindow(window) {
     attachTabs(window)
