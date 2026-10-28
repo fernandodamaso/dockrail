@@ -43,6 +43,8 @@ class SelectiveLauncherTests(unittest.TestCase):
         return M.manage(command, environ=self.env, bundle=ROOT)
 
     def test_selective_subset_is_ready_and_idempotent(self):
+        self.assertEqual(CLI.AGENT_COMMANDS, tuple(row[0] for row in M.AGENTS))
+        self.assertEqual(CLI.AGENT_LAUNCHERS, tuple(row[1] for row in M.AGENTS))
         self.agent("claude")
         self.agent("herdr")
         probes = CLI.ReadinessProbes(environ=self.env)
@@ -55,6 +57,12 @@ class SelectiveLauncherTests(unittest.TestCase):
         self.assertTrue(self.desktop("claude-code").is_file())
         self.assertFalse(self.desktop("pi").exists())
         self.assertEqual(probes.missing_agent_launchers(), [])
+        from test_cli_doctor import FakeProbes, status, settings
+        fake = FakeProbes()
+        fake.missing_launchers = probes.missing_agent_launchers()
+        feature = CLI.feature_readiness(status(), settings(), fake)["agentLaunchers"]
+        self.assertEqual(feature["status"], "ready")
+        self.assertEqual(feature["installation"], "installed")
         self.assertEqual(self.action("add")["added"], [])
         owned = json.loads(self.state.read_text(encoding="utf-8"))["files"]
         self.assertEqual(len(owned), 4)
