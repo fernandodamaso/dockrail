@@ -81,7 +81,7 @@ assert.deepEqual(plain(h.host.settings.iconOverrides),{code:'file:///icons/a.svg
 const before=h.writes.length
 reply=h.host.saveSettingIntent('controlCommand','omarchy-menu toggle apps --compact',
   h.host.settings.controlCommand)
-assert.equal(reply.ok,true)
+assert.equal(reply.accepted,true)
 assert.equal(h.writes.length,before+1)
 assert.equal(h.host.settings.controlCommand,'omarchy-menu toggle apps --compact')
 assert.equal(h.host.saveSettingIntent('controlCommand','bad','old command').reply.error.code,'E_STALE')
