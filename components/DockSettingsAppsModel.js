@@ -3,11 +3,11 @@
 // Read-only Settings projection. IDs remain stored verbatim; host app intents
 // validate canonical identities and apply each latest-state edit.
 function entryFor(id, applications) {
-  var wanted = String(id || "").toLowerCase().replace(/\\.desktop$/, "")
+  var wanted = String(id || "").toLowerCase().replace(/\.desktop$/, "")
   var entries = applications || []
   for (var i = 0; i < entries.length; ++i) {
     var entry = entries[i]
-    if (entry && String(entry.id || "").toLowerCase().replace(/\\.desktop$/, "") === wanted)
+    if (entry && String(entry.id || "").toLowerCase().replace(/\.desktop$/, "") === wanted)
       return entry
   }
   return null
