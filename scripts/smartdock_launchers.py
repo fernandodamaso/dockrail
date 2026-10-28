@@ -132,6 +132,10 @@ def manage(action, environ=None, bundle=None):
             result["availableAgents"].append(command)
         for relative in _paths(agent):
             if action == "remove" and relative not in owned:
+                # Never remove a foreign file, but surface it to the caller.
+                target = data / relative
+                if os.path.lexists(target):
+                    result["preserved"].append(relative)
                 continue
             target = data / relative
             try:
