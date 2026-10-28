@@ -17,6 +17,10 @@ Item {
   property bool cursorActive: false
   property bool launcherPending: false
   property string feedback: ""
+  // The native theme exposes no warning token; derive readable amber for dark/light backgrounds.
+  readonly property color cautionColor: (Commons.Color.background.r*0.2126
+    + Commons.Color.background.g*0.7152 + Commons.Color.background.b*0.0722)>0.5
+    ? "#835600" : "#f6bb6b"
   readonly property var readiness: host.featureReadinessBridge.lastGoodFeatures
   readonly property var broker: host.settingsActions
   readonly property bool busy: host.settingsWriteState === "saving"
@@ -279,7 +283,7 @@ Item {
               text:"Security trade-off: local programs can control the debug profile."
               width:cardBody.width-Style.space(83)
               wrapMode:Text.WordWrap
-              color:Commons.Color.foreground
+              color:root.cautionColor
               font.family:Style.font.family
               font.pixelSize:Style.font.caption
             }
@@ -305,7 +309,7 @@ Item {
               text:"Herdr 0.9.1+ is needed to jump to panes."
               width:cardBody.width-Style.space(83)
               wrapMode:Text.WordWrap
-              color:Commons.Color.foreground
+              color:root.cautionColor
               font.family:Style.font.family
               font.pixelSize:Style.font.caption
             }
