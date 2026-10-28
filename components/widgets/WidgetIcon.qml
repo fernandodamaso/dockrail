@@ -1,6 +1,7 @@
 import QtQuick
 import Qt5Compat.GraphicalEffects
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: root
@@ -10,7 +11,7 @@ Item {
   property bool themeTinted: !root.preserveBrand
   property string sizeToken: "md"
   property string containerVariant: "plain"
-  property color tint: Color.foreground
+  property color tint: Commons.Color.foreground
   property string accessibleName: ""
   property string fallbackText: "?"
 
@@ -34,12 +35,12 @@ Item {
     radius: Math.min(8, width / 3)
     visible: root.containerVariant !== "plain"
     color: root.containerVariant === "tile"
-      ? Qt.tint(Color.background, Util.alpha(Color.accent, 0.22))
+      ? Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.accent, 0.22))
       : root.containerVariant === "soft"
-        ? Qt.tint(Color.background, Util.alpha(Color.foreground, 0.08))
+        ? Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.08))
         : "transparent"
     border.width: root.containerVariant === "outlined" ? 1 : 0
-    border.color: Util.alpha(Color.foreground, 0.18)
+    border.color: Util.alpha(Commons.Color.foreground, 0.18)
   }
 
   Image {
@@ -67,7 +68,7 @@ Item {
     visible: root.failed
     text: root.fallbackText
     textFormat: Text.PlainText
-    color: Util.alpha(Color.foreground, 0.72)
+    color: Util.alpha(Commons.Color.foreground, 0.72)
     font.family: Style.font.family
     font.pixelSize: Math.max(10, root.glyphSize - 2)
     font.bold: true

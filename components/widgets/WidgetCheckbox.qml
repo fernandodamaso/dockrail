@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
+import qs.Commons as Commons
 
 Controls.AbstractButton {
   id: root
@@ -25,17 +26,17 @@ Controls.AbstractButton {
       width: 17
       height: 17
       radius: 4
-      color: root.checked ? Color.accent : "transparent"
+      color: root.checked ? Commons.Color.accent : "transparent"
       border.width: root.activeFocus ? 2 : 1
-      border.color: root.checked ? Color.accent
-        : root.activeFocus ? Color.accent : Util.alpha(Color.foreground, 0.34)
+      border.color: root.checked ? Commons.Color.accent
+        : root.activeFocus ? Commons.Color.accent : Util.alpha(Commons.Color.foreground, 0.34)
 
       WidgetIcon {
         anchors.centerIn: parent
         visible: root.checked
         iconName: "check"
         sizeToken: "xs"
-        tint: Color.background
+        tint: Commons.Color.background
       }
     }
 

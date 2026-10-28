@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Row {
   id: root
@@ -12,7 +13,7 @@ Row {
   spacing: Style.space(6)
 
   readonly property color tone: root.semantic === "neutral"
-    ? Util.alpha(Color.foreground, 0.72) : semanticPalette.tone(root.semantic)
+    ? Util.alpha(Commons.Color.foreground, 0.72) : semanticPalette.tone(root.semantic)
 
   Rectangle {
     anchors.verticalCenter: parent.verticalCenter

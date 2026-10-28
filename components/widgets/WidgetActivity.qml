@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Column {
   id: root
@@ -23,7 +24,7 @@ Column {
         width: 1
         height: parent.height
         visible: index < root.model.length - 1
-        color: Util.alpha(Color.foreground, 0.12)
+        color: Util.alpha(Commons.Color.foreground, 0.12)
       }
 
       Rectangle {

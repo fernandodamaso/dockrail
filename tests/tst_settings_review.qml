@@ -19,7 +19,17 @@ TestCase {
       property string settingsWriteError: ""
       property string runtimeMode: "plugin"
       property string configPath: "/fixture/dock.json"
-      property var featureReadinessBridge: null
+      property QtObject featureReadinessBridge: QtObject {
+        property var lastGoodFeatures: ({})
+        property bool panelVisible:false
+        function focused() {}
+      }
+      property QtObject settingsActions: QtObject {
+        property bool inFlight:false
+        property var installConfirmation:null
+        property string status:"idle"
+        function cancelInstall() {installConfirmation=null}
+      }
       property var nextReply: null
       property var writes: []
       function saveSettingIntent(key, value, expected) {

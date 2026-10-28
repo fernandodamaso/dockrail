@@ -77,10 +77,14 @@ Item {
   }
   function selectSection(id) {
     if (Registry.order.indexOf(id) < 0) return false
+    if (selectedSection === "sidebar-widgets" && id !== selectedSection) widgetsSection.cancelPending()
     selectedSection = id
     focusPane = "sections"
     lastSection = id
     return true
+  }
+  function sectionImplemented(id) {
+    return ["appearance","layout","behavior","sidebar-widgets"].indexOf(id) >= 0
   }
   function reportWrite(outcome) {
     var result = Registry.writeOutcome(outcome)

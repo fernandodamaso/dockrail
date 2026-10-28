@@ -32,6 +32,9 @@ assert.equal(model.moveSlot(selected,'io.local.system',1),-1)
 assert.equal(model.moveSlot(selected,selected[0],-1),-1)
 assert.equal(model.moveSlot(selected,selected[selected.length-1],1),-1)
 assert.equal(model.moveSlot(selected,'missing.id',1),-1)
+assert.equal(model.moveSlot(selected,'io.local.weather',3),4,'drag may cross several rows')
+assert.equal(model.moveSlot(selected,'demo.display',-3),0,'upward multi-row drag')
+assert.equal(model.moveSlot(selected,'herdr.agents',0),-1,'zero delta is a no-op')
 // canToggle inputs: disabling is always allowed (stuck unknown IDs stay
 // removable); enabling requires registration and availability.
 for (const row of list) {
@@ -79,3 +82,5 @@ assert.match(qml,/nextAction|offer-open-folder|Open folder|createdPath/, 'explic
 assert.match(panel,/id:widgetsSection/, 'section registered in shared panel')
 assert.match(manager,/SettingsWidgets\.rows/, 'sidebar picker shares Coding agents')
 console.log('SET-05: ordering, unknown retention, demo filtering, Herdr limited and host writer passed')
+
+assert.equal(model.limited({herdrAgents:{runtime:'limited',installation:'installed',configuration:'partly-on',nextAction:{kind:'enable'}}}),false, 'Off is not an incompatible Herdr installation')

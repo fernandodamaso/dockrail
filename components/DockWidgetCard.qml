@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Window
 import QtQuick.Controls as Controls
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "widgets"
 
@@ -13,10 +14,10 @@ Item {
   property var appearance: null
   property real contentInset: Style.space(5) + Style.space(4)
   readonly property color idleCardFill: appearance
-    ? appearance.monitorFill : Qt.tint(Color.background, Util.alpha(Color.foreground, 0.035))
+    ? appearance.monitorFill : Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035))
   readonly property color headerHoverFill: appearance
     ? appearance.workspaceHoverFill
-    : Qt.tint(Qt.darker(Color.background, 1.04), Util.alpha(Color.foreground, 0.09))
+    : Qt.tint(Qt.darker(Commons.Color.background, 1.04), Util.alpha(Commons.Color.foreground, 0.09))
   readonly property real widgetCardRadius: appearance && appearance.cardRadius !== undefined
     ? appearance.cardRadius : Math.min(3, Style.cornerRadius)
   property bool bodyNavigationEnabled: true
@@ -66,7 +67,7 @@ Item {
     radius: root.widgetCardRadius
     color: root.idleCardFill
     borderSpec: root.hasCardFocus
-      ? Border.controlSpec("focus", Color.foreground, Color.accent)
+      ? Border.controlSpec("focus", Commons.Color.foreground, Commons.Color.accent)
       : Border.none()
   }
 
@@ -76,7 +77,7 @@ Item {
     anchors.right: parent.right
     anchors.top: parent.top
     height: 2
-    color: Color.accent
+    color: Commons.Color.accent
   }
 
   Rectangle {
@@ -85,7 +86,7 @@ Item {
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     height: 2
-    color: Color.accent
+    color: Commons.Color.accent
   }
 
   HoverHandler { id: cardHover }
@@ -152,7 +153,7 @@ Item {
         iconName: "grip-vertical"
         sizeToken: "xs"
         containerVariant: "plain"
-        tint: Util.alpha(Color.foreground, 0.55)
+        tint: Util.alpha(Commons.Color.foreground, 0.55)
         accessibleName: "Drag affordance"
       }
 
@@ -207,7 +208,7 @@ Item {
       iconName: root.iconName
       sizeToken: "md"
       containerVariant: "plain"
-      tint: Color.foreground
+      tint: Commons.Color.foreground
       accessibleName: root.title
     }
 
@@ -223,7 +224,7 @@ Item {
       textFormat: Text.PlainText
       elide: Text.ElideRight
       color: !root.collapsed || root.hasCardFocus
-        ? Color.foreground : Util.alpha(Color.foreground, 0.85)
+        ? Commons.Color.foreground : Util.alpha(Commons.Color.foreground, 0.85)
       font.family: Style.font.family
       font.pixelSize: Style.font.body
       font.weight: Font.DemiBold
@@ -239,7 +240,7 @@ Item {
       width: Math.max(17, badgeText.implicitWidth + 8)
       height: 17
       radius: 8.5
-      color: Color.accent
+      color: Commons.Color.accent
       Accessible.role: Accessible.StaticText
       Accessible.name: root.badgeCount + " notifications"
 
@@ -249,7 +250,7 @@ Item {
         anchors.centerIn: parent
         text: root.badgeCount > 99 ? "99+" : String(root.badgeCount)
         textFormat: Text.PlainText
-        color: Color.background
+        color: Commons.Color.background
         font.family: Style.font.family
         font.pixelSize: 9
         font.bold: true
@@ -282,7 +283,7 @@ Item {
         containerVariant: "plain"
         accessibleName: collapseButton.tooltipText
         rotation: root.collapsed ? 0 : 180
-        tint: Color.foreground
+        tint: Commons.Color.foreground
       }
     }
   }
@@ -303,7 +304,7 @@ Item {
       anchors.right: parent.right
       anchors.top: parent.top
       height: 1
-      color: Util.alpha(Color.foreground, 0.07)
+      color: Util.alpha(Commons.Color.foreground, 0.07)
     }
 
     DockSidebarWidgetView {

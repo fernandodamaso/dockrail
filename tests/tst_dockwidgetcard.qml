@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import qs.Commons
+import qs.Commons as Commons
 import "../components"
 
 TestCase {
@@ -95,7 +96,7 @@ TestCase {
     var card = makeCard()
     compare(card.appearance, null)
     var surface = findByName(card, "widget-card-surface")
-    compare(surface.color, Qt.tint(Color.background, Util.alpha(Color.foreground, 0.035)))
+    compare(surface.color, Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035)))
     compare(surface.radius, Math.min(3, Style.cornerRadius))
   }
 
@@ -115,7 +116,7 @@ TestCase {
     compare(surface.color, testAppearance.monitorFill)
     compare(surface.radius, 0)
     card.appearance = null
-    compare(surface.color, Qt.tint(Color.background, Util.alpha(Color.foreground, 0.035)))
+    compare(surface.color, Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035)))
     compare(surface.radius, Math.min(3, Style.cornerRadius))
   }
 
@@ -124,15 +125,15 @@ TestCase {
     var title = findByName(card, "widget-card-title")
     compare(title.font.pixelSize, Style.font.body)
     compare(title.font.weight, Font.DemiBold)
-    compare(title.color, Color.foreground)
+    compare(title.color, Commons.Color.foreground)
     card.collapsed = true
-    compareColor(title.color, Util.alpha(Color.foreground, 0.85))
+    compareColor(title.color, Util.alpha(Commons.Color.foreground, 0.85))
     card.forceActiveFocus()
-    compare(title.color, Color.foreground)
+    compare(title.color, Commons.Color.foreground)
     var divider = findByName(card, "widget-card-divider")
     verify(divider !== null)
     compare(divider.height, 1)
-    compareColor(divider.color, Util.alpha(Color.foreground, 0.07))
+    compareColor(divider.color, Util.alpha(Commons.Color.foreground, 0.07))
   }
 
   function test_header_geometry_data() {
@@ -257,7 +258,7 @@ TestCase {
     card.forceActiveFocus()
     waitForRendering(card)
     var image = grabImage(card)
-    compareColor(image.pixel(Math.floor(card.width / 2), 0), Color.accent)
+    compareColor(image.pixel(Math.floor(card.width / 2), 0), Commons.Color.accent)
   }
 
   function test_title_single_click_does_not_toggle() {

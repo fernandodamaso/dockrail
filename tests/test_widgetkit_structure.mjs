@@ -212,8 +212,8 @@ test('Widget card header toggle stays passive and reorder remains on the drag ha
 
 test('Widget semantic colors are centralized and theme-aware', () => {
   const palette = source('WidgetSemanticPalette')
-  assert.match(palette, /Color\.background/)
-  assert.match(palette, /Color\.accent/)
+  assert.match(palette, /Commons\.Color\.background/)
+  assert.match(palette, /Commons\.Color\.accent/)
   assert.match(palette, /backgroundLuminance/)
   for (const semantic of ['danger', 'warning', 'success', 'info'])
     assert.match(palette, new RegExp('property color ' + semantic))
@@ -233,17 +233,17 @@ test('Widget semantic colors are centralized and theme-aware', () => {
 
 test('WidgetKit follows sidebar text, radius, and semantic token contracts', () => {
   const palette = source('WidgetSemanticPalette')
-  assert.match(palette, /property color danger:\s*Color\.urgent/)
-  assert.match(palette, /property color mutedTextBase:\s*Color\.muted/)
+  assert.match(palette, /property color danger:\s*Commons\.Color\.urgent/)
+  assert.match(palette, /property color mutedTextBase:\s*Commons\.Color\.muted/)
   assert.match(palette, /property color mutedText:/)
 
   for (const name of all)
-    assert.doesNotMatch(source(name), /Util\.alpha\(Color\.foreground,\s*0\.62\)/,
+    assert.doesNotMatch(source(name), /Util\.alpha\(Commons\.Color\.foreground,\s*0\.62\)/,
       name + ' must not retain the legacy 0.62 muted alpha')
 
   const stat = source('WidgetStat')
   assert.match(stat, /radius:\s*Math\.min\(3,\s*Style\.cornerRadius\)/)
-  assert.match(stat, /color:\s*Util\.alpha\(Color\.foreground,\s*0\.04\)/)
+  assert.match(stat, /color:\s*Util\.alpha\(Commons\.Color\.foreground,\s*0\.04\)/)
   assert.doesNotMatch(stat, /border\.width/,
     'WidgetStat is a fill-only nested surface')
 

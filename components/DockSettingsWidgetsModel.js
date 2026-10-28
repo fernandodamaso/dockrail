@@ -32,10 +32,12 @@ function rows(registry, requested, development) {
 function moveSlot(order,id,delta) {
   var ids=WidgetModel.requestedIds(order)
   var index=ids.indexOf(id)
-  if (index<0 || (delta<0 && index===0) || (delta>0 && index===ids.length-1))
-    return -1
-  return delta<0 ? index-1 : index+2
+  if (index<0 || !isFinite(delta)) return -1
+  var next=Math.max(0,Math.min(ids.length-1,index+Math.trunc(delta)))
+  if (next===index) return -1
+  return next<index ? next : next+1
 }
 function limited(features) {
-  return !!(features && features.herdrAgents && features.herdrAgents.runtime==="limited")
+  return !!(features && features.herdrAgents && features.herdrAgents.runtime==="limited"
+    && !(features.herdrAgents.nextAction && features.herdrAgents.nextAction.kind==="enable"))
 }

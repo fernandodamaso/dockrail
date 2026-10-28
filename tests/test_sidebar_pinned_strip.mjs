@@ -36,7 +36,7 @@ assert.match(stripQml, /pinCell\.activeFocus && !pinCell\.mouseFocused/,
   'mouse-focused pinned tiles do not keep a stale focus fill')
 assert.match(stripQml, /pinCell\.mouseFocused = true[\s\S]*forceActiveFocus\(Qt\.MouseFocusReason\)/,
   'pointer activation records mouse focus before focusing the pinned tile')
-assert.match(stripQml, /Style\.hoverFillFor\(Color\.foreground, Color\.accent\)/,
+assert.match(stripQml, /Style\.hoverFillFor\(Commons\.Color\.foreground, Commons\.Color\.accent\)/,
   'pinned tile hover uses the native hover fill')
 assert.match(stripQml, /scale: pinHover\.hovered \? 1\.08 : 1/,
   'pinned icon hover scales only the icon')
