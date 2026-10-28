@@ -66,17 +66,25 @@ TestCase {
     broker.executor.running=false
     broker.finish(JSON.stringify({apiVersion:1,ok:true,data:data}),0)
   }
+  function eachChild(node) {
+    var out=[]
+    var list=node.children || []
+    for (var i=0;i<list.length;i++) out.push(list[i])
+    return out
+  }
   function namedText(node,text) {
     if(node.text===text)return node
-    for(var child of node.children||[]) {
-      var match=namedText(child,text)
+    var kids=eachChild(node)
+    for(var i=0;i<kids.length;i++) {
+      var match=namedText(kids[i],text)
       if(match)return match
     }
     return null
   }
   function allText(node,text) {
     var matches=node.text===text?[node]:[]
-    for(var child of node.children||[])matches=matches.concat(allText(child,text))
+    var kids=eachChild(node)
+    for(var i=0;i<kids.length;i++)matches=matches.concat(allText(kids[i],text))
     return matches
   }
   function test_reorder_retains_widget_focus_and_repeats() {
@@ -184,10 +192,13 @@ TestCase {
     var mouse=findChild(section,"widget-drag-test.gamma")
     verify(mouse)
     var height=section.targets[0].height
-    mousePress(mouse,12,17,Qt.LeftButton)
-    mouseMove(mouse,12,7,25)
-    mouseMove(mouse,12,17-height*2,50)
-    mouseRelease(mouse,12,17-height*2,Qt.LeftButton)
+    var startY=17
+    var endY=17-height*2
+    mousePress(mouse,12,startY,Qt.LeftButton)
+    var steps=5
+    for (var step=1;step<=steps;step++)
+      mouseMove(mouse,12,startY+(endY-startY)*step/steps,20)
+    mouseRelease(mouse,12,endY,Qt.LeftButton)
     tryCompare(host,"calls",[{id:"test.gamma",slot:0}])
     compare(host.settings.sidebarWidgets,["test.gamma","test.alpha","test.beta"])
   }
@@ -231,7 +242,8 @@ TestCase {
   }
   function collectTexts(node, predicate, out) {
     if(node.text !== undefined && predicate(node.text)) out.push(node)
-    for(var child of node.children||[]) collectTexts(child, predicate, out)
+    var kids=eachChild(node)
+    for(var i=0;i<kids.length;i++) collectTexts(kids[i], predicate, out)
     return out
   }
   function test_package_markup_displays_literally() {
