@@ -23,8 +23,9 @@ agent_ids=(
   smartdock-agent-claude-code
   smartdock-agent-kilo-code
   smartdock-agent-cline
+  smartdock-agent-herdr
 )
-agent_extensions=(png svg svg svg svg svg svg)
+agent_extensions=(png svg svg svg svg svg svg svg)
 desktop_dir="$data_home/applications"
 svg_icon_dir="$data_home/icons/hicolor/scalable/apps"
 raster_icon_dir="$data_home/icons/hicolor/256x256/apps"
@@ -75,20 +76,17 @@ if $cli_only; then
 fi
 
 remove_agent_assets() {
-  for index in "${!agent_ids[@]}"; do
-    id="${agent_ids[$index]}"
-    extension="${agent_extensions[$index]}"
-    rm -f -- "$desktop_dir/$id.desktop"
-    if [[ "$extension" == svg ]]; then
-      rm -f -- "$svg_icon_dir/$id.svg"
-    else
-      rm -f -- "$raster_icon_dir/$id.$extension"
-    fi
-  done
+  local script_dir
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  [[ -f "$script_dir/scripts/smartdock_cli.py" ]] || {
+    echo 'Launcher manager is unavailable; launchers were left untouched.' >&2
+    return 1
+  }
+  python3 "$script_dir/scripts/smartdock_cli.py" launchers remove --json
 }
 if $agent_assets_only; then
   remove_agent_assets
-  echo 'Removed Dockrail terminal-agent launchers and icons.'
+  echo 'Removed only unmodified Dockrail-owned launchers and icons.'
   exit
 fi
 # Refuse --purge before removing anything: the plugin shares the configuration.
