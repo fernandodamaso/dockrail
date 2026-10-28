@@ -258,4 +258,99 @@ TestCase {
     verify(!scene.actions.activateHerdrTarget(oldTarget))
     compare(scene.windowActions.raises, 0)
   }
+
+  function t3Snapshot(bridge, generation, epoch) {
+    return {
+      schemaVersion: 1,
+      providerEpoch: epoch || "epoch-1",
+      revision: generation,
+      servers: [{
+        id: "t3:env-1",
+        source: "t3",
+        product: "T3 Code",
+        capabilities: { focusAgent: true },
+        clients: [{ pid: 41, startTime: 41,
+          ancestors: [{ pid: 40, startTime: 40 }] }]
+      }],
+      agents: [{
+        id: "t3:env-1:" + generation + ":thread-1",
+        serverId: "t3:env-1",
+        connectionGeneration: generation,
+        paneId: "thread-1",
+        terminalId: "term-1",
+        title: "Same Title",
+        status: "working"
+      }],
+      windowProcesses: {
+        revision: bridge.windowProcessRevision,
+        identities: [{ pid: 40, startTime: 40 }]
+      }
+    }
+  }
+
+  function readyT3Scene() {
+    var scene = createTemporaryObject(sceneFactory, testCase)
+    verify(scene !== null)
+    var win = createTemporaryObject(windowFactory, scene)
+    scene.windowActions.live = [win]
+    scene.windowActions.handles = [{
+      wayland: win, address: "0xABC",
+      lastIpcObject: { pid: 40 }
+    }]
+    scene.bridge.dockConsumerActive = true
+    scene.bridge.syncHerdrWindowProcesses()
+    scene.service.publishSnapshot(t3Snapshot(scene.bridge, 1, "epoch-1"))
+    tryCompare(scene.bridge, "snapshotReady", true)
+    return { scene: scene, win: win }
+  }
+
+  function test_t3ThreadDispatchesOneUrl() {
+    var value = readyT3Scene()
+    var scene = value.scene
+    compare(scene.service.acquireCount, 1,
+      "one shared action owner acquires the provider")
+    var agent = scene.bridge.summaryForToplevels([value.win]).rows[0]
+    compare(agent.focusAgentSupported, true,
+      "dock rows inherit the associated T3 server focus capability")
+    var target = scene.actions.captureAgentTarget(value.win,
+      Object.assign({ key: "dock-row", kind: "herdr-agent" }, agent))
+    verify(target !== null)
+    compare(target.serverId, "t3:env-1")
+    compare(target.paneId, "thread-1")
+    var dispatched = []
+    scene.actions.openT3ThreadUrl = function(url) {
+      dispatched.push(String(url))
+      return true
+    }
+    verify(scene.actions.activateHerdrTarget(target))
+    compare(scene.service.focusCalls.length, 1)
+    compare(dispatched.length, 0, "first validation dispatches nothing yet")
+    scene.actions.onHerdrFocusFinished("focus-1", true, "")
+    compare(scene.windowActions.raises, 1)
+    compare(scene.service.focusCalls.length, 2, "two validation calls")
+    compare(dispatched.length, 0, "raise plus revalidation dispatch nothing yet")
+    scene.actions.onHerdrFocusFinished("focus-2", true, "")
+    compare(scene.service.focusCalls.length, 2, "no third provider call")
+    compare(scene.windowActions.raises, 1, "no second raise")
+    compare(dispatched, ["t3code://threads/env-1/thread-1"])
+  }
+
+  function test_t3StaleTargetDispatchesNothing() {
+    var value = readyT3Scene()
+    var scene = value.scene
+    var target = scene.actions.captureAgentTarget(value.win, {
+      key: "row", kind: "herdr-agent", agentId: scene.bridge.snapshot.agents[0].id
+    })
+    var dispatched = []
+    scene.actions.openT3ThreadUrl = function(url) {
+      dispatched.push(String(url))
+      return true
+    }
+    verify(scene.actions.activateHerdrTarget(target))
+    scene.service.sourceEpoch = "epoch-2"
+    scene.bridge.syncHerdrWindowProcesses()
+    scene.actions.onHerdrFocusFinished("focus-1", true, "")
+    compare(scene.windowActions.raises, 0)
+    compare(dispatched.length, 0, "invalidated T3 target dispatches nothing")
+  }
 }

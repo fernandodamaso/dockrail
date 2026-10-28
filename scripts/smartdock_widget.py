@@ -40,6 +40,7 @@ PROTECTED_WIDGETS = {
     "demo.inputs": ("Demo - Inputs", "built-in", True),
     "demo.actions-states": ("Demo - Actions & states", "built-in", True),
     "herdr.agents": ("Coding agents", "integration", False),
+    "t3.threads": ("T3 Code threads", "integration", False),
 }
 RESERVED_PACKAGE_FILES = {".smartdock-source.json", ".smartdock-package.json"}
 RUNTIME_WIDGETKIT_DIR = "Dockrail"

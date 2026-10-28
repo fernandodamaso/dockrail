@@ -167,7 +167,7 @@ Widgets: one enabled-order list and **Off** group, grip + keyboard **Alt+↑/↓
 
 ### Canonical setting mapping (frozen canvas board 13)
 
-All **58 settings** appear below. The plan's four reversals and moved homes override stale lines elsewhere in the canvas. Color/border *Enabled flags are paired into one primary control; `position` (fixed bottom), `groupWindows` (deprecated), `sidebarWidgetCollapsed` (in-place), and `sidebarMonitor` (legacy banner) have no ordinary generated row.
+All **59 settings** appear below. The plan's four reversals and moved homes override stale lines elsewhere in the canvas. Color/border *Enabled flags are paired into one primary control; `position` (fixed bottom), `groupWindows` (deprecated), `sidebarWidgetCollapsed` (in-place), and `sidebarMonitor` (legacy banner) have no ordinary generated row.
 
 | Key | Section | Group | Label |
 | --- | --- | --- | --- |
@@ -217,6 +217,7 @@ All **58 settings** appear below. The plan's four reversals and moved homes over
 | `launcherBadgeMode` | Behavior | Attention | Badge style |
 | `urgentWindowAnimationEnabled` | Behavior | Attention on the dock | Urgent nudge |
 | `dockHerdrIndicators` | Behavior | Attention on the dock | Agent state on terminal icons |
+| `dockT3Indicators` | Behavior | Attention on the dock | T3 Code threads on dock icons |
 | `groupWindows` | Behavior | — | Not shown |
 | `sidebarWidgets` | Sidebar & Widgets | Widgets | Widgets list |
 | `sidebarWidgetCollapsed` | Sidebar & Widgets | — | Not shown |

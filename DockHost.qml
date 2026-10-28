@@ -144,13 +144,15 @@ Item {
   property var launcherBadgeService: null
   property var browserProfileService: null
   property var herdrService: null
+  property var t3Service: null
   property bool herdrBinaryInstalled: false
   property bool herdrBinaryProbePending: false
+  property bool t3BinaryInstalled: false
+  property bool t3BinaryProbePending: false
   readonly property var applications: DesktopEntries.applications.values || []
   property int iconReloadRevision: 0
   // Menus may cache popup instances, but only one editor owns a live session.
   property var activeIconDialog: null
-
   // Reuse the exact app picker and Change Icon dialog used by dock menus.
   // Settings never owns a second artwork editor or application-list writer.
   LazyLoader {
@@ -228,10 +230,36 @@ Item {
     return true
   }
 
+  function refreshT3BinaryAvailability() {
+    if (t3BinaryProbe.running) return false
+    root.t3BinaryProbePending = true
+    t3BinaryProbeTimeout.restart()
+    t3BinaryProbe.running = true
+    return true
+  }
+
   // Keep the lease boundary stable while unrelated registry entries refresh.
   function acquireHerdrWidget(owner) {
     return root.herdrWindowAgents.createConsumerLease(owner)
   }
+
+  function acquireT3Widget(owner) {
+    return root.herdrWindowAgents.createConsumerLease(owner)
+  }
+
+  function sidebarWidgetActive(id) {
+    var view = sidebarState.widgetView(id)
+    return !!(view && view.active)
+  }
+
+  readonly property bool herdrSourceWanted: (DockModel.normalizeSetting(
+      "dockHerdrIndicators", root.settings.dockHerdrIndicators)
+      && root.presentation.classicScreens.length > 0)
+    || root.sidebarWidgetActive("herdr.agents")
+  readonly property bool t3SourceWanted: (DockModel.normalizeSetting(
+      "dockT3Indicators", root.settings.dockT3Indicators)
+      && root.presentation.classicScreens.length > 0)
+    || root.sidebarWidgetActive("t3.threads")
   readonly property var connectedScreens: Quickshell.screens
   readonly property var hyprMonitors: Hyprland.monitors ? Hyprland.monitors.values || [] : []
   readonly property var hyprWorkspaces: Hyprland.workspaces ? Hyprland.workspaces.values || [] : []
@@ -258,6 +286,21 @@ Item {
         expandedView: herdrExpandedView,
         compactView: herdrCompactView,
         popupView: herdrPopupView
+      }
+    }
+    if (root.t3Service) {
+      registry["t3.threads"] = {
+        id: "t3.threads",
+        label: "T3 Code threads",
+        description: "Show T3 Code threads from the local T3 server in the sidebar.",
+        feature: "t3",
+        manageable: root.t3BinaryInstalled,
+        available: root.t3BinaryInstalled && root.t3Service.available !== false,
+        revision: 1,
+        acquire: root.acquireT3Widget,
+        expandedView: t3ExpandedView,
+        compactView: t3CompactView,
+        popupView: t3PopupView
       }
     }
     var externalDescriptors = externalWidgetRegistry.descriptors || ({})
@@ -854,6 +897,7 @@ Item {
   Component.onCompleted: {
     refreshWorkspaceCounts()
     refreshHerdrBinaryAvailability()
+    refreshT3BinaryAvailability()
     scopeRefreshController.requestRefresh()
   }
 
@@ -926,6 +970,36 @@ Item {
     repeat: true
     running: true
     onTriggered: root.refreshHerdrBinaryAvailability()
+  }
+
+  Process {
+    id: t3BinaryProbe
+    command: ["sh", "-c", "command -v t3 >/dev/null 2>&1"]
+    onExited: function(exitCode) {
+      t3BinaryProbeTimeout.stop()
+      if (!root.t3BinaryProbePending) return
+      root.t3BinaryProbePending = false
+      root.t3BinaryInstalled = exitCode === 0
+    }
+  }
+
+  Timer {
+    id: t3BinaryProbeTimeout
+    interval: 1500
+    repeat: false
+    onTriggered: {
+      if (!root.t3BinaryProbePending) return
+      root.t3BinaryProbePending = false
+      root.t3BinaryInstalled = false
+      if (t3BinaryProbe.running) t3BinaryProbe.running = false
+    }
+  }
+
+  Timer {
+    interval: 30000
+    repeat: true
+    running: true
+    onTriggered: root.refreshT3BinaryAvailability()
   }
 
   Process {
@@ -1023,21 +1097,29 @@ Item {
 
   DockHerdrWindowAgents {
     id: herdrWindowAgentsController
-    herdrService: root.herdrService
+    herdrService: agentSourceMux
     toplevels: root.desktopToplevels
     hyprToplevels: root.hyprToplevels
     focusedToplevel: ToplevelManager.activeToplevel
     scopeRevision: root.scopeRevision
-    dockConsumerActive: DockModel.normalizeSetting(
-      "dockHerdrIndicators", root.settings.dockHerdrIndicators)
+    dockConsumerActive: (DockModel.normalizeSetting("dockHerdrIndicators", root.settings.dockHerdrIndicators)
+        || DockModel.normalizeSetting("dockT3Indicators", root.settings.dockT3Indicators))
       && root.presentation.classicScreens.length > 0
+  }
+
+  DockAgentSourceMux {
+    id: agentSourceMux
+    sources: [
+      { id: "herdr", service: root.herdrService, enabled: root.herdrSourceWanted && !!root.herdrService },
+      { id: "t3", service: root.t3Service, enabled: root.t3SourceWanted && !!root.t3Service }
+    ]
   }
 
   DockHerdrAgentActions {
     id: herdrAgentActionsController
     bridge: root.herdrWindowAgents
     windowActions: root.windowActions
-    herdrService: root.herdrService
+    herdrService: agentSourceMux
   }
 
   DockWorkspaceMonitorDrag {
@@ -1055,9 +1137,12 @@ Item {
     launcherBadgeMode: root.settings.launcherBadgeMode === "dots-only" ? "dots-only" : "automatic"
   }
 
-  Component { id: herdrExpandedView; DockHerdrAgentsView {} }
-  Component { id: herdrCompactView; DockHerdrAgentsView {} }
-  Component { id: herdrPopupView; DockHerdrAgentsView {} }
+  Component { id: herdrExpandedView; DockHerdrAgentsView { sourceFilter: "herdr" } }
+  Component { id: herdrCompactView; DockHerdrAgentsView { sourceFilter: "herdr" } }
+  Component { id: herdrPopupView; DockHerdrAgentsView { sourceFilter: "herdr" } }
+  Component { id: t3ExpandedView; DockHerdrAgentsView { sourceFilter: "t3" } }
+  Component { id: t3CompactView; DockHerdrAgentsView { sourceFilter: "t3" } }
+  Component { id: t3PopupView; DockHerdrAgentsView { sourceFilter: "t3" } }
 
   DockSidebarController {
     id: sidebarState

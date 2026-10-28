@@ -26,10 +26,31 @@ Item {
   readonly property var presentationWidgetIds: {
     var revision = root.controller.widgetRevision
     var ids = root.controller.widgetIds || []
-    var view = root.controller.widgetView("herdr.agents")
-    var snap = view && view.status === "ready" && view.data ? view.data : null
-    var showHerdr = SidebarModel.herdrFallbackVisible(snap, root.controller.herdrAssociations)
-    return ids.filter(function(id) { return id !== "herdr.agents" || showHerdr })
+    function fallbackVisibleFor(widgetId, source) {
+      var view = root.controller.widgetView(widgetId)
+      var snap = view && view.status === "ready" && view.data ? view.data : null
+      var filtered = SidebarModel.filterSnapshotBySource(snap, source)
+      if (SidebarModel.herdrFallbackVisible(filtered, root.controller.herdrAssociations))
+        return true
+      if (source === "t3" && filtered && typeof filtered === "object") {
+        var matched = SidebarModel.matchedHerdrServerIds(root.controller.herdrAssociations)
+        var servers = Array.isArray(filtered.servers) ? filtered.servers : []
+        for (var i = 0; i < servers.length; i++) {
+          var server = servers[i]
+          if (!server || typeof server !== "object") continue
+          if (matched[String(server.id || "")] === true) continue
+          if (SidebarModel.t3PairingHint(server)) return true
+        }
+      }
+      return false
+    }
+    var showHerdr = fallbackVisibleFor("herdr.agents", "herdr")
+    var showT3 = fallbackVisibleFor("t3.threads", "t3")
+    return ids.filter(function(id) {
+      if (id === "herdr.agents") return showHerdr
+      if (id === "t3.threads") return showT3
+      return true
+    })
   }
   readonly property int presentedWidgetCount: presentationWidgetIds.length
   readonly property real naturalWidgetHeaderHeight: Math.max(Style.space(32), sectionLabel.implicitHeight) + Style.space(6)

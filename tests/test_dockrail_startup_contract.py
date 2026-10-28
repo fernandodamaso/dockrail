@@ -28,7 +28,7 @@ class StartupContractTests(unittest.TestCase):
         shell = read("shell.qml")
         self.assertEqual(shell.count("DockMigrationBootstrap"), 1)
         self.assertIn('runtimeMode: "standalone"', shell)
-        self.assertEqual(shell.count("active: migration.ready"), 2)
+        self.assertEqual(shell.count("active: migration.ready"), 3)
         self.assertIn("configPath: migration.configPath", shell)
         self.assertIn("dataRoot: migration.dataRoot", shell)
 
