@@ -6,6 +6,8 @@
     "status",
     "doctor",
     "setup",
+    "launchers.add",
+    "launchers.remove",
     "config.schema",
     "config.get",
     "config.set",
