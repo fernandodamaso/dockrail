@@ -44,7 +44,7 @@ TestCase {
   function test_lucide_decodes_and_uses_project_color() {
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="9" fill="white"/></svg>'
     var item = createTemporaryObject(factory, test, { icon: {
-      kind: "lucide", color: "rose", source: "data:image/svg+xml;base64," + Qt.btoa(Array.from(svg, function(c) { return c.charCodeAt(0) }))
+      kind: "lucide", color: "rose", source: "data:image/svg+xml;base64," + Qt.btoa(svg)
     } })
     var glyph = child(item, "t3-project-lucide")
     verify(glyph !== null)
