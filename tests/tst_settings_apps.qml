@@ -181,6 +181,15 @@ TestCase {
     verify(section.commandFeedback.indexOf("E_VALIDATION")>=0)
   }
 
+  function test_stationary_grip_click_never_reorders() {
+    var grip=findChild(pinnedRows()[0],"apps-pin-grip")
+    verify(grip!==null)
+    compare(section.draggedPinTarget(grip),"app.short")
+    mouseClick(grip,grip.width/2,grip.height/2,Qt.LeftButton)
+    compare(host.settings.pinned,["app.short","app.long","app.third"])
+    compare(host.calls.length,0)
+  }
+
   function test_drag_target_uses_actual_wrapped_row_geometry() {
     var pins=pinnedRows()
     verify(pins[1].height>pins[0].height)
