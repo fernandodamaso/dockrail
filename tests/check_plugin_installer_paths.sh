@@ -28,6 +28,8 @@ mkdir -p "$plugin/components" "$plugin/scripts" "$plugin/assets" \
   "$plugin/provider/browser-profiles" "$plugin/provider/launcher-badges"
 cp "$repo_dir/install.sh" "$plugin/install.sh"
 cp "$repo_dir/shell.qml" "$plugin/shell.qml"
+cp "$repo_dir/scripts/smartdock_cli.py" "$plugin/scripts/"
+cp "$repo_dir/scripts/smartdock_launchers.py" "$plugin/scripts/"
 cp "$repo_dir/scripts/install-browser-profile-provider" "$plugin/scripts/"
 cp "$repo_dir/scripts/build-launcher-badge-provider" "$plugin/scripts/"
 cp "$repo_dir/provider/browser-profiles/browser_profile_provider.py" \
