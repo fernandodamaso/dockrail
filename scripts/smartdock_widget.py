@@ -274,7 +274,9 @@ class Store:
         self.config_home = Path(config_home or os.environ.get("XDG_CONFIG_HOME", self.home / ".config")).expanduser().resolve()
         self.canonical_root = self.data_home / "dockrail/widgets"
         self.legacy_root = self.data_home / "smartdock/widgets"
-        self.root = self.canonical_root if (self.canonical_root.exists() or not self.legacy_root.exists()) else self.legacy_root
+        # Startup migration owns legacy aliases. New package writes must match
+        # the host registry root even when an empty legacy directory survives.
+        self.root = self.canonical_root
         self.registry_path = self.root / "registry.json"
         self.dev_state_path = self.root / ".dev-state.json"
         self.dev_root = self.root / ".dev"
@@ -689,9 +691,11 @@ class Store:
         if backup.exists():
             shutil.rmtree(backup, ignore_errors=True)
 
-    def install(self, source_spec: str):
+    def install(self, source_spec: str, *, expected_manifest=None):
         with self.resolved_source(source_spec) as (source, source_metadata):
             manifest = validate_manifest(source)
+            if expected_manifest is not None and manifest != expected_manifest:
+                raise WidgetError("E_STALE", "Widget identity or manifest changed; review the source again before installing.")
             with self.locked():
                 target = self.root / manifest["id"]
                 if target.exists():

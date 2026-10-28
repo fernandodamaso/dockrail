@@ -12,8 +12,11 @@ omarchy_shell="${OMARCHY_PATH:-/usr/share/omarchy}/shell"
 if [[ -d "$omarchy_shell/Commons" && -d "$omarchy_shell/Ui" ]]; then
   import_root="${XDG_CACHE_HOME:-$HOME/.cache}/dockrail/qml-imports"
   mkdir -p "$import_root"
-  if [[ ! -e "$import_root/qs" ]]; then
-    ln -s "$omarchy_shell" "$import_root/qs"
+  # Retarget a stale or dangling alias after OMARCHY_PATH moves; never replace
+  # a real directory.
+  if [[ -L "$import_root/qs" || ! -e "$import_root/qs" ]] \
+      && [[ "$(readlink -- "$import_root/qs" || true)" != "$omarchy_shell" ]]; then
+    ln -sfn -- "$omarchy_shell" "$import_root/qs"
   fi
   export QML2_IMPORT_PATH="$import_root${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
 fi

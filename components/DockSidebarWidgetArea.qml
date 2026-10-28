@@ -5,6 +5,7 @@ import QtQuick.Controls as Controls
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "widgets"
 import "DockSidebarWidgetModel.js" as WidgetModel
@@ -353,7 +354,7 @@ Item {
           iconName: "plus"
           sizeToken: "xs"
           containerVariant: "plain"
-          tint: Color.foreground
+          tint: Commons.Color.foreground
           accessibleName: manageButton.tooltipText
         }
       }
@@ -416,7 +417,7 @@ Item {
         implicitWidth: root.viewport.scrollGutter
         implicitHeight: 40
         radius: width / 2
-        color: Util.alpha(Color.foreground, verticalScrollBar.pressed ? 0.45 : verticalScrollBar.hovered ? 0.32 : 0.18)
+        color: Util.alpha(Commons.Color.foreground, verticalScrollBar.pressed ? 0.45 : verticalScrollBar.hovered ? 0.32 : 0.18)
       }
       background: Item { implicitWidth: root.viewport.scrollGutter }
     }
@@ -503,8 +504,8 @@ Item {
     Ui.BorderSurface {
       id: popupSurface
       anchors.fill: parent
-      color: Color.menu.background
-      borderSpec: Border.surfaceSpec("menu", "border", Color.menu.border, Style.normalBorderWidth)
+      color: Commons.Color.menu.background
+      borderSpec: Border.surfaceSpec("menu", "border", Commons.Color.menu.border, Style.normalBorderWidth)
       clip: true
 
       Ui.Button {
@@ -561,7 +562,7 @@ Item {
             width: parent.width
             text: popupView.snapshot ? String(popupView.snapshot.status || "unavailable") : "Unavailable"
             textFormat: Text.PlainText
-            color: Color.foreground
+            color: Commons.Color.foreground
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             wrapMode: Text.Wrap

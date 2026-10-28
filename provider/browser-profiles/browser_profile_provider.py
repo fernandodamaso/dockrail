@@ -918,7 +918,6 @@ def run(args):
             snapshot = build_snapshot(assignments, context_profiles, pages,
                                       args.port, classes, windows,
                                       list_tab_strip_entries(client))
-            available = True
         except (CdpError, OSError, ValueError) as error:
             client.close()
             context_profiles.clear()
@@ -934,7 +933,6 @@ def run(args):
                 "activities": {},
                 "tabs": {},
             }
-            available = False
         fingerprint = snapshot_fingerprint(snapshot)
         if fingerprint != last_fingerprint:
             revision += 1

@@ -1,10 +1,11 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Canvas {
   id: root
   property var values: []
-  property color lineColor: Color.accent
+  property color lineColor: Commons.Color.accent
   property real lineWidth: 2
 
   implicitWidth: 120

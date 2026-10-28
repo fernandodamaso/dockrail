@@ -13,6 +13,12 @@ grep -Eq 'showTrashSetting = TrashModel\.normalizeShowTrash\(parsed\.showTrash\)
   || { echo "Reloaded Trash visibility must update normalized host-owned state" >&2; exit 1; }
 grep -Eq 'running: root\.settingsLoaded && root\.showTrash' "$host" \
   || { echo "Trash polling must stop when settings hide Trash" >&2; exit 1; }
+grep -Eq '&& root\.presentation\.classicScreens\.length > 0' "$host" \
+  || { echo "Trash polling must stop while no classic dock shows Trash" >&2; exit 1; }
+grep -Eq 'triggeredOnStart: true' "$host" \
+  || { echo "Trash must refresh as soon as a classic dock shows it" >&2; exit 1; }
+grep -Eq 'trashListExitCode = exitCode' "$host" \
+  || { echo "Trash listing must settle on the gio exit code" >&2; exit 1; }
 grep -Eq 'showTrash: root\.showTrash' "$host" \
   || { echo "Dock instances must consume host-owned Trash visibility" >&2; exit 1; }
 grep -Eq 'required property bool showTrash' "$dock" \

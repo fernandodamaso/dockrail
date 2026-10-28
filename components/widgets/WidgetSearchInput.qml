@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 WidgetTextInput {
   id: root
@@ -13,7 +14,7 @@ WidgetTextInput {
     iconName: root.searchIconName
     sizeToken: "sm"
     containerVariant: "plain"
-    tint: Util.alpha(Color.foreground, 0.52)
+    tint: Util.alpha(Commons.Color.foreground, 0.52)
     opacity: 0.72
     accessibleName: "Search"
   }

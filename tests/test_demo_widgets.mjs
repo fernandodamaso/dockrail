@@ -5,10 +5,11 @@ import test from 'node:test'
 const read = path => fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8')
 const ids = ['demo.display', 'demo.lists', 'demo.inputs', 'demo.actions-states']
 
-test('branch host exposes the source-owned demo registry', () => {
+test('source-owned demo registry is gated by an explicit development session', () => {
   const host = read('DockHost.qml')
   assert.match(host, /DockDemoWidgetRegistry\s*\{/)
-  assert.match(host, /demoWidgetRegistry\.descriptors/)
+  assert.match(host, /root\.settingsDeveloperBuild \? demoWidgetRegistry\.descriptors : \(\{\}\)/)
+  assert.match(host, /Quickshell\.env\("DOCKRAIL_DEV_BUILD"\)/)
   assert.match(host, /registry\["herdr\.agents"\]/)
   const registry = read('components/DockDemoWidgetRegistry.qml')
   for (const id of ids) assert.match(registry, new RegExp(id.replace(/[.-]/g, '\\$&')))
@@ -29,14 +30,11 @@ test('all four demo bodies are real Widget-kit compositions', () => {
   }
 })
 
-test('branch installer seeds demos alongside existing Widgets exactly once', () => {
+test('installer never enables demo Widgets in user configuration', () => {
   const installer = read('install.sh')
-  assert.match(installer, /\.demo-widgets-seeded-v2/)
-  assert.match(installer, /smartdock_seed_demo_widgets\.py/)
-  const seeder = read('scripts/smartdock_seed_demo_widgets.py')
-  assert.match(seeder, /next_ids = list\(current\)/)
-  assert.match(seeder, /if widget_id not in next_ids/)
-  assert.match(seeder, /if marker_path\.exists\(\)/)
+  assert.doesNotMatch(installer, /demo-widgets-seeded|seed_demo_widgets/)
+  assert.doesNotMatch(installer, /demo\.(display|lists|inputs|actions-states)/)
+  assert.equal(fs.existsSync(new URL('../scripts/smartdock_seed_demo_widgets.py', import.meta.url)), false)
 })
 
 test('Widget demo Lucide assets are bundled', () => {

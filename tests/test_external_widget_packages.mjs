@@ -25,8 +25,10 @@ assert.match(host, /"herdr\.agents"[\s\S]*?manageable:\s*root\.herdrBinaryInstal
 assert.match(model, /function manageableRows\(registry, enabledIds\)/,
   'registry model must include enabled integrations so unavailable rows stay removable');
 assert.match(manager,
-  /WidgetModel\.manageableRows\(\s*controller\.widgetRegistry, controller\.widgetIds\)/,
-  'Add/Manage must filter non-manageable descriptors while retaining enabled removals');
+  /SettingsWidgets\.rows\(\s*controller\.widgetRegistry, controller\.widgetIds/,
+  'Add/Manage uses the Settings inventory so Coding agents remains discoverable');
+assert.match(manager, /return row\.registered/,
+  'Add/Manage retains only registered sources, never synthetic unknown installations');
 assert.match(view, /presentation \+ "Source"/,
   'the existing Widget view loader must accept registry-owned package sources');
 assert.match(view, /source:\s*root\.factory \? "" : root\.sourceUrl/,

@@ -1,8 +1,10 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "DockSidebarWidgetModel.js" as WidgetModel
+import "DockSettingsWidgetsModel.js" as SettingsWidgets
 
 // Panel-owned Widget management popup. This intentionally lives outside the
 // independent Widget pane so Add/Manage remains available even when there are
@@ -15,8 +17,11 @@ Item {
   required property var viewport
 
   readonly property var popupWindow: managerPopup
-  readonly property var registeredRows: WidgetModel.manageableRows(
-    controller.widgetRegistry, controller.widgetIds)
+  readonly property var registeredRows: SettingsWidgets.rows(
+    controller.widgetRegistry, controller.widgetIds,
+    !!(panel.host && panel.host.settingsDeveloperBuild)).filter(function(row) {
+      return row.registered
+    })
 
   property bool managerOpen: false
   property Item managerAnchor: null
@@ -114,7 +119,8 @@ Item {
       managerIntro.implicitHeight
         + managerDivider.implicitHeight
         + managerLayout.spacing * 2
-        + Math.min(managerRows.implicitHeight, Style.space(280)),
+        + Math.min(managerRows.implicitHeight, Style.space(280))
+        + Style.space(40),
       Style.space(420))
 
     onOpenChanged: if (open) anchorTimer.restart()
@@ -142,7 +148,7 @@ Item {
             width: parent.width
             text: "Widgets"
             textFormat: Text.PlainText
-            color: Color.foreground
+            color: Commons.Color.foreground
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             font.bold: true
@@ -153,7 +159,7 @@ Item {
             width: parent.width
             text: "Choose what appears in the sidebar."
             textFormat: Text.PlainText
-            color: Qt.darker(Color.foreground, 1.4)
+            color: Qt.darker(Commons.Color.foreground, 1.4)
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
             wrapMode: Text.WordWrap
@@ -179,7 +185,7 @@ Item {
             height: 14
             iconName: "x"
             iconSize: 14
-            tint: Color.foreground
+            tint: Commons.Color.foreground
           }
         }
       }
@@ -187,6 +193,18 @@ Item {
       Ui.PanelSeparator {
         id: managerDivider
         width: parent.width
+      }
+
+      Ui.Button {
+        width: parent.width
+        text: "Manage in Settings…"
+        tooltipText: "Manage all Dockrail preferences"
+        onClicked: {
+          var anchor = root.managerAnchor
+          root.close()
+          if (root.panel.host) root.panel.host.openSettings(anchor,
+            root.panel.screen ? root.panel.screen.name : "", "sidebar-widgets")
+        }
       }
 
       Flickable {
@@ -211,7 +229,7 @@ Item {
             width: parent.width
             text: "No optional Widgets are available in this build."
             textFormat: Text.PlainText
-            color: Qt.darker(Color.foreground, 1.5)
+            color: Qt.darker(Commons.Color.foreground, 1.5)
             font.family: Style.font.family
             font.pixelSize: Style.font.bodySmall
             font.italic: true
@@ -254,7 +272,7 @@ Item {
                 height: 18
                 iconName: managerRow.modelData.iconName
                 iconSize: 18
-                tint: Color.foreground
+                tint: Commons.Color.foreground
               }
 
               Text {
@@ -266,7 +284,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: managerRow.modelData.label
                 textFormat: Text.PlainText
-                color: Color.foreground
+                color: Commons.Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.bodySmall
                 elide: Text.ElideRight
@@ -280,7 +298,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Unavailable"
                 textFormat: Text.PlainText
-                color: Qt.darker(Color.foreground, 1.5)
+                color: Qt.darker(Commons.Color.foreground, 1.5)
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
               }
@@ -292,8 +310,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 checked: managerRow.enabledWidget
                 interactive: false
-                foreground: Color.foreground
-                accent: Color.accent
+                foreground: Commons.Color.foreground
+                accent: Commons.Color.accent
               }
 
               MouseArea {

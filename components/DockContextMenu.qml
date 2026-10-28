@@ -38,6 +38,7 @@ PopupWindow {
   signal openLauncher()
   signal openNewWindow()
   signal addApplication()
+  signal settingsRequested()
   signal removeFromDock()
   signal hideFromDock()
   signal toggleAutoHide()
@@ -906,6 +907,8 @@ PopupWindow {
   function controlPageActions() {
     if (root.sidebarHeaderMenu) return [
       DockMenuModel.headerRecord("sidebar-controls:header", "Sidebar", ""),
+      DockMenuModel.actionRecord("sidebar-controls:settings", "Dockrail Settings…",
+        "settings", true, "open-settings", null),
       DockMenuModel.actionRecord("sidebar-controls:switch", "Switch to dock",
         "panel-bottom", true, "switch-presentation", null,
         { destination: "classic" })
@@ -927,7 +930,10 @@ PopupWindow {
         "controls:auto-hide",
         root.autoHide ? "Disable Auto-Hide" : "Enable Auto-Hide",
         DockModel.dockControlIcon("auto-hide", root.autoHide),
-        true, "toggle-auto-hide", null)
+        true, "toggle-auto-hide", null),
+      DockMenuModel.separatorRecord("controls:settings-separator"),
+      DockMenuModel.actionRecord("controls:settings", "Dockrail Settings…", "settings",
+        true, "open-settings", null)
     ]
   }
 
@@ -1147,6 +1153,8 @@ PopupWindow {
       root.dismiss(); Qt.callLater(function() { root.openLauncher() }); return true
     case "add-application":
       root.dismiss(); root.addApplication(); return true
+    case "open-settings":
+      root.dismiss(); root.settingsRequested(); return true
     case "toggle-auto-hide":
       root.toggleAutoHide(); root.dismiss(); return true
     case "switch-presentation":

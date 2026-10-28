@@ -96,6 +96,27 @@ class ProcfsTests(unittest.TestCase):
             t3procfs.assert_own_listener(3785, self.root / "missing")
         self.assertEqual(ctx.exception.code, "listener_untrusted")
 
+    def test_missing_tcp6_reads_as_ipv6_disabled(self) -> None:
+        # Kernels booted with ipv6.disable=1 expose no /proc/net/tcp6.
+        self.write_net("tcp", [
+            tcp_row("0100007F:0EC9", uid=self.uid, inode=111),
+            tcp_row("0100007F:1234", "0100007F:0EC9", state="01", uid=self.uid),
+        ])
+        self.assertEqual(
+            t3procfs.listener_records(3785, self.root), [("socket:[111]", self.uid)]
+        )
+        t3procfs.assert_own_listener(3785, self.root)
+        self.assertEqual(
+            t3procfs.peer_listener_uid(0x1234, 3785, self.root), self.uid
+        )
+
+    def test_missing_tcp_table_stays_untrusted(self) -> None:
+        self.write_net("tcp6", [])
+        with self.assertRaises(ProcfsError) as ctx:
+            t3procfs.assert_own_listener(3785, self.root)
+        self.assertEqual(ctx.exception.code, "listener_untrusted")
+        self.assertIsNone(t3procfs.peer_listener_uid(0x1234, 3785, self.root))
+
     def test_listener_pid(self) -> None:
         self.write_net("tcp", [tcp_row("0100007F:0EC9", uid=self.uid, inode=4242)])
         self.write_net("tcp6", [])

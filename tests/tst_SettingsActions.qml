@@ -38,14 +38,15 @@ TestCase {
     compare(broker.confirmInstall("/tmp/example",true).error.code,"E_CONFIRMATION")
     verify(broker.prepareInstall("/tmp/example").accepted)
     var ready = {apiVersion:1,ok:true,data:{confirmation:{
-      source:"/tmp/example",id:"example.widget",name:"Example",replacesExisting:false,canInstall:true
+      manifest:{id:"example.widget",name:"Example"},source:"/tmp/example",id:"example.widget",name:"Example",replacesExisting:false,canInstall:true
     }}}
     verify(broker.finish(JSON.stringify(ready),0))
     compare(broker.status,"awaiting-confirmation")
     compare(broker.confirmInstall("/tmp/other",true).error.code,"E_CONFIRMATION")
     compare(broker.confirmInstall("/tmp/example",false).error.code,"E_CONFIRMATION")
     verify(broker.confirmInstall("/tmp/example",true).accepted)
-    compare(fakeExecutor.command.slice(-3).join("|"),"install|--source|/tmp/example")
+    compare(fakeExecutor.command.slice(-5,-1).join("|"),"install|--source|/tmp/example|--expected-manifest")
+    compare(JSON.parse(fakeExecutor.command.slice(-1)[0]),ready.data.confirmation.manifest)
     verify(broker.finish('{"apiVersion":1,"ok":false,"error":{"code":"E_CONFLICT","message":"Already installed"}}',1) === false)
     compare(broker.errorCode,"E_CONFLICT")
   }

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
+import qs.Commons as Commons
 
 Controls.AbstractButton {
   id: root
@@ -25,9 +26,9 @@ Controls.AbstractButton {
       width: 34
       height: 19
       radius: 10
-      color: root.checked ? Color.accent : Util.alpha(Color.foreground, 0.15)
+      color: root.checked ? Commons.Color.accent : Util.alpha(Commons.Color.foreground, 0.15)
       border.width: root.activeFocus ? 1 : 0
-      border.color: Color.accent
+      border.color: Commons.Color.accent
 
       Rectangle {
         width: 15
@@ -35,7 +36,7 @@ Controls.AbstractButton {
         radius: 8
         y: 2
         x: root.checked ? parent.width - width - 2 : 2
-        color: root.checked ? Color.background : Util.alpha(Color.foreground, 0.78)
+        color: root.checked ? Commons.Color.background : Util.alpha(Commons.Color.foreground, 0.78)
         Behavior on x { NumberAnimation { duration: 110 } }
       }
     }

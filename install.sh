@@ -93,7 +93,6 @@ install_client_bundle() {
     install -m 0644 "$source_dir/scripts/smartdock_settings_actions.py" "$destination/scripts/smartdock_settings_actions.py"
     install -m 0644 "$source_dir/scripts/dockrail_paths.py" "$destination/scripts/dockrail_paths.py"
     install -m 0644 "$source_dir/scripts/dockrail_migrate.py" "$destination/scripts/dockrail_migrate.py"
-    install -m 0755 "$source_dir/scripts/smartdock_seed_demo_widgets.py" "$destination/scripts/smartdock_seed_demo_widgets.py"
     install -m 0644 "$source_dir/config/settings-schema.json" "$destination/config/settings-schema.json"
     install -m 0644 "$source_dir/config/dock.json" "$destination/config/dock.json"
     local document
@@ -168,13 +167,11 @@ command -v python3 >/dev/null 2>&1 || { echo 'Python 3 is required for the CLI.'
 
 migration_json=""
 migration_was_running=false
-migration_provenance=
 if ! migration_json="$(python3 -B "$source_dir/scripts/dockrail_migrate.py" startup --runtime standalone --handoff-standalone)"; then
   printf '%s\n' "$migration_json" >&2
   exit 1
 fi
 migration_was_running="$(python3 -c 'import json,sys; print("true" if json.load(sys.stdin)["data"]["standaloneWasRunning"] else "false")' <<<"$migration_json")"
-migration_provenance="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["selectionProvenance"])' <<<"$migration_json")"
 
 install -d "$app_dir" "$config_dir" "$bin_home" "$desktop_dir"
 if [[ "$source_dir" != "$app_dir" ]]; then
@@ -222,17 +219,6 @@ if [[ ! -f "$config_dir/dock.json" ]]; then
   echo "Created configuration: $config_dir/dock.json"
 else
   echo "Preserved configuration: $config_dir/dock.json"
-fi
-
-if [[ "$migration_provenance" == "canonical-clean" ]]; then
-  demo_widget_seed_marker="$config_dir/.demo-widgets-seeded-v2"
-  demo_widget_seed_result="$(python3 "$source_dir/scripts/smartdock_seed_demo_widgets.py" "$config_dir/dock.json" "$demo_widget_seed_marker")"
-  case "$demo_widget_seed_result" in
-    seeded) echo "Enabled missing Dockrail demo Widgets for this branch." ;;
-    preserved) echo "Demo Widget selection already present." ;;
-    already) ;;
-    invalid) echo "Skipped demo Widget seeding because the existing Widget config needs repair." >&2 ;;
-  esac
 fi
 
 if $install_autostart; then "$bin_home/dockrail" autostart enable; fi

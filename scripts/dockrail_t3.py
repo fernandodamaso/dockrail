@@ -116,6 +116,11 @@ def listener_records(
         try:
             with open(proc_root / "net" / name, "r", encoding="utf-8") as handle:
                 lines = handle.read().splitlines()
+        except FileNotFoundError:
+            # No tcp6 table means IPv6 is disabled, so no IPv6 listener exists.
+            if name == "tcp6" and (proc_root / "net").is_dir():
+                continue
+            raise CliError("listener_untrusted", "cannot verify the T3 listener")
         except (OSError, ValueError, UnicodeError):
             raise CliError("listener_untrusted", "cannot verify the T3 listener")
         for line in lines[1:]:

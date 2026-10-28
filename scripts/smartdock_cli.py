@@ -116,6 +116,7 @@ AGENT_LAUNCHERS = (
     'smartdock-agent-cline',
 )
 SETUP_FEATURES = ('chrome', 'herdr', 'launcher-counts', 'agent-launchers')
+LAUNCHER_COUNTS_ARCH_PREREQUISITES = 'sudo pacman -S --needed cmake gcc qt6-base'
 
 
 class ReadinessProbes:
@@ -816,6 +817,16 @@ def setup_action(feature, status, message, mutation=None):
     return value
 
 
+def launcher_counts_missing_prerequisites(probes):
+    """Check the build tools without installing or starting a provider build."""
+    missing = []
+    if not probes.which('cmake'):
+        missing.append('CMake')
+    if not any(probes.which(name) for name in ('c++', 'g++', 'clang++')):
+        missing.append('C++ compiler')
+    return missing
+
+
 def run_setup(transport, instance, initial_status, args, checks, probes=None,
               actions=None, input_fn=input, stdin_is_tty=None):
     """Run guided setup only after execute() selected a real running host."""
@@ -1032,11 +1043,21 @@ def run_setup(transport, instance, initial_status, args, checks, probes=None,
                     'launcher-counts', 'skipped',
                     'Launcher-count provider was not built.'))
             else:
-                records.append(setup_action(
-                    'launcher-counts', 'manual',
-                    'Dockrail never builds launcher counts automatically. Run this yourself '
-                    'after reviewing the optional build requirements:\n  '
-                    + actions.launcher_counts_command()))
+                missing = launcher_counts_missing_prerequisites(probes)
+                if missing:
+                    records.append(setup_action(
+                        'launcher-counts', 'unavailable',
+                        'Missing launcher-count build prerequisites: '
+                        + ', '.join(missing) + '.\n'
+                        'Install them on Omarchy/Arch with:\n  '
+                        + LAUNCHER_COUNTS_ARCH_PREREQUISITES
+                        + '\nNo provider build was started.'))
+                else:
+                    records.append(setup_action(
+                        'launcher-counts', 'manual',
+                        'Dockrail never builds launcher counts automatically. Run this yourself '
+                        'after reviewing the optional build requirements:\n  '
+                        + actions.launcher_counts_command()))
 
     final, settings = setup_snapshot(transport, instance, checks, probes)
     return envelope({
@@ -1326,7 +1347,7 @@ def build_parser():
     parser = Parser(prog='dockrail', add_help=False, allow_abbrev=False)
     add_globals(parser)
     commands = parser.add_subparsers(dest='group')
-    for name in ('help', 'agent-guide', 'status', 'doctor'):
+    for name in ('help', 'agent-guide', 'status', 'doctor', 'settings'):
         child_parser(commands, name)
     setup = child_parser(commands, 'setup')
     setup.add_argument('--feature', choices=SETUP_FEATURES)
@@ -1580,6 +1601,15 @@ def execute(args):
         if args.group == 'doctor':
             error.data['checks'] = checks
         raise
+    if args.group == 'settings':
+        # Fixed no-arg IPC entry point. Never use the CLI configuration mutator
+        # to implement a second UI writer.
+        response = transport.run(['qs', 'ipc', '--pid', str(instance['pid']), 'call', '--',
+                                  'dockrail-settings', 'open'])
+        if response != 'opened':
+            raise CliError('E_RUNTIME_NOT_FOUND',
+                           'Settings needs an active dock or sidebar anchor on a connected monitor.')
+        return envelope({'opened': True, 'runtime': status['data']['runtime']})
     if args.group == 'setup':
         checks['liveRuntime'] = True
         return run_setup(transport, instance, status, args, checks)

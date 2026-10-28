@@ -36,11 +36,11 @@ def inspect_install(store, source):
         return {
             'source': source, 'id': manifest['id'], 'name': manifest['name'],
             'replacesExisting': existing, 'canInstall': not existing,
-            'requiresConfirmation': True,
+            'requiresConfirmation': True, 'manifest': manifest,
         }
 
 
-def execute(action, widget_id=None, name=None, source=None, store=None, launcher_runner=None):
+def execute(action, widget_id=None, name=None, source=None, expected_manifest=None, store=None, launcher_runner=None):
     store = store or Store()
     if action == 'prepare-install':
         return envelope({'confirmation': inspect_install(store, source)})
@@ -52,10 +52,9 @@ def execute(action, widget_id=None, name=None, source=None, store=None, launcher
         return envelope({'created': store.create(widget_id, name), 'enabled': False,
                          'nextAction': 'offer-open-folder'})
     if action == 'install':
-        confirmation = inspect_install(store, source)
-        if confirmation['replacesExisting']:
-            raise WidgetError('E_CONFLICT', 'This Widget is already installed; install will not overwrite it.', confirmation)
-        package = store.install(source)
+        if not isinstance(expected_manifest, dict) or not valid_widget_id(expected_manifest.get('id')):
+            raise WidgetError('E_CONFIRMATION', 'Install requires a reviewed Widget manifest.')
+        package = store.install(explicit_source(source), expected_manifest=expected_manifest)
         return envelope({'package': package, 'enabledBySettings': False})
     if action in ('launchers-add', 'launchers-remove'):
         # INF-4 owns these commands and their file ownership tracking.
@@ -85,9 +84,11 @@ def main(argv=None):
     parser.add_argument('--id')
     parser.add_argument('--name')
     parser.add_argument('--source')
+    parser.add_argument('--expected-manifest')
     args = parser.parse_args(argv)
     try:
-        result = execute(args.action, widget_id=args.id, name=args.name, source=args.source)
+        result = execute(args.action, widget_id=args.id, name=args.name, source=args.source,
+                         expected_manifest=json.loads(args.expected_manifest) if args.expected_manifest else None)
     except WidgetError as error:
         result = error_envelope(error)
     except (OSError, ValueError) as error:
