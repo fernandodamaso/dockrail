@@ -78,6 +78,8 @@ PopupWindow {
   readonly property int activityTotal: activityPresentation.total
   property var agentRows: []
   property string herdrLabel: ""
+  property string herdrProduct: "Herdr"
+  property string herdrFocusHint: "Click a row to focus its pane."
   property var herdrCounters: []
   readonly property bool showWindowPreviews:
     root.members.length >= 2 && !root.herdrOnly
@@ -197,6 +199,8 @@ PopupWindow {
     root.agentRows = []
     root.herdrOnly = false
     root.herdrLabel = ""
+    root.herdrProduct = "Herdr"
+    root.herdrFocusHint = "Click a row to focus its pane."
     root.herdrCounters = []
     root.anchorHovered = false
     root.anchorItem = null
@@ -264,6 +268,8 @@ PopupWindow {
     root.herdrOnly = requestedAgents.length > 0
       && anchorItem["previewHerdrOnly"] === true
     root.herdrLabel = String(anchorItem["previewHerdrLabel"] || "")
+    root.herdrProduct = String(anchorItem["previewHerdrProduct"] || "Herdr")
+    root.herdrFocusHint = String(anchorItem["previewHerdrFocusHint"] || "Click a row to focus its pane.")
     root.herdrCounters = Array.isArray(anchorItem["previewHerdrCounters"])
       ? anchorItem["previewHerdrCounters"] : []
     root.anchorHovered = true
@@ -344,6 +350,8 @@ PopupWindow {
     root.herdrOnly = root.agentRows.length > 0
       && root.anchorItem["previewHerdrOnly"] === true
     root.herdrLabel = String(root.anchorItem["previewHerdrLabel"] || "")
+    root.herdrProduct = String(root.anchorItem["previewHerdrProduct"] || "Herdr")
+    root.herdrFocusHint = String(root.anchorItem["previewHerdrFocusHint"] || "Click a row to focus its pane.")
     root.herdrCounters = Array.isArray(root.anchorItem["previewHerdrCounters"])
       ? root.anchorItem["previewHerdrCounters"] : []
     Qt.callLater(root.refreshSupplementaryContent)
@@ -773,7 +781,7 @@ PopupWindow {
             anchors.right: herdrCountersRow.left
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
-            text: root.herdrLabel ? "Herdr · " + root.herdrLabel : "Herdr"
+            text: root.herdrLabel ? root.herdrProduct + " · " + root.herdrLabel : root.herdrProduct
             textFormat: Text.PlainText
             color: Color.menu.text
             font.family: Style.font.menuFamily
@@ -866,7 +874,7 @@ PopupWindow {
                 + ", " + HerdrModel.displayAgentTabSecondary(modelData)
                 + ", " + HerdrModel.statusLabel(modelData.status)
               Accessible.description: actionable
-                ? "Focus this Herdr agent pane" : "Remote Herdr agent"
+                ? (root.herdrProduct === "T3 Code" ? "Open this T3 thread" : "Focus this Herdr agent pane") : "Remote Herdr agent"
               Accessible.onPressAction: if (actionable)
                 root.activateAgentTarget(capturedTarget)
 
@@ -1001,7 +1009,7 @@ PopupWindow {
           width: contentFlow.width
           height: root.agentFooterHeight
           leftPadding: Style.space(4)
-          text: "Click a row to focus its pane."
+          text: root.herdrFocusHint
           textFormat: Text.PlainText
           color: Util.alpha(Color.menu.text, 0.58)
           font.family: Style.font.menuFamily
@@ -1154,6 +1162,8 @@ PopupWindow {
       root.refreshAgentContent()
     }
     function onPreviewHerdrLabelChanged() { root.refreshAgentContent() }
+    function onPreviewHerdrProductChanged() { root.refreshAgentContent() }
+    function onPreviewHerdrFocusHintChanged() { root.refreshAgentContent() }
     function onPreviewHerdrCountersChanged() { root.refreshAgentContent() }
   }
 

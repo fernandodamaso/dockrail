@@ -12,6 +12,7 @@ import "DockSidebarWidgetModel.js" as WidgetModel
 Item {
   id: root
   property var widgetContext: ({})
+  property string sourceFilter: "herdr"
 
   readonly property var snapshot: widgetContext && widgetContext.data
     ? widgetContext.data : ({})
@@ -44,14 +45,19 @@ Item {
     var all = WidgetModel.listLike(snapshot.servers) || []
     return all.filter(function(server) {
       return server && typeof server === "object"
+        && HerdrModel.serverSource(server) === root.sourceFilter
         && root.matchedIdSet[String(server.id || "")] !== true
     })
   }
   readonly property var agents: {
     var all = WidgetModel.listLike(snapshot.agents) || []
+    var kept = Object.create(null)
+    root.servers.forEach(function(server) {
+      kept[String(server.id || "")] = true
+    })
     return all.filter(function(agent) {
       return agent && typeof agent === "object"
-        && root.matchedIdSet[String(agent.serverId || "")] !== true
+        && kept[String(agent.serverId || "")] === true
     })
   }
   readonly property int unmatchedBlocked: {
@@ -86,6 +92,13 @@ Item {
       if (transport === "remote") {
         detail = String(server.health || "") === "live" && items.length > 0
           ? "Live" : SidebarModel.herdrStateTitle(server, root.snapshot)
+      } else if (HerdrModel.serverSource(server) === "t3") {
+        var pairingHint = SidebarModel.t3PairingHint(server)
+        if (pairingHint) detail = pairingHint
+        else if (String(server.errorCode || "") === "server_not_running")
+          detail = "T3 Code is not running"
+        else if (String(server.health || "") !== "live")
+          detail = SidebarModel.herdrStateTitle(server, root.snapshot)
       }
       output.push({
         kind: "session",
@@ -115,6 +128,7 @@ Item {
           key: String(agent.id || id + ":agent"),
           title: HerdrModel.displayAgentTitle(agent),
           detail: secondary || (String(agent.agent || "agent") + " · " + String(agent.status || "unknown")),
+          projectIcon: root.sourceFilter === "t3" ? agent.projectIcon || null : null,
           status: String(agent.status || "unknown")
         })
       })
@@ -132,12 +146,20 @@ Item {
   function summary() {
     if (!root.hasFallbackContent) return ""
     var total = root.agents.length
-    var text = "Unmatched / unattached Herdr sessions"
+    var isT3 = root.sourceFilter === "t3"
+    var text = isT3 ? "Unmatched / unattached T3 Code threads"
+      : "Unmatched / unattached Herdr sessions"
     if (total > 0)
-      text += " · " + String(total) + (total === 1 ? " agent" : " agents")
+      text += " · " + String(total) + (total === 1
+        ? (isT3 ? " thread" : " agent") : (isT3 ? " threads" : " agents"))
     if (root.unmatchedBlocked > 0)
       text += " · " + root.unmatchedBlocked + " blocked"
-    if (SidebarModel.herdrInventoryPartial(root.snapshot))
+    var partial = root.sourceFilter === "t3"
+      ? root.servers.some(function(server) {
+          return SidebarModel.herdrInventoryPartial(root.snapshot, server)
+        })
+      : SidebarModel.herdrInventoryPartial(root.snapshot)
+    if (partial)
       text += " · partial"
     return text
   }
@@ -300,16 +322,32 @@ Item {
               elide: Text.ElideRight
             }
 
-            Text {
+            Row {
               visible: modelData.detail.length > 0
               width: parent.width
-              text: modelData.detail
-              textFormat: Text.PlainText
-              color: Commons.Color.foreground
-              opacity: 0.6
-              font.family: Style.font.family
-              font.pixelSize: Math.max(10, Style.font.body - 2)
-              elide: Text.ElideRight
+              height: Math.max(fallbackDetailLabel.implicitHeight, fallbackProjectIcon.visible ? fallbackProjectIcon.height : 0)
+              spacing: fallbackProjectIcon.visible ? Style.space(4) : 0
+
+              DockT3ProjectIcon {
+                id: fallbackProjectIcon
+                icon: modelData.projectIcon || null
+                visible: icon !== null && parent.width >= width
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                id: fallbackDetailLabel
+                width: Math.max(0, parent.width - (fallbackProjectIcon.visible ? fallbackProjectIcon.width + parent.spacing : 0))
+                height: parent.height
+                text: modelData.detail
+                textFormat: Text.PlainText
+                color: Commons.Color.foreground
+                opacity: 0.6
+                font.family: Style.font.family
+                font.pixelSize: Math.max(10, Style.font.body - 2)
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+              }
             }
           }
         }

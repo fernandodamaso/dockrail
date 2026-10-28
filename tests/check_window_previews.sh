@@ -59,7 +59,8 @@ require_pattern 'modelData\.focusAgentSupported[[:space:]]*===[[:space:]]*true' 
 require_pattern 'activeFocusOnTab:[[:space:]]*actionable' components/DockWindowPreview.qml
 require_pattern 'Keys\.onReturnPressed:' components/DockWindowPreview.qml
 require_pattern 'text:[[:space:]]*"↵ Focus"' components/DockWindowPreview.qml
-require_pattern 'text:[[:space:]]*"Click a row to focus its pane\."' components/DockWindowPreview.qml
+require_pattern 'property[[:space:]]+string[[:space:]]+herdrFocusHint:[[:space:]]*"Click a row to focus its pane\."' components/DockWindowPreview.qml
+require_pattern 'text:[[:space:]]*root\.herdrFocusHint' components/DockWindowPreview.qml
 require_pattern 'HerdrModel\.displayAgentTabSecondary\(' components/DockWindowPreview.qml
 require_pattern 'DockHerdrStatusMark[[:space:]]*\{' components/DockWindowPreview.qml
 require_pattern 'Qt\.callLater\(root\.refreshSupplementaryContent\)' components/DockWindowPreview.qml

@@ -23,7 +23,7 @@ class SidebarWidgetConfigTests(unittest.TestCase):
         self.assertTrue(result['ok'], result)
         spec = result['data']['settings']['sidebarWidgets']
         self.assertEqual(spec['default'], [])
-        self.assertEqual(spec['registeredIds'], ['herdr.agents'])
+        self.assertEqual(spec['registeredIds'], ['herdr.agents', 't3.threads'])
         self.assertEqual(spec['format'], 'sidebar-widget-ids')
         before = self.command('config get --json')['data']['settings']
         self.assertEqual(before['sidebarWidgets'], ['future.clock'])
@@ -76,5 +76,5 @@ class SidebarWidgetConfigTests(unittest.TestCase):
 
     def test_bundled_schema_never_advertises_fixture_ids(self):
         result = cli.bundled_schema('sidebarWidgets')
-        self.assertEqual(result['data']['settings']['sidebarWidgets']['registeredIds'], ['herdr.agents'])
+        self.assertEqual(result['data']['settings']['sidebarWidgets']['registeredIds'], ['herdr.agents', 't3.threads'])
         self.assertNotIn('fixture.', json.dumps(result))

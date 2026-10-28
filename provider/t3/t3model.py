@@ -13,6 +13,8 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+from t3icons import project_icon
+
 SCHEMA_VERSION = 1
 SHELL_SCHEMA_VERSION = 2
 MAX_VISIBLE_THREADS = 64
@@ -69,20 +71,18 @@ def _is_subagent(thread: dict[str, Any]) -> bool:
 
 
 def unread(thread: dict[str, Any]) -> bool:
-    """True when the latest run completed after the thread was last visited."""
+    """True when the latest completion has not been visited or settled."""
     completed = thread.get("latestRunCompletedAt")
     if not isinstance(completed, str) or not completed:
         return False
     completed_ms = _parse_ms(completed)
     if completed_ms is None:
         return False
-    visited = thread.get("lastVisitedAt")
-    if not isinstance(visited, str) or not visited:
-        return True
-    visited_ms = _parse_ms(visited)
-    if visited_ms is None:
-        return True
-    return visited_ms < completed_ms
+    for field in ("lastVisitedAt", "settledAt"):
+        acknowledged_ms = _parse_ms(thread.get(field))
+        if acknowledged_ms is not None and acknowledged_ms >= completed_ms:
+            return False
+    return True
 
 
 def classify(thread: dict[str, Any], now_ms: int) -> str:
@@ -371,6 +371,7 @@ def build_snapshot(
                     "live": True,
                     "workspaceId": project_id if isinstance(project_id, str) else "",
                     "workspaceLabel": project_title,
+                    "projectIcon": project_icon(project),
                     "tabId": project_id if isinstance(project_id, str) else "",
                     "tabTitle": project_title,
                     "title": title,
