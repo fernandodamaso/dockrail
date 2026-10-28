@@ -4,13 +4,13 @@
 // source of state. Installation/runtime status comes only from doctor.
 var cards = [
   {id:"chrome", key:"chromeProfilesTabs", title:"Chrome",
-   subtitle:"Profile badges, unread counts and tabs in the sidebar", icon:"chrome",
+   subtitle:"Profile badges, unread counts and tabs in the sidebar", icon:"app-window",
    setup:"dockrail setup --feature chrome", home:"apps", homeLabel:"Apps › Chrome"},
   {id:"coding-agents", key:"herdrAgents", title:"Coding agents (Herdr)",
    subtitle:"Agent status in the sidebar and on terminal icons", icon:"bot",
    setup:"dockrail setup --feature herdr", home:"sidebar-widgets", homeLabel:"Sidebar & Widgets"},
   {id:"launcher-counts", key:"launcherCounts", title:"Launcher badge counts",
-   subtitle:"Unread numbers from apps; dots remain the fallback", icon:"badge-check",
+   subtitle:"Unread numbers from apps; dots remain the fallback", icon:"circle-alert",
    setup:"dockrail setup --feature launcher-counts", home:"behavior", homeLabel:"Behavior › Attention"},
   {id:"agent-launchers", key:"agentLaunchers", title:"Terminal agent launchers",
    subtitle:"Desktop launchers for installed coding agents", icon:"terminal",
