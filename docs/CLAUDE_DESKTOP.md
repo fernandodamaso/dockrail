@@ -62,7 +62,8 @@ sidebar, hover-preview or dock context-menu session row
 | `PostToolUse` | working; also answers an open prompt, which restores the state before it |
 | `PreToolUse` for `AskUserQuestion` | input needed until you answer |
 | `Notification` (permission, elicitation or agent input prompt) | input needed until the next completed tool call |
-| `Stop` | done, or soft input needed if the turn ends with a question; input needed while a prompt is still open |
+| `Stop` | done, or soft input needed if the turn ends with a question; input needed while a prompt is still open; a turn that ends while background agents still run stays working until they finish |
+| Subagent `PostToolUse` after a finished turn | working again, since background work is still running |
 | `SessionEnd` | record removed |
 | Subagent `PostToolUse` while a prompt is open | answers it: back to the state before the prompt |
 | Any other subagent event | keeps a working session fresh, nothing else |

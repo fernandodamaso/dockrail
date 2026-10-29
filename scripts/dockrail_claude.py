@@ -167,6 +167,12 @@ def asks_user(payload: Mapping[str, Any]) -> bool:
     )
 
 
+def has_background_tasks(payload: Mapping[str, Any]) -> bool:
+    """Return whether a Stop payload reports background work still in flight."""
+    tasks = payload.get("background_tasks")
+    return bool(tasks) and not isinstance(tasks, str)
+
+
 def status_for(payload: Mapping[str, Any], awaiting_user: bool = False) -> str | None:
     """Map one hook payload to a session status; ``None`` keeps the record."""
     event = payload.get("hook_event_name")
@@ -177,7 +183,10 @@ def status_for(payload: Mapping[str, Any], awaiting_user: bool = False) -> str |
     if event in ("UserPromptSubmit", "PostToolUse"):
         return "working"
     if event == "Stop":
-        return "blocked" if awaiting_user else "done"
+        if awaiting_user:
+            return "blocked"
+        # A turn that ends while background agents still run stays working until they finish.
+        return "working" if has_background_tasks(payload) else "done"
     if event == "Notification":
         kind = payload.get("notification_type")
         if kind in BLOCKING_NOTIFICATIONS:
@@ -282,8 +291,10 @@ def subagent_update(payload: Mapping[str, Any], record: dict[str, Any], now: int
 
     Claude Code does not say which agent a prompt belongs to, so a session tracks
     one pending prompt. The next completed tool call, from Claude or a subagent,
-    answers it and the state from before the prompt returns. Subagent payloads
-    never supply cwd, transcript or process, and never touch awaitingUser.
+    answers it and the state from before the prompt returns. A subagent tool call
+    after a finished turn means background work is still running, so it reopens
+    the turn as working. Subagent payloads never supply cwd, transcript or
+    process, and never touch awaitingUser.
     """
     if not record or record.get("sessionId") != payload.get("session_id"):
         return None
@@ -306,6 +317,8 @@ def subagent_update(payload: Mapping[str, Any], record: dict[str, Any], now: int
         return resumed
     if record.get("status") == "working":
         return dict(record, updatedAtMs=now)
+    if event == "PostToolUse" and record.get("status") == "done":
+        return dict(record, status="working", updatedAtMs=now)
     return None
 
 

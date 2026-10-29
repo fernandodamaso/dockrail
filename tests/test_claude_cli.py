@@ -119,8 +119,9 @@ class HookTests(unittest.TestCase):
         [record] = self.records()
         self.assertEqual((record["status"], record["updatedAtMs"]), ("done", 1_000_000_000_000))
         self.assertNotIn("pendingPrompt", record)
-        # Once answered, a finished subagent's later tool calls change nothing.
-        self.assertEqual(self.hook(dict(sub, hook_event_name="PostToolUse", tool_name="Bash")), "ignored")
+        # Once answered, a later subagent tool call means background work still runs: the turn reopens.
+        self.assertEqual(self.hook(dict(sub, hook_event_name="PostToolUse", tool_name="Bash")), "working")
+        self.assertEqual(self.records()[0]["status"], "working")
 
     def test_subagent_prompt_during_pending_question_restores_question(self) -> None:
         base = {"session_id": "s16", "cwd": "/w/proj"}
@@ -196,10 +197,47 @@ class HookTests(unittest.TestCase):
         [record] = self.records()
         self.assertEqual((record["status"], record["updatedAtMs"]), ("working", 1_000_000_000_000))
         self.assertEqual(self.hook(dict(base, hook_event_name="Stop")), "done")
-        self.assertEqual(self.hook(post), "ignored")
+        # A subagent tool call after the turn finished means background work still runs.
+        self.assertEqual(self.hook(post), "working")
         # Subagent SessionEnd never removes the parent record.
         self.assertEqual(self.hook(dict(sub, hook_event_name="SessionEnd")), "ignored")
+        self.assertEqual(self.records()[0]["status"], "working")
+
+    def test_stop_with_background_tasks_stays_working_until_they_finish(self) -> None:
+        base = {"session_id": "s30", "cwd": "/w/proj"}
+        self.hook(dict(base, hook_event_name="UserPromptSubmit"))
+        running = [{"task_id": "t1", "description": "Run tests"}]
+        self.assertEqual(self.hook(dict(base, hook_event_name="Stop", background_tasks=running)), "working")
+        self.assertEqual(self.records()[0]["status"], "working")
+        self.assertEqual(self.hook(dict(base, hook_event_name="Stop", background_tasks=[])), "done")
         self.assertEqual(self.records()[0]["status"], "done")
+        self.assertEqual(self.hook(dict(base, hook_event_name="Stop", background_tasks="")), "done")
+        self.assertEqual(self.hook(dict(base, hook_event_name="Stop", background_tasks={"t1": {}})), "working")
+
+    def test_stop_with_background_tasks_and_question_stays_blocked(self) -> None:
+        base = {"session_id": "s31", "cwd": "/w/proj"}
+        self.hook(dict(base, hook_event_name="UserPromptSubmit"))
+        self.hook(dict(base, hook_event_name="PostToolUse", tool_name="mcp__ccd_turn__wrap_up",
+                       tool_input={"ask": "Which?"}))
+        running = [{"task_id": "t1", "description": "Run tests"}]
+        self.assertEqual(self.hook(dict(base, hook_event_name="Stop", background_tasks=running)), "blocked")
+        [record] = self.records()
+        self.assertEqual((record["status"], record["awaitingUser"]), ("blocked", True))
+
+    def test_subagent_tool_call_after_question_keeps_it_blocked(self) -> None:
+        base = {"session_id": "s32", "cwd": "/w/proj"}
+        sub = dict(base, agent_id="agent-1")
+        self.hook(dict(base, hook_event_name="UserPromptSubmit"))
+        self.hook(dict(base, hook_event_name="PostToolUse", tool_name="mcp__ccd_turn__wrap_up",
+                       tool_input={"ask": "Which?"}))
+        self.assertEqual(self.hook(dict(base, hook_event_name="Stop")), "blocked")
+        self.assertEqual(self.hook(dict(sub, hook_event_name="PostToolUse", tool_name="Bash")), "ignored")
+        [record] = self.records()
+        self.assertEqual((record["status"], record["awaitingUser"]), ("blocked", True))
+        # A turn without a question clears awaitingUser, so the next main Stop ends done.
+        self.hook(dict(base, hook_event_name="PostToolUse", tool_name="mcp__ccd_turn__wrap_up",
+                       tool_input={}))
+        self.assertEqual(self.hook(dict(base, hook_event_name="Stop")), "done")
 
     def test_agent_tagged_prompt_also_blocks(self) -> None:
         base = {"session_id": "s21", "cwd": "/w/proj"}
