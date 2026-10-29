@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict'
+import { loadModel, read, plain, hostHarness } from './host_harness.mjs'
+const registry=loadModel('DockSettingsRegistry')
+const metadata=JSON.parse(read('config/settings-schema.json'))
+const hits=plain(registry.search(metadata,'glow'))
+assert.ok(hits.length>=3)
+assert.equal(hits[0].key,'hoverGlowEnabled')
+assert.ok(hits.every(hit=>hit.section==='appearance'))
+assert.equal(registry.search(metadata,'NoKeyShouldEverMatch').length,0)
+assert.ok(plain(registry.search(metadata,'herdr')).some(hit=>hit.key==='dockHerdrIndicators'))
+assert.ok(plain(registry.search(metadata,'magnification')).some(hit=>hit.key==='magnification'))
+assert.ok(plain(registry.search(metadata,'sidebarMonitor')).every(hit=>hit.key!=='sidebarMonitor'))
+const counts=plain(registry.searchCounts(hits))
+assert.equal(counts.appearance,hits.length)
+assert.equal(registry.firstRun(true,true,'missing'),true)
+assert.equal(registry.firstRun(true,false,'missing'),false)
+assert.equal(registry.firstRun(false,true,'loaded'),false)
+assert.equal(registry.firstRun(true,true,'invalid'),false)
+const input={sidebarMonitor:'HDMI-A-1',presentationModeByMonitor:{'OLD-DP':'classic'}}
+const view={entries:[{connector:'HDMI-A-1',mode:'sidebar'},{connector:'DP-1',mode:'classic'}]}
+const conversion=plain(registry.legacyConversion(input,view))
+assert.deepEqual(conversion.patch.presentationModeByMonitor,
+ {'OLD-DP':'classic','HDMI-A-1':'sidebar','DP-1':'classic'})
+assert.deepEqual(conversion.expected.presentationModeByMonitor,{'OLD-DP':'classic'})
+assert.deepEqual(input.presentationModeByMonitor,{'OLD-DP':'classic'})
+const h=hostHarness({presentationModeByMonitor:{'OLD-DP':'classic'}})
+const outcome=h.host.saveSettingsIntent(conversion.patch,conversion.expected)
+assert.equal(outcome.accepted,true)
+assert.deepEqual(plain(h.host.settings.presentationModeByMonitor),conversion.patch.presentationModeByMonitor)
+const stale=h.host.saveSettingsIntent(conversion.patch,conversion.expected)
+assert.equal(stale.accepted,false)
+assert.equal(stale.reply.error.code,'E_STALE')
+console.log('SET-08 search, first-run guard and stale-safe legacy conversion passed')
