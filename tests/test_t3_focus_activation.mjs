@@ -3,6 +3,7 @@ import { loadModel } from './host_harness.mjs'
 import { interactionFixture, qmlMethods } from './sidebar_interaction_fixture.mjs'
 
 const T3Activation = loadModel('DockT3ActivationModel')
+const ClaudeActivation = loadModel('DockClaudeActivationModel')
 
 // Pure URL construction: exact segment encoding, strict rejection.
 assert.equal(T3Activation.threadUrl('t3:env-1', 'thread-1'),
@@ -58,15 +59,16 @@ assert.equal(T3Activation.threadUrl('t3:e', 42), '')
 // Paired surrogates (real emoji) are valid opaque identity.
 assert.ok(T3Activation.threadUrl('t3:env-1', 'ok🎉') !== '')
 
-// Controller fixture: T3 server plus an injected URL dispatcher.
-function t3Fixture() {
+// Controller fixture: one activation server (T3, Claude or Herdr) plus injected
+// URL dispatchers. Agent rows carry the given desktopSessionId.
+function activationFixture(serverId, source, desktopSessionId) {
   const f = interactionFixture()
   const windowRow = f.controller.projection.rows[0]
   const windowKey = windowRow.key
   const shared = {
     windowKey,
     providerEpoch: 'epoch-1',
-    serverId: 't3:env-1',
+    serverId,
     connectionGeneration: 1,
     nested: true,
     toplevel: windowRow.toplevel,
@@ -81,8 +83,8 @@ function t3Fixture() {
   }
   const agentRow = Object.assign({}, shared, {
     kind: 'herdr-agent',
-    key: JSON.stringify(['herdr-agent', windowKey, 't3:env-1:1:thread-1']),
-    agentId: 't3:env-1:1:thread-1',
+    key: JSON.stringify(['herdr-agent', windowKey, serverId + ':1:thread-1']),
+    agentId: serverId + ':1:thread-1',
     paneId: 'thread-1',
     terminalId: 'term-1',
     title: 'Same Title',
@@ -90,8 +92,8 @@ function t3Fixture() {
   })
   const secondAgent = Object.assign({}, shared, {
     kind: 'herdr-agent',
-    key: JSON.stringify(['herdr-agent', windowKey, 't3:env-1:1:thread-2']),
-    agentId: 't3:env-1:1:thread-2',
+    key: JSON.stringify(['herdr-agent', windowKey, serverId + ':1:thread-2']),
+    agentId: serverId + ':1:thread-2',
     paneId: 'thread-2',
     terminalId: 'term-2',
     title: 'Same Title',
@@ -99,7 +101,7 @@ function t3Fixture() {
   })
   f.controller.projection.rows.push(agentRow, secondAgent)
   f.controller.herdrAssociations = {
-    byWindowKey: { [windowKey]: 't3:env-1' }, unmatchedServerIds: [],
+    byWindowKey: { [windowKey]: serverId }, unmatchedServerIds: [],
   }
   const focusCalls = []
   let focusSeq = 0
@@ -117,14 +119,15 @@ function t3Fixture() {
     connectionGeneration: row.connectionGeneration,
     paneId: row.paneId,
     terminalId: row.terminalId,
+    desktopSessionId,
   }))
   const liveToplevels = [windowRow.toplevel]
   const bridge = {
     snapshotReady: true,
     herdrAssociationEpoch: agentRow.providerEpoch,
-    herdrAssociations: { byWindowKey: { 'bridge-window': 't3:env-1' }, unmatchedServerIds: [] },
+    herdrAssociations: { byWindowKey: { 'bridge-window': serverId }, unmatchedServerIds: [] },
     snapshot: {
-      servers: [{ id: 't3:env-1', source: 't3', capabilities: { focusAgent: true } }],
+      servers: [{ id: serverId, source, capabilities: { focusAgent: true } }],
       agents: canonicalAgents,
     },
     raises: 0,
@@ -134,7 +137,7 @@ function t3Fixture() {
     isAlive(toplevel) { return liveToplevels.includes(toplevel) },
     currentAgent(windowKeyValue, agentId) {
       if (windowKeyValue !== 'bridge-window'
-          || this.herdrAssociations.byWindowKey[windowKeyValue] !== 't3:env-1') return null
+          || this.herdrAssociations.byWindowKey[windowKeyValue] !== serverId) return null
       return canonicalAgents.find(agent => agent.id === agentId) || null
     },
   }
@@ -148,10 +151,12 @@ function t3Fixture() {
     },
   }
   const dispatches = []
+  const claudeDispatches = []
   const HerdrModel = loadModel('DockHerdrModel')
   const agentActions = qmlMethods('DockHerdrAgentActions.qml', {
     HerdrModel,
     T3Activation,
+    ClaudeActivation,
     Qt: { openUrlExternally() { return false } },
     bridge,
     windowActions,
@@ -166,11 +171,16 @@ function t3Fixture() {
     dispatches.push(String(url))
     return true
   }
+  agentActions.openClaudeSessionUrl = url => {
+    claudeDispatches.push(String(url))
+    return true
+  }
   f.controller.herdrAgentActions = agentActions
   f.bridge = bridge
   f.windowActions = windowActions
   f.focusCalls = focusCalls
   f.dispatches = dispatches
+  f.claudeDispatches = claudeDispatches
   f.canonicalAgents = canonicalAgents
   f.agentActions = agentActions
   f.agentRow = agentRow
@@ -178,6 +188,10 @@ function t3Fixture() {
   f.windowKey = windowKey
   f.liveToplevels = liveToplevels
   return f
+}
+
+function t3Fixture() {
+  return activationFixture('t3:env-1', 't3', '')
 }
 
 // First success raises and revalidates with zero dispatches; second success
@@ -197,6 +211,7 @@ function t3Fixture() {
   f.agentActions.onHerdrFocusFinished('focus-2', true, '')
   assert.equal(f.dispatches.length, 1)
   assert.equal(f.dispatches[0], 't3code://threads/env-1/thread-1')
+  assert.equal(f.claudeDispatches.length, 0, 'T3 never dispatches Claude routes')
   assert.equal(f.focusCalls.length, 2, 'no third provider call')
   assert.equal(f.bridge.raises, 1, 'no second raise')
 }
@@ -344,6 +359,85 @@ for (const mutate of [
   assert.equal(f.focusCalls.length, 3)
   f.agentActions.onHerdrFocusFinished('focus-3', true, '')
   assert.deepEqual(f.dispatches, ['t3code://threads/env-1/thread-2'])
+}
+
+// Claude sessions: the raised window opens the Claude Desktop session route
+// exactly once after the second validation; no thread URL and no third call.
+const CLAUDE_SESSION = 'local_9c9eb232-bfa0-4023-ac76-79aee015b3c5'
+{
+  const f = activationFixture('claude:local', 'claude', CLAUDE_SESSION)
+  const target = f.agentActions.captureAgentTarget(f.agentRow.toplevel, f.agentRow)
+  assert.ok(target)
+  assert.equal(target.desktopSessionId, CLAUDE_SESSION)
+  assert.equal(f.agentActions.activateHerdrTarget(target), true)
+  f.agentActions.onHerdrFocusFinished('focus-1', true, '')
+  assert.equal(f.bridge.raises, 1)
+  assert.equal(f.claudeDispatches.length, 0, 'no dispatch before second validation')
+  f.agentActions.onHerdrFocusFinished('focus-2', true, '')
+  assert.deepEqual(f.claudeDispatches, ['claude://code/continue?session=' + CLAUDE_SESSION])
+  assert.equal(f.dispatches.length, 0, 'Claude never dispatches thread URLs')
+  assert.equal(f.focusCalls.length, 2, 'no third provider call')
+  assert.equal(f.bridge.raises, 1, 'no second raise')
+  assert.equal(f.agentActions.focusErrorFor(f.agentRow.key), '')
+}
+
+// Unknown desktopSessionId: the raised window is success; nothing opens and no
+// error is recorded.
+{
+  const f = activationFixture('claude:local', 'claude', '')
+  const target = f.agentActions.captureAgentTarget(f.agentRow.toplevel, f.agentRow)
+  assert.ok(target)
+  assert.equal(target.desktopSessionId, '')
+  f.agentActions.activateHerdrTarget(target)
+  f.agentActions.onHerdrFocusFinished('focus-1', true, '')
+  f.agentActions.onHerdrFocusFinished('focus-2', true, '')
+  assert.equal(f.bridge.raises, 1)
+  assert.equal(f.claudeDispatches.length, 0)
+  assert.equal(f.dispatches.length, 0)
+  assert.equal(f.agentActions.focusErrorFor(f.agentRow.key), '')
+}
+
+// Rejected, unavailable and throwing dispatchers record unsupported and keep
+// the raised window.
+for (const opener of [
+  url => { return false },
+  null,
+  url => { throw new Error('boom') },
+]) {
+  const f = activationFixture('claude:local', 'claude', CLAUDE_SESSION)
+  f.agentActions.openClaudeSessionUrl = opener
+  const target = f.agentActions.captureAgentTarget(f.agentRow.toplevel, f.agentRow)
+  f.agentActions.activateHerdrTarget(target)
+  f.agentActions.onHerdrFocusFinished('focus-1', true, '')
+  f.agentActions.onHerdrFocusFinished('focus-2', true, '')
+  assert.equal(f.bridge.raises, 1, 'raised window is retained')
+  assert.equal(f.claudeDispatches.length, 0)
+  assert.equal(f.agentActions.focusErrorFor(f.agentRow.key), 'unsupported')
+}
+
+// Stale Claude target after the raise opens nothing.
+{
+  const f = activationFixture('claude:local', 'claude', CLAUDE_SESSION)
+  const target = f.agentActions.captureAgentTarget(f.agentRow.toplevel, f.agentRow)
+  f.agentActions.activateHerdrTarget(target)
+  f.agentActions.onHerdrFocusFinished('focus-1', true, '')
+  f.canonicalAgents[0].connectionGeneration = 2
+  f.agentActions.onHerdrFocusFinished('focus-2', true, '')
+  assert.equal(f.claudeDispatches.length, 0, 'stale Claude target must not dispatch')
+}
+
+// Herdr servers never open Claude or T3 routes, even with a session id present.
+{
+  const f = activationFixture('local-h', undefined, CLAUDE_SESSION)
+  const target = f.agentActions.captureAgentTarget(f.agentRow.toplevel, f.agentRow)
+  assert.ok(target)
+  f.agentActions.activateHerdrTarget(target)
+  f.agentActions.onHerdrFocusFinished('focus-1', true, '')
+  f.agentActions.onHerdrFocusFinished('focus-2', true, '')
+  assert.equal(f.bridge.raises, 1)
+  assert.equal(f.claudeDispatches.length, 0)
+  assert.equal(f.dispatches.length, 0)
+  assert.equal(f.agentActions.focusErrorFor(f.agentRow.key), '')
 }
 
 console.log('t3 focus activation: PASS')

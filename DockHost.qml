@@ -155,6 +155,7 @@ Item {
   property var browserProfileService: null
   property var herdrService: null
   property var t3Service: null
+  property var claudeService: null
   property bool herdrBinaryInstalled: false
   property bool herdrBinaryProbePending: false
   property bool t3BinaryInstalled: false
@@ -271,6 +272,9 @@ Item {
       "dockT3Indicators", root.settings.dockT3Indicators)
       && root.presentation.classicScreens.length > 0)
     || root.sidebarWidgetActive("t3.threads")
+  // The dock and the sidebar both show Claude Desktop sessions; the setting alone creates demand.
+  readonly property bool claudeSourceWanted: DockModel.normalizeSetting(
+      "dockClaudeIndicators", root.settings.dockClaudeIndicators)
   readonly property var connectedScreens: Quickshell.screens
   readonly property var hyprMonitors: Hyprland.monitors ? Hyprland.monitors.values || [] : []
   readonly property var focusedHyprlandMonitor: Hyprland.focusedMonitor
@@ -1114,16 +1118,19 @@ Item {
     hyprToplevels: root.hyprToplevels
     focusedToplevel: ToplevelManager.activeToplevel
     scopeRevision: root.scopeRevision
-    dockConsumerActive: (DockModel.normalizeSetting("dockHerdrIndicators", root.settings.dockHerdrIndicators)
+    // Claude has no sidebar Widget lease, so its setting keeps the bridge active for the sidebar too.
+    dockConsumerActive: ((DockModel.normalizeSetting("dockHerdrIndicators", root.settings.dockHerdrIndicators)
         || DockModel.normalizeSetting("dockT3Indicators", root.settings.dockT3Indicators))
-      && root.presentation.classicScreens.length > 0
+      && root.presentation.classicScreens.length > 0)
+      || root.claudeSourceWanted
   }
 
   DockAgentSourceMux {
     id: agentSourceMux
     sources: [
       { id: "herdr", service: root.herdrService, enabled: root.herdrSourceWanted && !!root.herdrService },
-      { id: "t3", service: root.t3Service, enabled: root.t3SourceWanted && !!root.t3Service }
+      { id: "t3", service: root.t3Service, enabled: root.t3SourceWanted && !!root.t3Service },
+      { id: "claude", service: root.claudeService, enabled: root.claudeSourceWanted && !!root.claudeService }
     ]
   }
 

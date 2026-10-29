@@ -363,8 +363,10 @@ Item {
     var revision = root.herdrBlockedTransitionRevision
     if (revision <= root.seenHerdrBlockedTransitionRevision) return
     root.seenHerdrBlockedTransitionRevision = revision
+    // Same suppression as urgent motion; a skipped transition is not replayed later.
     if (root.motionReady && root.urgentWindowAnimationEnabled
-        && root.attentionBadgesEnabled) attentionMotion.play()
+        && root.attentionBadgesEnabled && !root.urgentMotionSuppressed
+        && !root.focused) attentionMotion.play()
   }
 
   Component.onCompleted: {
@@ -696,7 +698,8 @@ Item {
     if (root.runningCount > 0)
       name += " · " + root.runningCount + (root.runningCount === 1 ? " window" : " windows")
     if (root.herdrAgentCount > 0) {
-      var noun = root.previewHerdrProduct === "T3 Code" ? "thread" : "agent"
+      var noun = root.previewHerdrProduct === "T3 Code" ? "thread"
+        : root.previewHerdrProduct === "Claude" ? "session" : "agent"
       name += " · " + root.herdrAgentCount
         + (root.herdrAgentCount === 1 ? " " + noun : " " + noun + "s")
     }

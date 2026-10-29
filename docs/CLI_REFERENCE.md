@@ -260,6 +260,30 @@ Local unpairing does not revoke the server-side session: revoke it separately
 with `t3 auth session list` / `t3 auth session revoke <id>` when needed.
 Errors exit 2 with a one-line message, or `{"ok":false,...}` with `--json`.
 
+## Claude Desktop hooks (`dockrail claude`)
+
+`dockrail claude hooks install` adds Claude Code hooks to
+`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json` so Claude Desktop sessions
+report their state to the dock and sidebar (`dockClaudeIndicators`). It
+preserves every other key and user hook, is idempotent, and refuses an invalid
+settings file. The hook events are `SessionStart`, `UserPromptSubmit`,
+`PreToolUse` (matcher `AskUserQuestion`), `PostToolUse`, `Notification`,
+`Stop` and `SessionEnd`. Re-run `install` after updating Dockrail to add
+events that newer releases use; `status` reports `installed: false` until it
+does.
+
+```sh
+dockrail claude hooks install [--json]
+dockrail claude hooks status [--json]
+dockrail claude hooks uninstall [--json]
+```
+
+`status` reports the settings path, installed events and session-record
+count. `uninstall` removes only Dockrail's entries. `dockrail claude hook` is
+the hook entry point itself (reads the hook payload on stdin, prints nothing,
+always exits 0). Errors exit 2 with a one-line message, or
+`{"ok":false,...}` with `--json`. See `docs/CLAUDE_DESKTOP.md`.
+
 ## Sidebar configuration and diagnostics
 
 Sidebar settings include `presentationMode`, `presentationModeByMonitor`,

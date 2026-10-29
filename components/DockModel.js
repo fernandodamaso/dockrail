@@ -440,6 +440,7 @@ function settingsDefaults() {
     browserProfileBadgesEnabled: true,
     dockHerdrIndicators: false,
     dockT3Indicators: false,
+    dockClaudeIndicators: false,
     windowIconOverrides: []
   }
 }
@@ -781,6 +782,7 @@ function normalizeSetting(key, value) {
   case "browserProfileBadgesEnabled":
   case "dockHerdrIndicators":
   case "dockT3Indicators":
+  case "dockClaudeIndicators":
   case "sidebarBrowserTabsEnabled":
     return typeof value === "boolean" ? value : defaults[key]
   case "backgroundColor":

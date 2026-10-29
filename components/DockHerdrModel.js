@@ -378,28 +378,30 @@ function serverFocusAgentSupported(server) {
 }
 
 function serverSource(server) {
-  if (server && typeof server === "object" && server.source === "t3")
-    return "t3"
+  if (server && typeof server === "object"
+      && (server.source === "t3" || server.source === "claude"))
+    return server.source
   return "herdr"
 }
 
 function serverProduct(server) {
-  if (serverSource(server) === "t3") {
-    var product = server && typeof server === "object"
-      ? cleanDisplayText(server.product) : ""
-    return product || "T3 Code"
-  }
-  return "Herdr"
+  var source = serverSource(server)
+  if (source === "herdr") return "Herdr"
+  var product = server && typeof server === "object"
+    ? cleanDisplayText(server.product) : ""
+  return product || (source === "t3" ? "T3 Code" : "Claude")
 }
 
 function agentNoun(server) {
-  return serverSource(server) === "t3" ? "thread" : "agent"
+  var source = serverSource(server)
+  return source === "t3" ? "thread" : source === "claude" ? "session" : "agent"
 }
 
 function focusHint(server) {
-  return serverSource(server) === "t3"
-    ? "Click a row to open this thread in T3 Code."
-    : "Click a row to focus its pane."
+  var source = serverSource(server)
+  if (source === "t3") return "Click a row to open this thread in T3 Code."
+  if (source === "claude") return "Click a row to open this session in Claude Desktop."
+  return "Click a row to focus its pane."
 }
 
 function serverDisplayLabel(server) {

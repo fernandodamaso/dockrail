@@ -27,6 +27,16 @@ ShellRoot {
   }
 
   Loader {
+    id: claudeLoader
+    active: migration.ready
+    sourceComponent: Component {
+      DockHerdrService {
+        providerRelativePath: "../provider/claude/bin/dockrail-claude-provider"
+      }
+    }
+  }
+
+  Loader {
     id: dockLoader
     active: migration.ready
     sourceComponent: Component {
@@ -36,6 +46,7 @@ ShellRoot {
         dataRoot: migration.dataRoot
         herdrService: herdrLoader.item
         t3Service: t3Loader.item
+        claudeService: claudeLoader.item
       }
     }
   }

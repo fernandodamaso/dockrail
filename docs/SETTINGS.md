@@ -44,7 +44,7 @@ Each setting has one **canonical** editing home. Features additionally offers sc
 | **Layout** | Per-monitor Classic/Sidebar presentation, sidebar edge/width, classic auto-hide/reserved space/margin, and **Displays**, **Sidebar**, **Classic dock** cards. Classic dock contains Size and position, Hiding, and Apps on the dock (Arrange apps tiles with dependent controls). |
 | **Behavior · Pointer** | Left click, middle click, and scroll actions. Destructive actions such as closing an app's windows are marked as destructive. |
 | **Behavior · Windows** | Window previews and window behavior controls. |
-| **Behavior · Attention** | Attention badges, urgent nudge, launcher badge style/count behavior, and Herdr agent state on terminal icons. |
+| **Behavior · Attention** | Attention badges, urgent nudge, launcher badge style/count behavior, Herdr agent state on terminal icons, and Claude Desktop session indicators. |
 | **Sidebar & Widgets** | Enabled/ordered sidebar widgets, including `herdr.agents`; one ordered list with an **Off** group and a Create widget form. Compact workspace rows move to Layout › Sidebar; Chrome tabs move to Apps › Chrome. Widget collapse stays on its card. |
 | **Features** | Independent runtime readiness badges and aggregate feature switches for Chrome, Coding agents and Launcher counts, plus explicit Add/Remove launchers; Python detection through the asynchronous INF-2 bridge, with refresh on open/focus and polling only while visible and needed. |
 | **Apps** | Pinned apps, hidden apps, Show Trash, and discovery/reset of custom-icon rules by handing off to Change Icon. |
@@ -117,7 +117,7 @@ The accepted design has no open design questions. These decisions are binding fo
 - Sliders commit on release.
 - Use one colour control and one border-width control with **Theme default** or a custom value.
 - Keep Chrome profile badges, muted services **and Chrome tabs** in **Apps · Chrome**.
-- Keep launcher-count presentation and Herdr terminal-icon state in **Behavior · Attention**.
+- Keep launcher-count presentation, Herdr terminal-icon state and Claude Desktop session indicators in **Behavior · Attention**.
 - Include Apps, while context menus and dragging remain primary.
 - Keep Change Icon as the only icon editor and share its editing slot with Settings.
 - Put `controlCommand` under Advanced and never execute it from Settings.
@@ -218,6 +218,7 @@ All **59 settings** appear below. The plan's four reversals and moved homes over
 | `urgentWindowAnimationEnabled` | Behavior | Attention on the dock | Urgent nudge |
 | `dockHerdrIndicators` | Behavior | Attention on the dock | Agent state on terminal icons |
 | `dockT3Indicators` | Behavior | Attention on the dock | T3 Code threads on dock icons |
+| `dockClaudeIndicators` | Behavior | Attention | Claude Desktop session indicators |
 | `groupWindows` | Behavior | — | Not shown |
 | `sidebarWidgets` | Sidebar & Widgets | Widgets | Widgets list |
 | `sidebarWidgetCollapsed` | Sidebar & Widgets | — | Not shown |

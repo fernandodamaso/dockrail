@@ -702,4 +702,78 @@ TestCase {
     c.refresh()
     verify(!c.folds[foldKey])
   }
+
+  Component { id: refreshSpyFactory; SignalSpy { signalName: "refreshed" } }
+
+  // Claude has no sidebar Widget lease: bridge view and association changes
+  // must schedule a projection refresh by themselves.
+  function test_bridge_view_changes_refresh_without_widget_lease() {
+    var service = createTemporaryObject(herdrServiceFactory, this)
+    verify(service !== null)
+    var a = createTemporaryObject(toplevelFactory, this, { title: "A" })
+    var screen = { name: "DP-1", width: 1920, height: 1080 }
+    var c = createHerdrController(service, {
+      widgetRegistry: {
+        "herdr.agents": {
+          id: "herdr.agents",
+          available: true,
+          acquire: function(owner) { return service.acquire(owner) }
+        }
+      },
+      settings: {
+        presentationMode: "sidebar",
+        pinned: [],
+        workspaceGroups: [],
+        sidebarCollapsed: false,
+        sidebarWidgets: []
+      },
+      screens: [screen],
+      monitors: [{ id: 0, name: "DP-1", activeWorkspace: { id: 1 } }],
+      workspaces: [{ id: 1, monitorID: 0 }],
+      toplevels: [a],
+      hyprToplevels: [{
+        wayland: a, address: "0xa",
+        lastIpcObject: { workspace: { id: 1 }, monitor: 0, pid: 40 }
+      }]
+    })
+    verify(c !== null)
+    var bridge = c.host.herdrWindowAgents
+    verify(bridge !== null)
+    // The dock-side setting keeps the bridge leased without any sidebar Widget.
+    bridge.dockConsumerActive = true
+    compare(bridge.consumerActive, true)
+    compare(c.widgetIds.length, 0)
+    var spy = createTemporaryObject(refreshSpyFactory, this, { target: c })
+    verify(spy !== null)
+    wait(0)
+    var before = spy.count
+
+    // A provider snapshot bumps viewRevision and must refresh the sidebar.
+    var revisionBefore = bridge.viewRevision
+    service.publishSnapshot({
+      schemaVersion: 1,
+      providerEpoch: "epoch-1",
+      revision: 10,
+      servers: [{
+        id: "local-a",
+        capabilities: { focusAgent: true },
+        clients: [{ pid: 41, startTime: 41, ancestors: [{ pid: 40, startTime: 40 }] }]
+      }],
+      windowProcesses: { revision: 1, identities: [{ pid: 40, startTime: 40 }] }
+    })
+    verify(bridge.viewRevision > revisionBefore)
+    tryVerify(function() { return spy.count > before }, 2000)
+
+    // An association change alone also schedules a refresh.
+    wait(0)
+    before = spy.count
+    bridge.herdrAssociations = { byWindowKey: ({}), unmatchedServerIds: [] }
+    tryVerify(function() { return spy.count > before }, 2000)
+
+    // Refreshes settle: no callLater ping-pong after the scheduled work runs.
+    wait(0)
+    var settled = spy.count
+    wait(0)
+    compare(spy.count, settled)
+  }
 }

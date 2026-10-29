@@ -1,6 +1,6 @@
 // Pure multi-source snapshot merge behind one DockHerdrService-shaped view.
 //
-// Herdr and T3 providers each produce their own epoch and revision. This
+// Herdr, T3 and Claude Desktop providers each produce their own epoch and revision. This
 // module merges enabled, ready sources after that point so the bridge, the
 // actions, the dock, the preview, the menu and the sidebar keep consuming
 // one service. Top-level inventory copy (liveCounts, completeness,
@@ -25,7 +25,9 @@ function compositeEpoch(sources) {
 
 function sourceIdForServerId(serverId) {
   var id = String(serverId || "")
-  return id.indexOf("t3:") === 0 ? "t3" : "herdr"
+  if (id.indexOf("t3:") === 0) return "t3"
+  if (id.indexOf("claude:") === 0) return "claude"
+  return "herdr"
 }
 
 function mergedWindowProcesses(entries) {

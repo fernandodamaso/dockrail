@@ -551,8 +551,8 @@ function herdrServerById(snapshot, serverId) {
   return null
 }
 
-// Display-only server metadata for retained T3 parents whose server object
-// is temporarily absent (null snapshot or association revalidation). This
+// Display-only server metadata for retained T3 and Claude parents whose server
+// object is temporarily absent (null snapshot or association revalidation). This
 // never enters the provider snapshot and grants no verification, agents or
 // actions; it only keeps the source label stable.
 function herdrServerForDisplay(snapshot, serverId) {
@@ -565,6 +565,18 @@ function herdrServerForDisplay(snapshot, serverId) {
       source: "t3",
       product: "T3 Code",
       label: "T3 Code",
+      health: "unavailable",
+      capabilities: { focusAgent: false }
+    }
+  if (typeof serverId === "string" && serverId
+      && AgentSourceModel.sourceIdForServerId(serverId) === "claude")
+    return {
+      id: serverId,
+      source: "claude",
+      product: "Claude",
+      label: "Claude",
+      transport: "local",
+      host: "local",
       health: "unavailable",
       capabilities: { focusAgent: false }
     }
@@ -817,12 +829,15 @@ function project(input) {
     var serverId = herdrByWindow[window.key]
     var emptyCounts = HerdrModel.emptyStatusCounts()
     // Recover display-only source metadata before the unassociated guard so
-    // retained T3 parents keep their source while associations revalidate.
+    // retained T3 and Claude parents keep their source while associations revalidate.
     var displayServer = (typeof serverId === "string" && serverId)
       ? herdrServerForDisplay(herdrSnapshot, serverId) : null
     var displaySource = displayServer ? HerdrModel.serverSource(displayServer) : "herdr"
     var verifiedSources = input.herdrVerifiedSources
+    // Claude Desktop has no Widget, so dockClaudeIndicators decides whether its windows associate.
     if (typeof serverId !== "string" || !serverId
+        || (displaySource === "claude" && (!verifiedSources
+            || verifiedSources.claudePresent !== true))
         || (displaySource === "t3" && verifiedSources
             && verifiedSources.t3Present !== true)) {
       window.herdrAssociated = false
@@ -848,7 +863,7 @@ function project(input) {
     window.herdrTransport = serverMeta.transport
     window.herdrHost = serverMeta.host
     window.herdrSession = serverMeta.session
-    if (displaySource === "t3")
+    if (displaySource === "t3" || displaySource === "claude")
       window.herdrDisplayLabel = HerdrModel.serverProduct(displayServer || server)
     else
       window.herdrDisplayLabel = serverMeta.transport === "remote" ? serverMeta.serverLabel : "Herdr"
@@ -857,9 +872,10 @@ function project(input) {
     // Missing fold key => expanded. folds[herdrFoldKey] === true => folded.
     window.herdrFolded = !!window.herdrFoldKey && folds[window.herdrFoldKey] === true
     var agents = []
-    // Repaired labels on preserved T3 parents never turn stale rows actionable:
-    // agents still require the real server object for T3 sources.
-    if (verified && herdrSnapshot && (server || displaySource !== "t3"))
+    // Repaired labels on preserved T3 and Claude parents never turn stale rows
+    // actionable: agents still require the real server object for those sources.
+    if (verified && herdrSnapshot
+        && (server || (displaySource !== "t3" && displaySource !== "claude")))
       agents = herdrAgentsForServer(herdrSnapshot, serverId)
     var counts = HerdrModel.countAgentStatuses(agents)
     window.herdrStatusCounts = counts
@@ -905,7 +921,8 @@ function project(input) {
     var verified = verifiedSources
       ? verifiedSources[displaySource] === true : herdrAssociationsVerified
     var serverMeta = herdrServerMetadata(server || displayServer)
-    var agents = (verified && herdrSnapshot && (server || displaySource !== "t3"))
+    var agents = (verified && herdrSnapshot
+        && (server || (displaySource !== "t3" && displaySource !== "claude")))
       ? herdrAgentsForServer(herdrSnapshot, serverId) : []
     var epoch = herdrSnapshot && typeof herdrSnapshot.providerEpoch === "string"
       ? herdrSnapshot.providerEpoch : ""
@@ -929,8 +946,12 @@ function project(input) {
         var agentId = String(agent.id || "")
         if (!agentId) return
         var agentKind = agent.agent || ""
+        // Claude sessions carry no workspace, so the synthetic group label must not reach the subtitle.
+        var workspaceLabel = displaySource === "claude"
+          ? agent.workspaceLabel || ""
+          : agent.workspaceLabel || workspace.label || ""
         var agentPayload = Object.assign({}, agent, {
-          workspaceLabel: agent.workspaceLabel || workspace.label || "",
+          workspaceLabel: workspaceLabel,
           agent: agentKind
         })
         row({

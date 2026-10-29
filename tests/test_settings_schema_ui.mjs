@@ -3,7 +3,7 @@ import { read, loadModel, hostHarness, plain } from './host_harness.mjs';
 
 const settings = JSON.parse(read('config/settings-schema.json')).settings;
 const keys = Object.keys(settings);
-assert.equal(keys.length, 59);
+assert.equal(keys.length, 60);
 const ui = Object.fromEntries(keys.map(key => [key, settings[key].ui]));
 const allowedSections = new Set(['appearance', 'layout', 'behavior', 'sidebar-widgets', 'apps']);
 const allowedVisibility = new Set(['normal', 'conditional', 'advanced', 'hidden', 'in-place']);
@@ -33,6 +33,9 @@ assert.ok(classic.includes('dockHerdrIndicators'), 'Herdr terminal icon state is
 assert.ok(classic.includes('dockT3Indicators'), 'T3 dock icon state is classic-only');
 assert.equal(ui.dockT3Indicators.surface, 'classic');
 assert.equal(ui.dockT3Indicators.group, 'attention-on-the-dock');
+assert.ok(!classic.includes('dockClaudeIndicators'), 'Claude Desktop state also drives the sidebar window row');
+assert.equal(ui.dockClaudeIndicators.surface, 'all');
+assert.equal(ui.dockClaudeIndicators.group, 'attention');
 const host = hostHarness({ presentationMode: 'sidebar' });
 assert.deepEqual(plain(host.control.statusData().presentation.inactiveClassicSettings).sort(),
                  classic.slice().sort(), 'the real host projection must use the same inventory');

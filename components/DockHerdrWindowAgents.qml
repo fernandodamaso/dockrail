@@ -313,11 +313,18 @@ Item {
         Number(root.blockedTransitionByWindow[windowKey] || 0))
       var address = root.addressFor(toplevel).toLowerCase()
       var hasBlocked = false
+      var claudeServer = HerdrModel.serverSource(root.liveServerById(serverId)) === "claude"
       rows.forEach(function(agent) {
         var stateKey = root.indicatorStateKey(windowKey, serverId, agent.id)
         agents.push(Object.assign({}, agent, { indicatorKey: stateKey }))
         var state = root.agentIndicatorStates[stateKey]
-        if (HerdrModel.normalizeStatus(agent.status) === "done" && state
+        // Claude sessions with Desktop metadata clear when Claude Desktop stops
+        // listing them, so focusing their window must not acknowledge them. Claude
+        // sessions without that metadata would never clear, so they use the normal
+        // window-focus acknowledgement like Herdr and T3 agents.
+        var claudeDesktopOwned = claudeServer
+          && typeof agent.desktopSessionId === "string" && agent.desktopSessionId !== ""
+        if (!claudeDesktopOwned && HerdrModel.normalizeStatus(agent.status) === "done" && state
             && Number(state.acknowledgedSeq || 0) >= Number(state.completionSeq || 0))
           acknowledged[stateKey] = true
         if (HerdrModel.normalizeStatus(agent.status) === "blocked") hasBlocked = true
