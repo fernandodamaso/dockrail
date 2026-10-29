@@ -338,12 +338,18 @@ Item {
                   enabled:root.host.settingsLoadState!=="invalid" && root.host.settingsWriteState!=="saving"
                   onClicked:{
                     var entries=root.host.currentPresentation().entries || []
-                    if(entries.length)root.reportWrite(root.host.monitorModeIntent(entries[0].connector,"sidebar",
-                      ScreenModel.modeGestureToken(root.host.currentPresentation(),entries[0].connector)))
+                    var preferred=root.host.focusedSettingsConnector ? root.host.focusedSettingsConnector() : ""
+                    var target=entries.filter(function(entry){return entry.connector===preferred})[0] || entries[0]
+                    if(target)root.reportWrite(root.host.monitorModeIntent(target.connector,"sidebar",
+                      ScreenModel.modeGestureToken(root.host.currentPresentation(),target.connector)))
                   }
                 }
-                Text {text:"Integrations";font.bold:true;color:Commons.Color.foreground;font.family:Style.font.family}
-                Ui.Button {text:"Explore Chrome, Coding agents, Launcher counts and Agent launchers";onClicked:root.openFeature("chrome")}
+                Text {text:"Integrations · "+Features.summary(root.host.featureReadinessBridge.lastGoodFeatures)
+                  font.bold:true;color:Commons.Color.foreground;font.family:Style.font.family}
+                Ui.Button {text:"Set up Chrome";onClicked:root.openFeature("chrome")}
+                Ui.Button {text:"Set up Coding agents (Herdr)";onClicked:root.openFeature("coding-agents")}
+                Ui.Button {text:"Set up Launcher badge counts";onClicked:root.openFeature("launcher-counts")}
+                Ui.Button {text:"Set up Terminal agent launchers";onClicked:root.openFeature("agent-launchers")}
                 Ui.Button {text:"Then make it yours · Appearance";onClicked:root.selectSection("appearance")}
               }
               Column {
@@ -387,14 +393,16 @@ Item {
                       color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption
                     }
                     DockSettingsRow {
-                      visible:["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)>=0
+                      visible:modelData.section!=="layout" && !modelData.row.ui.pairedWith
+                        && ["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)>=0
                       width:parent.width;host:root.host;row:modelData.row
                       monitorCount:(root.host.connectedScreens || []).length
                       feedbackActive:root.panelOpen
                       onEdited:root.rowFeedback=""
                     }
                     Ui.Button {
-                      visible:["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)<0
+                      visible:modelData.section==="layout" || !!modelData.row.ui.pairedWith
+                        || ["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)<0
                       text:"Open "+modelData.label
                       onClicked:{root.searchTerm="";root.selectSection(modelData.section)}
                     }
