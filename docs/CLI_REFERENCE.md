@@ -47,11 +47,13 @@ Requested values retain intent. Effective output projects current normalization 
 
 Doctor keeps its legacy `status`, `reason` and `nextStep` fields for existing CLI agents. Each feature also exposes additive `configuration` (`off`, `partly-on`, `on`), `installation` (`missing`, `installed`), `runtime` (`unavailable`, `limited`, `ready`), and `nextAction` with `kind` and `text`. A disabled Chrome or Herdr preference does not by itself mean its provider is uninstalled. The Settings bridge reads `dockrail doctor --json` asynchronously, caches the last good result, and never runs installers.
 
+`agentLaunchers` additionally exposes a read-only `agents` array, in the fixed display order Claude Code, Pi, Cursor Agent, Herdr, Oh My Pi, Command Code, Kilo Code, Cline. Each entry has `label`, `command`, `found` (its binary is on PATH), and `launcherInstalled` (a desktop entry exists for a found agent). Both facts come from doctor probes; the Features UI does not inspect PATH or desktop files. Launchers are added only when the user explicitly chooses **Add launchers**; the typed **Remove launchers** action retains modified or foreign files.
+
 
 `dockrail doctor --json` keeps `apiVersion: 1` and adds a stable
 `data.features` object. Its keys are `sidebar`, `herdrAgents`,
 `chromeProfilesTabs`, `launcherCounts`, `agentLaunchers`, and
-`cliFreshness`. Every feature has exactly these readiness fields:
+`cliFreshness`. Every feature retains these stable legacy readiness fields (and includes the additive dimensions above):
 
 ```json
 {

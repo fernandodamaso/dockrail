@@ -578,6 +578,26 @@ def feature_readiness(status_data, settings, probes=None):
            'ready' if counts_installed else 'unavailable',
            'install' if not counts_installed else 'learn-more',
            features['launcherCounts']['nextStep'])
+    # One read-only inventory for the Features agent list. Reuse the same PATH
+    # and missing-launcher probes as doctor; QML must not inspect the OS.
+    agent_labels = {
+        'claude': 'Claude Code', 'pi': 'Pi', 'cursor-agent': 'Cursor Agent',
+        'herdr': 'Herdr', 'omp': 'Oh My Pi', 'commandcode': 'Command Code',
+        'kilo': 'Kilo Code', 'cline': 'Cline',
+    }
+    agent_rows = []
+    for command, launcher in zip(AGENT_COMMANDS, AGENT_LAUNCHERS):
+        found = bool(probes.which(command))
+        agent_rows.append({
+            'label': agent_labels[command], 'command': command,
+            'found': found,
+            'launcherInstalled': found and launcher not in missing_launchers,
+        })
+    # Show the frozen design's eight-agent order, independent of PATH order.
+    agent_order = ['claude', 'pi', 'cursor-agent', 'herdr',
+                   'omp', 'commandcode', 'kilo', 'cline']
+    agent_rows.sort(key=lambda row: agent_order.index(row['command']))
+
     # Installation is checked for detected agents only; runtime remains independent.
     launchers_installed = not missing_launchers
     enrich('agentLaunchers', 'on' if launchers_installed else 'off',
@@ -585,6 +605,7 @@ def feature_readiness(status_data, settings, probes=None):
            'ready' if launchers_installed else 'unavailable',
            'install' if not launchers_installed else 'learn-more',
            features['agentLaunchers']['nextStep'])
+    features['agentLaunchers']['agents'] = agent_rows
 
     for key in ('sidebar', 'cliFreshness'):
         legacy = features[key]
