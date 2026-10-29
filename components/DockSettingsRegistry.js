@@ -156,8 +156,12 @@ function search(metadata, term, shownKeys) {
         matches(label) ? 1 :
         matches(key) || (ui.pairedWith && matches(ui.pairedWith)) ? 2 :
         matches(help) ? 3 : -1
-      if (rank>=0) found.push({section:section.id,sectionLabel:section.label,
-        key:key,row:row,rank:rank,label:label,help:help})
+      if (rank>=0) {
+        var widgetHit=key==="sidebarWidgets" && needle.indexOf("herdr")>=0
+        found.push({section:section.id,sectionLabel:section.label,
+          key:key,row:row,rank:rank,label:widgetHit?"Coding agents":label,
+          help:help,widgetId:widgetHit?"herdr.agents":null})
+      }
       var feature=ui.feature
       if (!feature || seenFeatures[feature.id]) return
       seenFeatures[feature.id]=true
