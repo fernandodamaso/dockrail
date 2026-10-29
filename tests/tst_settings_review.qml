@@ -119,7 +119,6 @@ TestCase {
     view.focusTarget(0)
     compare(view.selectedTarget.key,"workspaceGroups")
   }
-  Component {id:generalFactory; DockSettingsGeneralSection {width:470;panelActive:true}}
 
   function test_retry_handles_raw_host_envelope() {
     var host=createTemporaryObject(hostFactory,testCase)
