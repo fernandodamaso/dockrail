@@ -172,6 +172,6 @@ function legacyConversion(settings, presentation) {
     if (entry && entry.connector && (entry.mode==="classic" || entry.mode==="sidebar"))
       next[entry.connector]=entry.mode
   })
-  return {patch:{presentationModeByMonitor:next},
-    expected:{presentationModeByMonitor:Object.assign({},existing)}}
+  return {patch:{presentationModeByMonitor:next,sidebarMonitor:""},
+    expected:{presentationModeByMonitor:Object.assign({},existing),sidebarMonitor:settings.sidebarMonitor}}
 }
