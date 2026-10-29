@@ -454,10 +454,25 @@ Item {
                       feedbackActive:root.panelOpen
                       onEdited:root.rowFeedback=""
                     }
+                    Ui.Toggle {
+                      visible:!!searchEntry.modelData.widgetId
+                      width:parent.width
+                      label:searchEntry.modelData.label
+                      description:"Herdr agents by workspace and window"
+                      checked:(root.host.settings.sidebarWidgets || []).indexOf(searchEntry.modelData.widgetId)>=0
+                      enabled:root.host.settingsLoadState!=="invalid"
+                        && root.host.settingsWriteState!=="saving"
+                        && !root.host.settingsReloadPending
+                        && (checked || widgetsSection.widgetRows.some(function(row){
+                          return row.id===searchEntry.modelData.widgetId && row.registered && row.available
+                        }))
+                      onClicked:widgetsSection.toggle(searchEntry.modelData.widgetId,!checked)
+                    }
                     Ui.Button {
-                      visible:searchEntry.modelData.section==="layout" || !!searchEntry.modelData.featureId
+                      visible:!searchEntry.modelData.widgetId &&
+                        (searchEntry.modelData.section==="layout" || !!searchEntry.modelData.featureId
                         || (!searchEntry.modelData.row.ui.pairedWith
-                          && ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)<0)
+                          && ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)<0))
                       text:"Open "+searchEntry.modelData.label
                       onClicked:searchEntry.modelData.featureId
                         ? root.openFeature(searchEntry.modelData.featureId)
