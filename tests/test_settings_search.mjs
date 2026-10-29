@@ -17,7 +17,7 @@ assert.equal(registry.firstRun(true,false,'missing'),false)
 assert.equal(registry.firstRun(false,true,'loaded'),false)
 assert.equal(registry.firstRun(true,true,'invalid'),false)
 const input={sidebarMonitor:'HDMI-A-1',presentationModeByMonitor:{'OLD-DP':'classic'}}
-const view={entries:[{connector:'HDMI-A-1',mode:'sidebar'},{connector:'DP-1',mode:'classic'}]}
+const view={entries:[{connector:'HDMI-A-1',mode:'sidebar',mapped:true},{connector:'DP-1',mode:'sidebar',mapped:false}]}
 const conversion=plain(registry.legacyConversion(input,view))
 assert.deepEqual(conversion.patch.presentationModeByMonitor,
  {'OLD-DP':'classic','HDMI-A-1':'sidebar','DP-1':'classic'})
@@ -25,6 +25,8 @@ assert.deepEqual(conversion.expected.presentationModeByMonitor,{'OLD-DP':'classi
 assert.equal(conversion.patch.sidebarMonitor,'')
 assert.equal(conversion.expected.sidebarMonitor,'HDMI-A-1')
 assert.deepEqual(input.presentationModeByMonitor,{'OLD-DP':'classic'})
+assert.equal(conversion.patch.presentationModeByMonitor['DP-1'],'classic',
+  'an unselected inherited sidebar must not become a second sidebar')
 const h=hostHarness({presentationModeByMonitor:{'OLD-DP':'classic'},sidebarMonitor:'HDMI-A-1'})
 const outcome=h.host.saveSettingsIntent(conversion.patch,conversion.expected)
 assert.equal(outcome.accepted,true)
