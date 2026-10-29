@@ -268,9 +268,14 @@ report their state to the dock and sidebar (`dockClaudeIndicators`). It
 preserves every other key and user hook, is idempotent, and refuses an invalid
 settings file. The hook events are `SessionStart`, `UserPromptSubmit`,
 `PreToolUse` (matcher `AskUserQuestion`), `PostToolUse`, `Notification`,
-`Stop` and `SessionEnd`. Re-run `install` after updating Dockrail to add
-events that newer releases use; `status` reports `installed: false` until it
-does.
+`Stop` and `SessionEnd`. `install` copies the hook script to
+`${XDG_DATA_HOME:-~/.local/share}/dockrail-cli/hooks/dockrail_claude.py` and
+points every command there, so source, `--cli-only` and Omarchy plugin
+installs, `omarchy plugin update` and `dockrail dev use/reset` all keep
+working. It also repairs commands that point at an older checkout or plugin
+path. Re-run `install` after updating Dockrail or switching install modes to
+add events that newer releases use, then start a new Claude Desktop session;
+running sessions keep their previous commands.
 
 ```sh
 dockrail claude hooks install [--json]
@@ -278,10 +283,12 @@ dockrail claude hooks status [--json]
 dockrail claude hooks uninstall [--json]
 ```
 
-`status` reports the settings path, installed events and session-record
-count. `uninstall` removes only Dockrail's entries. `dockrail claude hook` is
-the hook entry point itself (reads the hook payload on stdin, prints nothing,
-always exits 0). Errors exit 2 with a one-line message, or
+`status` reports the settings path, installed events, session-record count,
+and `scriptPath`, `scriptExists` and `scriptCurrent` for the hook script.
+`installed` is false when an event is missing or that script is missing or is
+not the stable path. `uninstall` removes only Dockrail's entries. `dockrail
+claude hook` is the hook entry point itself (reads the hook payload on stdin,
+prints nothing, always exits 0). Errors exit 2 with a one-line message, or
 `{"ok":false,...}` with `--json`. See `docs/CLAUDE_DESKTOP.md`.
 
 ## Sidebar configuration and diagnostics

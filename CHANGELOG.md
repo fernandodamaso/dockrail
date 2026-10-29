@@ -14,6 +14,9 @@
 
 ### Fixed
 
+- Claude Desktop hooks no longer break when the CLI is reinstalled from the
+  Omarchy plugin. Installed commands use a stable CLI-owned hook script and
+  `dockrail claude hooks status` reports a missing or stale script.
 - Fresh standalone installs no longer enable the four demo Widgets in the
   sidebar. Existing configurations are not changed; remove unwanted
   `demo.*` entries from `sidebarWidgets` if an earlier install added them.

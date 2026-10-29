@@ -108,6 +108,13 @@ install_client_bundle() {
   install -m 0755 "$source_dir/scripts/smartdock" "$bin_home/smartdock"
 }
 
+# Claude Code hooks point at this CLI-owned copy, so reinstalling the client or
+# switching between the source bundle and the Omarchy plugin never removes it.
+install_hook_script() {
+  install -d -m 0755 "$client_dir/hooks"
+  install -m 0644 "$source_dir/scripts/dockrail_claude.py" "$client_dir/hooks/dockrail_claude.py"
+}
+
 if $cli_only; then
   command -v python3 >/dev/null 2>&1 || { echo 'Python 3 is required for the CLI.' >&2; exit 1; }
   plugin_dir="$HOME/.config/omarchy/plugins/io.github.fernandodamaso.dockrail"
@@ -115,6 +122,7 @@ if $cli_only; then
   if [[ "$source_dir" == "$plugin_dir" || "$source_dir" == "$xdg_plugin_dir" ]]; then
     rm -rf -- "$client_dir"
     install -d "$client_dir" "$bin_home"
+    install_hook_script
     printf '%s\n' "$source_dir" >"$client_dir/.plugin-dir"
     install -m 0755 "$source_dir/uninstall.sh" "$client_dir/uninstall.sh"
     install -m 0755 "$source_dir/scripts/dockrail" "$bin_home/dockrail"
@@ -122,6 +130,7 @@ if $cli_only; then
   else
     rm -f -- "$client_dir/.plugin-dir"
     install_client_bundle "$client_dir"
+    install_hook_script
     printf '%s\n' "$source_dir" >"$client_dir/.source-dir"
   fi
   echo "Installed Dockrail client: $bin_home/dockrail"

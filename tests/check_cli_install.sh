@@ -26,6 +26,8 @@ test -x "$XDG_BIN_HOME/smartdock"
 test -f "$XDG_DATA_HOME/dockrail-cli/scripts/smartdock_cli.py"
 test -f "$XDG_DATA_HOME/dockrail-cli/scripts/smartdock_widget.py"
 test -f "$XDG_DATA_HOME/dockrail-cli/scripts/dockrail_migrate.py"
+test -f "$XDG_DATA_HOME/dockrail-cli/hooks/dockrail_claude.py"
+cmp -s "$XDG_DATA_HOME/dockrail-cli/hooks/dockrail_claude.py" "$repo/scripts/dockrail_claude.py"
 test -f "$XDG_DATA_HOME/dockrail-cli/SmartDock/WidgetKit/qmldir"
 test -f "$XDG_DATA_HOME/dockrail-cli/Dockrail/WidgetKit/qmldir"
 test -f "$XDG_DATA_HOME/dockrail-cli/components/widgets/WidgetSection.qml"
@@ -122,7 +124,10 @@ install_output="$(bash "$plugin/install.sh" --cli-only 2>&1)"
 test "$(command -v dockrail)" = "$XDG_BIN_HOME/dockrail"
 test "$(command -v smartdock)" = "$XDG_BIN_HOME/smartdock"
 test -f "$XDG_DATA_HOME/dockrail-cli/.plugin-dir"
+# The plugin branch removes the bundle but keeps the stable Claude hook copy.
 test ! -e "$XDG_DATA_HOME/dockrail-cli/scripts/smartdock_cli.py"
+test -f "$XDG_DATA_HOME/dockrail-cli/hooks/dockrail_claude.py"
+cmp -s "$XDG_DATA_HOME/dockrail-cli/hooks/dockrail_claude.py" "$repo/scripts/dockrail_claude.py"
 [[ "$install_output" == *'dockrail setup'* ]]
 dockrail help >/dev/null
 smartdock agent-guide >/dev/null
