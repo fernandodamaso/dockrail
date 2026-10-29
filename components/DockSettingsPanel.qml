@@ -385,26 +385,27 @@ Item {
                 Repeater {
                   model:root.searchResults
                   delegate:Column {
+                    id:searchEntry
                     required property var modelData
                     width:parent.width
                     spacing:Style.space(5)
                     Text {
-                      text:modelData.sectionLabel+" › "+modelData.row.ui.group
+                      text:searchEntry.modelData.sectionLabel+" › "+searchEntry.modelData.row.ui.group
                       color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption
                     }
                     DockSettingsRow {
-                      visible:modelData.section!=="layout" && !modelData.row.ui.pairedWith
-                        && ["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)>=0
-                      width:parent.width;host:root.host;row:modelData.row
+                      visible:searchEntry.modelData.section!=="layout" && !searchEntry.modelData.row.ui.pairedWith
+                        && ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)>=0
+                      width:parent.width;host:root.host;row:searchEntry.modelData.row
                       monitorCount:(root.host.connectedScreens || []).length
                       feedbackActive:root.panelOpen
                       onEdited:root.rowFeedback=""
                     }
                     Ui.Button {
-                      visible:modelData.section==="layout" || !!modelData.row.ui.pairedWith
-                        || ["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)<0
-                      text:"Open "+modelData.label
-                      onClicked:{root.searchTerm="";root.selectSection(modelData.section)}
+                      visible:searchEntry.modelData.section==="layout" || !!searchEntry.modelData.row.ui.pairedWith
+                        || ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)<0
+                      text:"Open "+searchEntry.modelData.label
+                      onClicked:{root.searchTerm="";root.selectSection(searchEntry.modelData.section)}
                     }
                   }
                 }
