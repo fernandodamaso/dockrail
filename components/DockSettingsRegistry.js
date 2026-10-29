@@ -184,6 +184,13 @@ function searchCounts(results) {
   ;(results || []).forEach(function(row) {counts[row.section]=(counts[row.section] || 0)+1})
   return counts
 }
+// Shared readiness gate: missing Chrome integration may only be disabled.
+function chromeToggleEditable(key, settings, readiness) {
+  if (key!=="browserProfileBadgesEnabled" && key!=="sidebarBrowserTabsEnabled") return true
+  var chrome=readiness && readiness.chromeProfilesTabs || {}
+  return (chrome.installation==="installed" && chrome.runtime==="ready")
+    || !!(settings && settings[key]===true)
+}
 function firstRun(defaultsInUse, loaded, loadState) {
   return loaded === true && defaultsInUse === true && loadState !== "invalid"
 }

@@ -24,6 +24,14 @@ assert.ok(plain(registry.search(metadata,'sidebarWidgetCollapsed',['sidebarWidge
 assert.ok(plain(registry.search(metadata,'herdr')).some(hit=>hit.key==='dockHerdrIndicators'))
 assert.ok(plain(registry.search(metadata,'magnification')).some(hit=>hit.key==='magnification'))
 assert.ok(plain(registry.search(metadata,'sidebarMonitor')).every(hit=>hit.key!=='sidebarMonitor'))
+const available={chromeProfilesTabs:{installation:'installed',runtime:'ready'}}
+const missing={chromeProfilesTabs:{installation:'missing',runtime:'unavailable'}}
+for (const key of ['browserProfileBadgesEnabled','sidebarBrowserTabsEnabled']) {
+  assert.equal(registry.chromeToggleEditable(key,{[key]:false},missing),false)
+  assert.equal(registry.chromeToggleEditable(key,{[key]:true},missing),true)
+  assert.equal(registry.chromeToggleEditable(key,{[key]:false},available),true)
+}
+assert.equal(registry.chromeToggleEditable('showTrash',{},missing),true)
 const counts=plain(registry.searchCounts(hits))
 assert.equal(counts.appearance,hits.length)
 assert.equal(registry.firstRun(true,true,'missing'),true)

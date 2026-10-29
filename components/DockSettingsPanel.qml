@@ -21,6 +21,7 @@ Item {
   property bool showHelp: false
   property string rowFeedback: ""
   property string searchTerm: ""
+  property var pendingSearchResult: null
   readonly property var searchVisibleKeys: {
     var groups=Registry.layoutGroups(metadata,(host.connectedScreens || []).length,host.settings.workspaceLayout || "flat")
     var keys=[]
@@ -83,6 +84,7 @@ Item {
   }
   function close() {
     if (!panelOpen) return
+    pendingSearchResult=null
     dismissAppsPopups()
     if (layoutSection) layoutSection.cancelPending()
     if (appearanceSection) appearanceSection.cancelPending()
@@ -105,6 +107,7 @@ Item {
   function selectSection(id) {
     if (Registry.order.indexOf(id) < 0) return false
     searchTerm = ""
+    pendingSearchResult = null
     if (selectedSection === "apps" && id !== selectedSection) dismissAppsPopups()
     if (selectedSection === "sidebar-widgets" && id !== selectedSection) widgetsSection.cancelPending()
     if (selectedSection === "apps" && id !== selectedSection && appsLoader.item) appsLoader.item.cancelPending()
@@ -121,20 +124,31 @@ Item {
     Qt.callLater(function(){featuresSection.focusFeature(id)})
     return true
   }
-  function openSearchResult(result) {
-    if (!result || !selectSection(result.section)) return false
-    Qt.callLater(function(){
-      var section=activeSectionView
-      if (!section || !section.targets) return
-      for(var i=0;i<section.targets.length;i++) {
+  // Apps loads asynchronously; keep the destination until its owner exists.
+  function focusPendingSearch() {
+    var result=pendingSearchResult
+    if (!result || selectedSection!==result.section) return
+    var section=activeSectionView
+    if (!section) return
+    var focused=section.focusSetting && section.focusSetting(result.key)
+    if (!focused && section.targets) {
+      for (var i=0;i<section.targets.length;i++) {
         var target=section.targets[i]
-        if(target && target.key===result.key) {
+        if (target && target.key===result.key) {
           section.focusTarget(i)
-          focusPane="settings"
-          return
+          focused=true
+          break
         }
       }
-    })
+    }
+    pendingSearchResult=null
+    if (focused) focusPane="settings"
+    else rowFeedback="This setting has no available editing target."
+  }
+  function openSearchResult(result) {
+    if (!result || !selectSection(result.section)) return false
+    pendingSearchResult=result
+    Qt.callLater(root.focusPendingSearch)
     return true
   }
   function reportWrite(outcome) {
@@ -438,6 +452,9 @@ Item {
                       color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption
                     }
                     DockSettingsRow {
+                      objectName:"settings-search-row-"+searchEntry.modelData.key
+                      enabled:Registry.chromeToggleEditable(searchEntry.modelData.key,
+                        root.host.settings,root.host.featureReadinessBridge.lastGoodFeatures)
                       visible:searchEntry.modelData.section!=="layout" && !searchEntry.modelData.featureId
                         && !searchEntry.modelData.row.ui.pairedWith
                         && ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)>=0
@@ -583,7 +600,10 @@ Item {
                     host:root.host,metadata:root.metadata,panelActive:root.panelOpen
                   })
                 }
-                onLoaded: if(item) item.panelActive=Qt.binding(function(){return root.panelOpen})
+                onLoaded: if(item) {
+                  item.panelActive=Qt.binding(function(){return root.panelOpen})
+                  Qt.callLater(root.focusPendingSearch)
+                }
               }
               Connections {
                 target:appsLoader.item

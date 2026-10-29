@@ -291,6 +291,54 @@ TestCase {
     compare(host.calls[0].expected,["gmail"])
   }
 
+  function test_search_opens_specialized_apps_targets_after_loader_completion() {
+    var panel=createTemporaryObject(panelFactory,host,{host:host,metadata:schema()})
+    verify(panel.openFor(testCase,"bottom","layout"))
+    var keys=["controlCommand","browserActivityMutedServices","pinned","hiddenApplications",
+      "iconOverrides","windowIconOverrides"]
+    for (var i=0;i<keys.length;i++) {
+      var key=keys[i]
+      panel.searchTerm=key
+      var result=panel.searchResults.filter(function(hit){return hit.key===key})[0]
+      verify(!!result,key+" should be searchable")
+      verify(panel.openSearchResult(result))
+      tryVerify(function(){return panel.activeSectionView!==null &&
+        panel.pendingSearchResult===null && panel.focusPane==="settings"})
+      var active=panel.activeSectionView
+      if (key==="controlCommand")
+        compare(active.selectedTarget,findChild(active,"apps-command-field"))
+      else if (key==="browserActivityMutedServices")
+        compare(active.selectedTarget,findChild(active,"apps-muted-select"))
+      else if (key==="pinned")
+        verify(!!active.selectedTarget.pinnedId)
+      else if (key==="hiddenApplications")
+        compare(active.selectedTarget.appId,"hidden.first")
+      else if (key==="iconOverrides")
+        verify(active.selectedTarget.modelData.kind!=="window")
+      else if (key==="windowIconOverrides")
+        compare(active.selectedTarget.modelData.kind,"window")
+      compare(panel.selectedSection,"apps")
+    }
+    panel.destroy()
+  }
+
+  function test_search_chrome_switches_respect_apps_readiness() {
+    var panel=createTemporaryObject(panelFactory,host,{host:host,metadata:schema()})
+    verify(panel.openFor(testCase,"bottom","apps"))
+    host.featureReadinessBridge.lastGoodFeatures=({chromeProfilesTabs:{installation:"missing",runtime:"unavailable"}})
+    for (var i=0;i<2;i++) {
+      var key=i===0?"browserProfileBadgesEnabled":"sidebarBrowserTabsEnabled"
+      panel.searchTerm=key
+      var row=findChild(panel,"settings-search-row-"+key)
+      verify(row!==null)
+      compare(row.enabled,host.settings[key]===true)
+      host.featureReadinessBridge.lastGoodFeatures=({chromeProfilesTabs:{installation:"installed",runtime:"ready"}})
+      compare(row.enabled,true)
+      host.featureReadinessBridge.lastGoodFeatures=({chromeProfilesTabs:{installation:"missing",runtime:"unavailable"}})
+    }
+    panel.destroy()
+  }
+
   function test_panel_closure_clears_confirmation_and_picker_owner() {
     var panel=createTemporaryObject(panelFactory,host,{host:host,metadata:schema()})
     verify(panel!==null)
