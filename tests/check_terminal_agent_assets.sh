@@ -44,10 +44,11 @@ ids=(
   smartdock-agent-claude-code
   smartdock-agent-kilo-code
   smartdock-agent-cline
+  smartdock-agent-herdr
 )
 
-commands=(pi omp commandcode cursor-agent claude kilo cline)
-extensions=(png svg svg svg svg svg svg)
+commands=(pi omp commandcode cursor-agent claude kilo cline herdr)
+extensions=(png svg svg svg svg svg svg svg)
 window_classes=(
   io.github.fernandodamaso.smartdock.agent.pi
   io.github.fernandodamaso.smartdock.agent.oh-my-pi
@@ -56,6 +57,7 @@ window_classes=(
   io.github.fernandodamaso.smartdock.agent.claude-code
   io.github.fernandodamaso.smartdock.agent.kilo-code
   io.github.fernandodamaso.smartdock.agent.cline
+  io.github.fernandodamaso.smartdock.agent.herdr
 )
 
 desktop_dir="$data_home/applications"
@@ -71,6 +73,12 @@ config_file="$config_home/smartdock/dock.json"
 install -d "$(dirname -- "$config_file")"
 printf '%s\n' '{"sentinel":"keep-me"}' >"$config_file"
 
+# Deterministic agent detection: both no-qs and fake-qs PATHs expose eight agents.
+for agent in "${commands[@]}"; do
+  printf '#!/bin/sh\nexit 0\n' >"$no_qs_bin/$agent"
+  chmod 0755 "$no_qs_bin/$agent"
+  cp -- "$no_qs_bin/$agent" "$fake_qs_bin/$agent"
+done
 PATH="$no_qs_bin:/usr/bin:/bin" bash "$repo_dir/install.sh" --agent-assets-only \
   || fail "asset-only install failed without qs"
 

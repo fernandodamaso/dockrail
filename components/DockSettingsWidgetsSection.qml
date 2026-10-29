@@ -104,6 +104,18 @@ Item {
     Qt.callLater(function(){root.selectedWidgetId=id;root.syncCursor();root.reordering=false})
     return accepted
   }
+  function focusSetting(key) {
+    if (key!=="sidebarWidgets" && key!=="sidebarWidgetCollapsed") return false
+    var index=0
+    if (key==="sidebarWidgetCollapsed") {
+      index=widgetRows.findIndex(function(row){return row.enabled})
+      if (index<0) index=0
+    }
+    var at=targets.indexOf(widgetList.itemAt(index))
+    if (at>=0) {focusTarget(at);return true}
+    reveal(cardBody)
+    return true
+  }
   function focusTarget(index) {
     cursor=Math.max(0,Math.min(targets.length-1,index))
     selectedWidgetId=targets[cursor] && targets[cursor].widgetId || ""

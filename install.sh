@@ -24,8 +24,9 @@ agent_ids=(
   smartdock-agent-claude-code
   smartdock-agent-kilo-code
   smartdock-agent-cline
+  smartdock-agent-herdr
 )
-agent_extensions=(png svg svg svg svg svg svg)
+agent_extensions=(png svg svg svg svg svg svg svg)
 
 usage() {
   cat <<'EOF'
@@ -87,6 +88,7 @@ install_client_bundle() {
     cp -R -- "$source_dir/SmartDock" "$destination/SmartDock"
     cp -R -- "$source_dir/Dockrail" "$destination/Dockrail"
     install -m 0644 "$source_dir/scripts/smartdock_cli.py" "$destination/scripts/smartdock_cli.py"
+    install -m 0644 "$source_dir/scripts/smartdock_launchers.py" "$destination/scripts/smartdock_launchers.py"
     install -m 0644 "$source_dir/scripts/smartdock_dev.py" "$destination/scripts/smartdock_dev.py"
     install -m 0644 "$source_dir/scripts/smartdock_widget.py" "$destination/scripts/smartdock_widget.py"
     install -m 0644 "$source_dir/scripts/dockrail_t3.py" "$destination/scripts/dockrail_t3.py"
@@ -135,21 +137,14 @@ raster_icon_dir="$data_home/icons/hicolor/256x256/apps"
 
 install_agent_assets() {
   [[ -d "$agent_asset_dir" ]] || { echo "Terminal-agent assets not found: $agent_asset_dir" >&2; exit 1; }
-  install -d "$desktop_dir" "$svg_icon_dir" "$raster_icon_dir"
-  for index in "${!agent_ids[@]}"; do
-    id="${agent_ids[$index]}"
-    extension="${agent_extensions[$index]}"
-    icon_dir="$svg_icon_dir"
-    if [[ "$extension" != svg ]]; then icon_dir="$raster_icon_dir"; fi
-    install -m 0644 "$agent_asset_dir/$id.desktop" "$desktop_dir/$id.desktop"
-    install -m 0644 "$agent_asset_dir/$id.$extension" "$icon_dir/$id.$extension"
-  done
+  command -v python3 >/dev/null 2>&1 || { echo 'Python 3 is required for terminal-agent launchers.' >&2; exit 1; }
+  python3 "$source_dir/scripts/smartdock_cli.py" launchers add --json
 }
 
 if $agent_assets_only; then
   install_agent_assets
   cat <<'EOF'
-Installed Dockrail terminal-agent launchers and icons.
+Installed detected Dockrail terminal-agent launchers and icons (foreign/edited files preserved).
 
 Plugin-folder invocation:
   bash "${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh" --agent-assets-only

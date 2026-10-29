@@ -21,14 +21,14 @@ var TERMINAL_CLI_APP_IDS = [
   "smartdock-agent-pi", "smartdock-agent-oh-my-pi",
   "smartdock-agent-command-code", "smartdock-agent-cursor",
   "smartdock-agent-claude-code", "smartdock-agent-kilo-code",
-  "smartdock-agent-cline"
+  "smartdock-agent-cline", "smartdock-agent-herdr"
 ]
 
 var TERMINAL_AGENT_APP_IDS = [
   "smartdock-agent-pi", "smartdock-agent-oh-my-pi",
   "smartdock-agent-command-code", "smartdock-agent-cursor",
   "smartdock-agent-claude-code", "smartdock-agent-kilo-code",
-  "smartdock-agent-cline"
+  "smartdock-agent-cline", "smartdock-agent-herdr"
 ]
 
 var TERMINAL_AGENT_APP_ID_MAPPINGS = [
@@ -38,7 +38,8 @@ var TERMINAL_AGENT_APP_ID_MAPPINGS = [
   ["io.github.fernandodamaso.smartdock.agent.cursor", "smartdock-agent-cursor"],
   ["io.github.fernandodamaso.smartdock.agent.claude-code", "smartdock-agent-claude-code"],
   ["io.github.fernandodamaso.smartdock.agent.kilo-code", "smartdock-agent-kilo-code"],
-  ["io.github.fernandodamaso.smartdock.agent.cline", "smartdock-agent-cline"]
+  ["io.github.fernandodamaso.smartdock.agent.cline", "smartdock-agent-cline"],
+  ["io.github.fernandodamaso.smartdock.agent.herdr", "smartdock-agent-herdr"]
 ]
 
 var TERMINAL_AGENT_SPINNER_FRAMES = [
