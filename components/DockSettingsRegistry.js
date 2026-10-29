@@ -169,8 +169,15 @@ function legacyConversion(settings, presentation) {
   var existing=settings.presentationModeByMonitor || {}
   var next=Object.assign({},existing)
   presentation.entries.forEach(function(entry) {
-    if (entry && entry.connector && (entry.mode==="classic" || entry.mode==="sidebar"))
-      next[entry.connector]=entry.mode
+    if (!entry || !entry.connector) return
+    if (entry.mode==="classic") next[entry.connector]="classic"
+    else if (entry.mode==="sidebar") {
+      // The legacy selector can leave unselected outputs unmapped even
+      // though their inherited presentation mode says sidebar. Per-monitor
+      // choices cannot encode "unmapped": migrate those to Classic rather
+      // than turning on extra sidebars unexpectedly.
+      next[entry.connector]=entry.mapped===false ? "classic" : "sidebar"
+    }
   })
   return {patch:{presentationModeByMonitor:next,sidebarMonitor:""},
     expected:{presentationModeByMonitor:Object.assign({},existing),sidebarMonitor:settings.sidebarMonitor}}
