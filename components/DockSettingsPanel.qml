@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "DockSettingsRegistry.js" as Registry
 import "DockSettingsFeaturesModel.js" as Features
+import "DockScreenPresentationModel.js" as ScreenModel
 
 // One host-owned KeyboardPanel, never a delegate-owned preferences editor.
 // Only the host writer mutates requested state; this panel never touches disk.
@@ -19,6 +20,11 @@ Item {
   property string lastSection: ""
   property bool showHelp: false
   property string rowFeedback: ""
+  property string searchTerm: ""
+  readonly property var searchResults: Registry.search(metadata,searchTerm)
+  readonly property var searchMatchCounts: Registry.searchCounts(searchResults)
+  readonly property bool searching: searchTerm.trim().length > 0
+  readonly property bool welcomeVisible: !searching && Registry.firstRun(host.settingsDefaultsInUse,host.settingsLoaded,host.settingsLoadState)
   readonly property var sections: Registry.registry(metadata)
   readonly property string saveLabel: Registry.status(
     host.settingsWriteState, host.settingsPersisted, host.settingsLoadState)
@@ -153,10 +159,11 @@ Item {
       Shortcut { sequence: "Alt+Up"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(-1) }
       Shortcut { sequence: "Alt+Down"; enabled: root.panelOpen && !!root.activeSectionView && root.focusPane === "settings"; onActivated: root.activeSectionView.reorderSelected(1) }
       anchors.fill: parent
-      blocked: !!root.activeSectionView && (root.activeSectionView.popupOpen || root.activeSectionView.editorFocused)
+      blocked: searchField.activeFocus || (!!root.activeSectionView && (root.activeSectionView.popupOpen || root.activeSectionView.editorFocused))
       onCloseRequested: {
         if (root.activeSectionView && root.activeSectionView.dismissEditor()) return
         if (root.showHelp) {root.showHelp=false;return}
+        if (root.searchTerm !== "") {root.searchTerm="";keyboard.forceActiveFocus();return}
         root.close()
       }
       onMoveRequested: function(dx,dy) {
@@ -181,7 +188,7 @@ Item {
         else if (key === "c" && root.focusPane === "settings" && root.activeSectionView) {
           clipboard.text = root.activeSectionView.copyCommand()
           clipboard.selectAll(); clipboard.copy()
-        } else if (key === "/") root.rowFeedback = "Search will be available in SET-08."
+        } else if (key === "/") {root.focusPane="sections";searchField.forceActiveFocus()}
       }
       Row {
         anchors.fill: parent
@@ -201,19 +208,46 @@ Item {
             wrapMode: Text.WordWrap
           }
           Ui.PanelSeparator { width: navigation.width }
+          TextInput {
+            id:searchField
+            objectName:"settings-search"
+            width:navigation.width
+            height:Style.space(30)
+            text:root.searchTerm
+            color:Commons.Color.foreground
+            font.family:Style.font.family
+            font.pixelSize:Style.font.body
+            clip:true
+            onTextChanged:root.searchTerm=text
+            Keys.onEscapePressed:function(event) {
+              root.searchTerm=""
+              keyboard.forceActiveFocus()
+              event.accepted=true
+            }
+            Text {
+              visible:searchField.text.length===0
+              text:"Search settings  /"
+              color:Commons.Color.foreground
+              opacity:0.6
+              anchors.verticalCenter:parent.verticalCenter
+              font.family:Style.font.family
+              font.pixelSize:Style.font.caption
+            }
+          }
           Repeater {
             model: root.sections
             delegate: Ui.Button {
               required property var modelData
               width: navigation.width
-              text: modelData.id === "features" && root.host.featureReadinessBridge.lastGoodFeatures
+              text: root.searching ? modelData.label + " · " + (root.searchMatchCounts[modelData.id] || 0)
+                : modelData.id === "features" && root.host.featureReadinessBridge.lastGoodFeatures
                 ? modelData.label + " · " + (Features.counts(root.host.featureReadinessBridge.lastGoodFeatures).limited
                     + Features.counts(root.host.featureReadinessBridge.lastGoodFeatures).missing)
                 : modelData.label
               selected: root.selectedSection === modelData.id
               focusable: true
               tooltipText: "Go to " + modelData.label
-              onClicked: root.selectSection(modelData.id)
+              onClicked: {root.searchTerm="";root.selectSection(modelData.id)}
             }
           }
           Ui.PanelSeparator { width: navigation.width }
@@ -269,7 +303,7 @@ Item {
             visible: root.showHelp
             text: "Host: " + root.host.runtimeMode + " · Settings: " + root.host.configPath
               + "\nCLI and Settings use the same writer."
-              + "\nKeyboard: j/k navigate, h/l change, Tab sections/settings, / search (SET-08), c copy CLI command, Alt+↑/↓ reorder, Esc close."
+              + "\nKeyboard: j/k navigate, h/l change, Tab sections/settings, / search, c copy CLI command, Alt+↑/↓ reorder, Esc close."
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
             width: parent.width
@@ -288,11 +322,90 @@ Item {
               id: layoutHost
               width: settingsScroll.width
               spacing: Style.space(10)
+              Column {
+                id:welcome
+                width:parent.width
+                visible:root.welcomeVisible
+                spacing:Style.space(10)
+                Text {text:"Welcome to Dockrail";color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.title;font.bold:true}
+                Text {
+                  width:parent.width;wrapMode:Text.WordWrap;color:Commons.Color.foreground
+                  text:"You're using the "+((root.host.currentPresentation().classicScreens || []).length ? "classic dock" : "sidebar")+
+                    ". Every change here saves right away; agents can use dockrail config."
+                }
+                Ui.Button {
+                  text:"Try the sidebar"
+                  enabled:root.host.settingsLoadState!=="invalid" && root.host.settingsWriteState!=="saving"
+                  onClicked:{
+                    var entries=root.host.currentPresentation().entries || []
+                    if(entries.length)root.reportWrite(root.host.monitorModeIntent(entries[0].connector,"sidebar",
+                      ScreenModel.modeGestureToken(root.host.currentPresentation(),entries[0].connector)))
+                  }
+                }
+                Text {text:"Integrations";font.bold:true;color:Commons.Color.foreground;font.family:Style.font.family}
+                Ui.Button {text:"Explore Chrome, Coding agents, Launcher counts and Agent launchers";onClicked:root.openFeature("chrome")}
+                Ui.Button {text:"Then make it yours · Appearance";onClicked:root.selectSection("appearance")}
+              }
+              Column {
+                width:parent.width
+                visible:!root.searching && !!root.host.settings.sidebarMonitor
+                spacing:Style.space(8)
+                Text {
+                  text:"Legacy setting found · sidebarMonitor"
+                  color:Commons.Color.foreground;font.family:Style.font.family;font.bold:true
+                }
+                Text {width:parent.width;wrapMode:Text.WordWrap;color:Commons.Color.foreground
+                  text:"Convert the currently connected monitors into explicit per-monitor choices. Disconnected entries are preserved."}
+                Ui.Button {
+                  text:"Convert to per-monitor settings"
+                  enabled:root.host.settingsLoadState!=="invalid" && root.host.settingsWriteState!=="saving"
+                    && !root.host.settingsReloadPending && root.host.settingsLoaded
+                  onClicked:{
+                    var intent=Registry.legacyConversion(root.host.settings,root.host.currentPresentation())
+                    if(intent)root.reportWrite(root.host.saveSettingsIntent(intent.patch,intent.expected))
+                  }
+                }
+              }
+              Column {
+                width:parent.width
+                visible:root.searching
+                spacing:Style.space(12)
+                Text {
+                  width:parent.width
+                  text:root.searchResults.length+" settings match “"+root.searchTerm+"”"
+                  textFormat:Text.PlainText;wrapMode:Text.WordWrap
+                  color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.title
+                }
+                Repeater {
+                  model:root.searchResults
+                  delegate:Column {
+                    required property var modelData
+                    width:parent.width
+                    spacing:Style.space(5)
+                    Text {
+                      text:modelData.sectionLabel+" › "+modelData.row.ui.group
+                      color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption
+                    }
+                    DockSettingsRow {
+                      visible:["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)>=0
+                      width:parent.width;host:root.host;row:modelData.row
+                      monitorCount:(root.host.connectedScreens || []).length
+                      feedbackActive:root.panelOpen
+                      onEdited:root.rowFeedback=""
+                    }
+                    Ui.Button {
+                      visible:["toggle","slider","dropdown","number","segmented"].indexOf(modelData.row.ui.control)<0
+                      text:"Open "+modelData.label
+                      onClicked:{root.searchTerm="";root.selectSection(modelData.section)}
+                    }
+                  }
+                }
+              }
               DockSettingsLayout {
                 id: layoutSection
                 panelActive: root.panelOpen
                 width: parent.width
-                visible: root.selectedSection === "layout"
+                visible: !root.searching && root.selectedSection === "layout"
                 host: root.host
                 metadata: root.metadata
                 onFocusSettings: root.focusPane="settings"
@@ -310,7 +423,7 @@ Item {
                 section: "appearance"
                 panelActive: root.panelOpen
                 width: parent.width
-                visible: root.selectedSection === "appearance"
+                visible: !root.searching && root.selectedSection === "appearance"
                 host: root.host
                 metadata: root.metadata
                 onFocusSettings: root.focusPane = "settings"
@@ -328,7 +441,7 @@ Item {
                 section: "behavior"
                 panelActive: root.panelOpen
                 width: parent.width
-                visible: root.selectedSection === "behavior"
+                visible: !root.searching && root.selectedSection === "behavior"
                 host: root.host
                 metadata: root.metadata
                 onFocusSettings: root.focusPane = "settings"
@@ -345,7 +458,7 @@ Item {
                 id:widgetsSection
                 width:parent.width
                 panelActive:root.panelOpen
-                visible:root.selectedSection === "sidebar-widgets"
+                visible:!root.searching && root.selectedSection === "sidebar-widgets"
                 host:root.host
                 metadata:root.metadata
                 onFocusSettings:root.focusPane="settings"
@@ -363,7 +476,7 @@ Item {
                 id:featuresSection
                 width:parent.width
                 panelActive:root.panelOpen
-                visible:root.selectedSection==="features"
+                visible:!root.searching && root.selectedSection==="features"
                 host:root.host
                 metadata:root.metadata
                 onFocusSettings:root.focusPane="settings"
@@ -383,7 +496,7 @@ Item {
                 id:appsLoader
                 width:parent.width
                 height:item ? item.implicitHeight : 0
-                active:root.selectedSection==="apps"
+                active:!root.searching && root.selectedSection==="apps"
                 visible:active
                 onActiveChanged: {
                   if(active) setSource(Qt.resolvedUrl("DockSettingsAppsSection.qml"), {
