@@ -64,7 +64,7 @@ export function hostHarness(settings, applications = []) {
     settingsDefaultsInUse: false, showTrash: false, showTrashSetting: false,
     settingsLoadedText: '', settingsWriteBaseText: '', settingsWriteText: '',
     // Presentation inputs read by currentPresentation()/gesture functions.
-    connectedScreens: [], hyprMonitors: [],
+    connectedScreens: [], hyprMonitors: [], focusedHyprlandMonitor: null,
     sidebarState: { mappedScreens: [], interactionBusy: false },
     modeGestureFeedbackByMonitor: ({}) });
   const control = functions('components/DockControl.qml', {
