@@ -434,9 +434,16 @@ Item {
                       feedbackActive:root.panelOpen
                       onEdited:root.rowFeedback=""
                     }
+                    DockSettingsPairedRow {
+                      visible:!!searchEntry.modelData.row.ui.pairedWith && !searchEntry.modelData.featureId
+                      width:parent.width
+                      row:searchEntry.modelData.row
+                      host:root.host
+                      feedbackActive:root.panelOpen
+                      onEdited:root.rowFeedback=""
+                    }
                     Ui.Button {
                       visible:searchEntry.modelData.section==="layout" || !!searchEntry.modelData.featureId
-                        || !!searchEntry.modelData.row.ui.pairedWith
                         || ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)<0
                       text:"Open "+searchEntry.modelData.label
                       onClicked:searchEntry.modelData.featureId
