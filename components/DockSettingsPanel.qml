@@ -397,11 +397,12 @@ Item {
                   color:Commons.Color.foreground;font.family:Style.font.family;font.bold:true
                 }
                 Text {width:parent.width;wrapMode:Text.WordWrap;color:Commons.Color.foreground
-                  text:"Convert connected monitors into per-monitor choices. Where the legacy selector left a monitor without a sidebar, it becomes Classic dock. Disconnected choices are preserved."}
+                  text:"The selected legacy monitor becomes Sidebar; every other connected monitor becomes Classic dock. Disconnected choices are preserved."}
                 Ui.Button {
                   text:"Convert to per-monitor settings"
                   enabled:root.host.settingsLoadState!=="invalid" && root.host.settingsWriteState!=="saving"
                     && !root.host.settingsReloadPending && root.host.settingsLoaded
+                    && !!Registry.legacyConversion(root.host.settings,root.host.currentPresentation())
                   onClicked:{
                     var intent=Registry.legacyConversion(root.host.settings,root.host.currentPresentation())
                     if(intent)root.reportWrite(root.host.saveSettingsIntent(intent.patch,intent.expected))
