@@ -132,21 +132,41 @@ function displayValue(ui, value) {
 function search(metadata, term, shownKeys) {
   var needle=String(term || "").trim().toLocaleLowerCase()
   if (!needle) return []
-  var visible=shownKeys || null
+  var visible=shownKeys || []
   var found=[]
+  var seenFeatures=Object.create(null)
   registry(metadata).forEach(function(section) {
     section.rows.forEach(function(row) {
-      if (row.ui.visibility !== "normal") return
-      if (visible && visible.indexOf(row.key) < 0) return
-      var label=String(row.ui.label || "")
-      var help=String(row.ui.help || "")
+      var ui=row.ui || {}
+      var visibility=ui.visibility
+      if (visibility==="hidden") return
+      if (visibility==="conditional" && visible.indexOf(row.key)<0) return
+      if (visibility==="in-place" && visible.indexOf(row.key)<0) return
+      // Paired controls are represented by their primary editor, not a
+      // second toggle. Search can still locate that primary by either key.
+      if (visibility==="in-place" && ui.pairedWith) return
+      var label=String(ui.label || "")
+      var help=String(ui.help || "")
       var key=row.key
       var rank=label.toLocaleLowerCase()===needle ? 0 :
         label.toLocaleLowerCase().indexOf(needle)>=0 ? 1 :
-        key.toLocaleLowerCase().indexOf(needle)>=0 ? 2 :
+        key.toLocaleLowerCase().indexOf(needle)>=0 ||
+        String(ui.pairedWith || "").toLocaleLowerCase().indexOf(needle)>=0 ? 2 :
         help.toLocaleLowerCase().indexOf(needle)>=0 ? 3 : -1
-      if (rank >= 0) found.push({section:section.id, sectionLabel:section.label,
-        key:key, row:row, rank:rank, label:label, help:help})
+      if (rank>=0) found.push({section:section.id,sectionLabel:section.label,
+        key:key,row:row,rank:rank,label:label,help:help})
+      var feature=ui.feature
+      if (!feature || seenFeatures[feature.id]) return
+      seenFeatures[feature.id]=true
+      var featureNames={"chrome":"Chrome",
+        "coding-agents":"Coding agents (Herdr)","launcher-counts":"Launcher badge counts"}
+      var title=featureNames[feature.id] || String(feature.id || "")
+      var haystack=(title+" "+String(feature.id || "")).toLocaleLowerCase()
+      if (haystack.indexOf(needle)>=0) {
+        found.push({section:"features",sectionLabel:"Features",
+          key:"feature:"+feature.id,featureId:feature.id,row:row,
+          rank:1,label:title,help:"Integration setup and readiness"})
+      }
     })
   })
   return found.sort(function(a,b) {return a.rank-b.rank || order.indexOf(a.section)-order.indexOf(b.section)
