@@ -1588,8 +1588,7 @@ var classicOnlySettings = [
   "urgentWindowAnimationEnabled",
   "showUrgentOutsideScope",
   "dockHerdrIndicators",
-  "dockT3Indicators",
-  "dockClaudeIndicators"
+  "dockT3Indicators"
 ]
 
 function inactiveClassicSettings(hasSidebar) {

@@ -217,9 +217,12 @@ sidebar widget. Re-pair when the session expires (`dockrail t3 pair`).
 ### Claude Desktop sessions
 
 Show a working spinner on the Claude Desktop icon while one of its Claude
-Code sessions runs, an input-needed mark on permission prompts and a done
-mark until you focus it. Install the Claude Code hooks once, then enable the
-dock indicators and start a new Claude Desktop session:
+Code sessions runs, an input-needed mark on permission prompts and when Claude
+asks you a question, and a done mark that clears when you open that session
+in Claude Desktop. The sidebar shows the same marks on the Claude window row
+and lists each session that needs attention under it; clicking a session row
+opens that session. Install the Claude Code hooks once, then enable the
+indicators and start a new Claude Desktop session:
 
 ```bash
 dockrail claude hooks install
@@ -618,7 +621,7 @@ apply. Read the running host's schema/defaults and preserve the user's values:
 | `browserProfileBadgesEnabled` | Show per-window browser profile badges when the browser-profile provider is installed and the browser exposes a DevTools endpoint; no provider is installed or started by this setting. |
 | `dockHerdrIndicators` | Show Herdr agent state on terminal icons, in hover previews and in the context menu. Uses the existing Herdr provider; enabling it starts that provider while a classic dock is active, including when it is auto-hidden. |
 | `dockT3Indicators` | Show T3 Code thread state on the T3 Code icon, in hover previews and in the context menu. Pair with dockrail t3 pair; requires a classic dock to run for dock-only demand. |
-| `dockClaudeIndicators` | Show Claude Desktop session state on the Claude Desktop icon: a working spinner while a session runs, plus input-needed and done marks. Install the Claude Code hooks with dockrail claude hooks install; requires a classic dock to run for dock-only demand. |
+| `dockClaudeIndicators` | Show Claude Desktop session state on the Claude Desktop dock icon and in its sidebar window row: a working spinner while a session runs, plus input-needed and done marks. The sidebar row also lists one row per session that needs attention. Install the Claude Code hooks with dockrail claude hooks install. |
 | `browserActivityMutedServices` | Service IDs muted from Chrome activity header and badge totals (`gmail`, `whatsapp`, …); rows stay visible/dimmed and openable; retained by preference reset |
 | `sidebarBrowserTabsEnabled` | When true and the browser-profile provider is available, sidebar Chrome windows can expand to list open page tabs (titles only, no URLs) |
 | `sidebarInlineSoloWorkspace` | When true, populated workspace names share the first application/window row instead of using a dedicated row; empty workspaces remain dedicated rows. Set `false` to retain separate workspace rows |

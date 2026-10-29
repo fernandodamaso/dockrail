@@ -213,10 +213,9 @@ Item {
       "dockT3Indicators", root.settings.dockT3Indicators)
       && root.presentation.classicScreens.length > 0)
     || root.sidebarWidgetActive("t3.threads")
-  // Claude Desktop sessions are dock-only, so only the dock creates demand.
+  // The dock and the sidebar both show Claude Desktop sessions; the setting alone creates demand.
   readonly property bool claudeSourceWanted: DockModel.normalizeSetting(
       "dockClaudeIndicators", root.settings.dockClaudeIndicators)
-    && root.presentation.classicScreens.length > 0
   readonly property var connectedScreens: Quickshell.screens
   readonly property var hyprMonitors: Hyprland.monitors ? Hyprland.monitors.values || [] : []
   readonly property var hyprWorkspaces: Hyprland.workspaces ? Hyprland.workspaces.values || [] : []
@@ -1059,10 +1058,11 @@ Item {
     hyprToplevels: root.hyprToplevels
     focusedToplevel: ToplevelManager.activeToplevel
     scopeRevision: root.scopeRevision
-    dockConsumerActive: (DockModel.normalizeSetting("dockHerdrIndicators", root.settings.dockHerdrIndicators)
-        || DockModel.normalizeSetting("dockT3Indicators", root.settings.dockT3Indicators)
-        || DockModel.normalizeSetting("dockClaudeIndicators", root.settings.dockClaudeIndicators))
-      && root.presentation.classicScreens.length > 0
+    // Claude has no sidebar Widget lease, so its setting keeps the bridge active for the sidebar too.
+    dockConsumerActive: ((DockModel.normalizeSetting("dockHerdrIndicators", root.settings.dockHerdrIndicators)
+        || DockModel.normalizeSetting("dockT3Indicators", root.settings.dockT3Indicators))
+      && root.presentation.classicScreens.length > 0)
+      || root.claudeSourceWanted
   }
 
   DockAgentSourceMux {

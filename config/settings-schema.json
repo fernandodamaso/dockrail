@@ -1159,15 +1159,15 @@
     },
     "dockClaudeIndicators": {
       "type": "boolean",
-      "description": "Show Claude Desktop session state on the Claude Desktop icon: a working spinner while a session runs, plus input-needed and done marks. Install the Claude Code hooks with dockrail claude hooks install; requires a classic dock to run for dock-only demand.",
+      "description": "Show Claude Desktop session state on the Claude Desktop dock icon and in its sidebar window row: a working spinner while a session runs, plus input-needed and done marks. The sidebar row also lists one row per session that needs attention. Install the Claude Code hooks with dockrail claude hooks install.",
       "ui": {
         "section": "behavior",
-        "group": "attention-on-the-dock",
-        "order": 480,
-        "label": "Claude Desktop sessions on dock icons",
-        "help": "Show a working spinner on the Claude Desktop icon while one of its Claude Code sessions runs. Install the hooks once with dockrail claude hooks install.",
+        "group": "attention",
+        "order": 445,
+        "label": "Claude Desktop session indicators",
+        "help": "Show a working spinner on the Claude Desktop dock icon and sidebar window row while one of its Claude Code sessions runs. The sidebar lists each session that needs attention. Install the hooks once with dockrail claude hooks install.",
         "control": "toggle",
-        "surface": "classic",
+        "surface": "all",
         "visibility": "normal",
         "commit": "change"
       }

@@ -5,8 +5,11 @@
 ### Added
 
 - T3 Code threads (sidebar widget `t3.threads`, dock indicators `dockT3Indicators`, `dockrail t3 pair|status|unpair`).
-- Claude Desktop session state on its dock icon (working spinner, input
-  needed, done) through Claude Code hooks (`dockClaudeIndicators`,
+- Claude Desktop session state on its dock icon and sidebar window row
+  (working spinner, input needed, done). A session needs input when Claude
+  asks you a question, and done clears when you open the session. The sidebar
+  lists each session that needs attention and opens it in Claude Desktop.
+  State comes from Claude Code hooks (`dockClaudeIndicators`,
   `dockrail claude hooks install|status|uninstall`).
 
 ### Fixed

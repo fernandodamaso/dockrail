@@ -6,7 +6,7 @@ const all=plain(model.registry(metadata))
 assert.deepEqual(all.map(s=>s.id),['appearance','layout','behavior','sidebar-widgets','features','apps'])
 const homes=all.flatMap(s=>s.rows.map(row=>row.key))
 // FDM-1040 froze 58; FDM-1051 slice 3 adds dockT3Indicators and Claude Desktop
-// adds dockClaudeIndicators (both behavior/attention-on-the-dock).
+// adds dockClaudeIndicators (behavior/attention, shared with dock and sidebar).
 assert.equal(homes.length,60)
 assert.equal(new Set(homes).size,60)
 const variants=[

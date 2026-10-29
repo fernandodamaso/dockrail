@@ -367,6 +367,123 @@ TestCase {
     compare(summary.count, 2)
   }
 
+  function claudeSnapshot(bridge, claudeStatus, herdrStatus, revision, includeDesktop,
+      includeBare) {
+    var agents = [{
+      id: "agent-a", serverId: "srv", connectionGeneration: 1,
+      paneId: "pane-a", status: herdrStatus, title: "Agent"
+    }]
+    if (includeDesktop) agents.push({
+      id: "session-1", serverId: "claude:desktop", connectionGeneration: 1,
+      desktopSessionId: "local_6f1c2a4e-9b3d-4e7a-8c2f-1a2b3c4d5e6f",
+      paneId: "", status: claudeStatus, title: "Session"
+    })
+    if (includeBare) agents.push({
+      id: "session-2", serverId: "claude:desktop", connectionGeneration: 1,
+      paneId: "", status: claudeStatus, title: "Unbound session"
+    })
+    return {
+      schemaVersion: 1,
+      providerEpoch: "epoch-1",
+      revision: revision,
+      servers: [{
+        id: "srv", health: "live", capabilities: { focusAgent: true },
+        clients: [{ pid: 41, startTime: 41,
+          ancestors: [{ pid: 40, startTime: 40 }] }]
+      }, {
+        id: "claude:desktop", source: "claude", health: "live",
+        capabilities: { focusAgent: true },
+        clients: [{ pid: 51, startTime: 51,
+          ancestors: [{ pid: 50, startTime: 50 }] }]
+      }],
+      agents: agents,
+      windowProcesses: {
+        revision: bridge.windowProcessRevision,
+        identities: [{ pid: 40, startTime: 40 }, { pid: 50, startTime: 50 }]
+      }
+    }
+  }
+
+  function readyHerdrAndClaudeBridge() {
+    var scene = createTemporaryObject(bridgeSceneFactory, testCase)
+    verify(scene !== null)
+    var herdr = createTemporaryObject(windowFactory, scene)
+    var claude = createTemporaryObject(windowFactory, scene)
+    scene.bridge.toplevels = [herdr, claude]
+    scene.bridge.hyprToplevels = [
+      { wayland: herdr, address: "0xabc", lastIpcObject: { pid: 40 } },
+      { wayland: claude, address: "0xdef", lastIpcObject: { pid: 50 } }
+    ]
+    scene.bridge.dockConsumerActive = true
+    scene.bridge.syncHerdrWindowProcesses()
+    scene.service.send({
+      status: "ready", revision: 1,
+      data: claudeSnapshot(scene.bridge, "working", "working", 1, true, true)
+    })
+    tryCompare(scene.bridge, "snapshotReady", true)
+    return { scene: scene, herdr: herdr, claude: claude }
+  }
+
+  function test_claudeCompletionSurvivesWindowFocus() {
+    var value = readyHerdrAndClaudeBridge()
+    var bridge = value.scene.bridge
+    function sendSessions(revision, claudeStatus, herdrStatus, includeDesktop, includeBare) {
+      value.scene.service.send({
+        status: "ready", revision: revision,
+        data: claudeSnapshot(bridge, claudeStatus, herdrStatus, revision,
+          includeDesktop, includeBare)
+      })
+    }
+    function send(revision, claudeStatus, herdrStatus, includeClaude) {
+      sendSessions(revision, claudeStatus, herdrStatus, includeClaude !== false,
+        includeClaude !== false)
+    }
+    function indicator(win) {
+      return bridge.summaryForToplevels([win]).indicatorStatus
+    }
+
+    send(2, "done", "done")
+    compare(indicator(value.claude), "done")
+    compare(indicator(value.herdr), "done")
+
+    // Focusing the Claude window does not open the session in Claude Desktop.
+    bridge.focusedToplevel = value.claude
+    compare(indicator(value.claude), "done", "Claude done survives focus")
+    // Herdr keeps today's behaviour: focusing its window acknowledges it.
+    bridge.focusedToplevel = value.herdr
+    compare(indicator(value.herdr), "", "Herdr completion is acknowledged by focus")
+    compare(indicator(value.claude), "done")
+    bridge.focusedToplevel = value.claude
+    compare(indicator(value.claude), "done", "Claude done survives a focus change")
+    bridge.focusedToplevel = null
+    compare(indicator(value.claude), "done", "Claude done survives losing focus")
+
+    // A Claude completion arriving while its window is focused is not acknowledged.
+    bridge.focusedToplevel = value.claude
+    send(3, "working", "working")
+    compare(indicator(value.claude), "working")
+    send(4, "done", "working")
+    compare(indicator(value.claude), "done", "fresh Claude completion while focused")
+    bridge.focusedToplevel = value.herdr
+    compare(indicator(value.claude), "done")
+
+    // A Claude session without Desktop metadata has nothing that clears it, so
+    // focusing its window acknowledges it. Only that session is listed here.
+    sendSessions(5, "working", "working", false, true)
+    sendSessions(6, "done", "done", false, true)
+    compare(indicator(value.claude), "done", "bare Claude completion waits for focus")
+    bridge.focusedToplevel = value.claude
+    compare(indicator(value.claude), "", "bare Claude completion is acknowledged by focus")
+    bridge.focusedToplevel = value.herdr
+    compare(indicator(value.claude), "")
+
+    // Opening the session in Claude Desktop makes the provider stop listing it.
+    send(7, "done", "done", false)
+    var gone = bridge.summaryForToplevels([value.claude])
+    compare(gone.count, 0, "dropped Claude session has no rows")
+    compare(gone.indicatorStatus, "", "dropped Claude session clears its done mark")
+  }
+
   function test_gapReplayAndBlockedBounceRevision() {
     var value = readyBridge("working")
     sendSnapshot(value, "blocked", 2)
@@ -392,6 +509,31 @@ TestCase {
     sendSnapshot(value, "done", 9)
     compare(value.scene.bridge.summaryForToplevels([value.win]).indicatorStatus, "",
       "replayed completion retains acknowledgment")
+  }
+
+  // Source-level guard: qmltestrunner cannot load DockItem (it needs the Quickshell
+  // core plugin), so this checks the blocked-bounce gate text in DockItem.qml.
+  function itemSource() {
+    var request = new XMLHttpRequest()
+    request.open("GET", Qt.resolvedUrl("../components/DockItem.qml"), false)
+    request.send()
+    if (!request.responseText) throw new Error("QML_XHR_ALLOW_FILE_READ=1 is required")
+    return request.responseText
+  }
+
+  function test_blockedBounceHonoursSuppressionAndFocus() {
+    var source = itemSource()
+    var start = source.indexOf("  function requestHerdrBlockedMotion() {")
+    verify(start >= 0, "DockItem requestHerdrBlockedMotion exists")
+    var body = source.slice(start, source.indexOf("\n  }\n", start))
+    var consume = body.indexOf("root.seenHerdrBlockedTransitionRevision = revision")
+    var gate = body.indexOf("if (root.motionReady")
+    verify(consume >= 0 && gate > consume, "skipped transitions are consumed before the gate")
+    verify(body.indexOf("!root.urgentMotionSuppressed", gate) > gate,
+      "blocked bounce honours urgent motion suppression")
+    verify(body.indexOf("!root.focused", gate) > gate,
+      "blocked bounce is skipped for the focused item")
+    verify(body.indexOf("attentionMotion.play()") > gate, "blocked bounce plays after the gate")
   }
 
   function test_replacementAndSettingOff() {

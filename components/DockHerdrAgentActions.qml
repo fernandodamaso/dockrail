@@ -1,6 +1,7 @@
 import QtQuick
 import "DockHerdrModel.js" as HerdrModel
 import "DockT3ActivationModel.js" as T3Activation
+import "DockClaudeActivationModel.js" as ClaudeActivation
 
 // Host-owned exact-capture Herdr focus orchestration. Targets are captured and
 // revalidated against DockHerdrWindowAgents, never sidebar projection rows.
@@ -39,9 +40,18 @@ Item {
     return HerdrModel.serverSource(root.serverForId(serverId)) === "t3"
   }
 
+  function isClaudeServerId(serverId) {
+    return HerdrModel.serverSource(root.serverForId(serverId)) === "claude"
+  }
+
   // Injectable native dispatcher. True means the URL was accepted for
   // opening, not that T3 navigated. Tests replace this property.
   property var openT3ThreadUrl: function(url) {
+    return Qt.openUrlExternally(url)
+  }
+
+  // Same contract as openT3ThreadUrl, for Claude Desktop session routes.
+  property var openClaudeSessionUrl: function(url) {
     return Qt.openUrlExternally(url)
   }
 
@@ -71,6 +81,7 @@ Item {
       agentId: agentId,
       paneId: paneId,
       terminalId: String(canonical.terminalId || ""),
+      desktopSessionId: String(canonical.desktopSessionId || ""),
       focusAgentSupported: true
     }
   }
@@ -166,6 +177,27 @@ Item {
     return requestId
   }
 
+  // A current Claude target opens its Claude Desktop session route once the
+  // window is raised. An unknown session id opens nothing and is still success.
+  function openClaudeSession(target, isLatest) {
+    if (!root.targetIsCurrent(target)) return
+    var url = ClaudeActivation.sessionUrl(target.serverId, target.desktopSessionId)
+    if (!url) return
+    if (!root.targetIsCurrent(target)) return
+    var opener = root.openClaudeSessionUrl
+    if (typeof opener !== "function") {
+      if (isLatest) root.setFocusError(target.key, "unsupported")
+      return
+    }
+    var accepted = false
+    try {
+      accepted = opener.call(root, url) === true
+    } catch (e) {
+      accepted = false
+    }
+    if (!accepted && isLatest) root.setFocusError(target.key, "unsupported")
+  }
+
   function onHerdrFocusFinished(requestId, ok, errorCode) {
     var pending = root.pendingFocusByRequest[requestId]
     if (!pending) return
@@ -192,7 +224,12 @@ Item {
       return
     }
     // Second validation success for a current T3 target dispatches one native
-    // thread URL. Herdr's second success returns with no further work.
+    // thread URL. A Claude target dispatches its session route. Herdr's second
+    // success returns with no further work.
+    if (root.isClaudeServerId(pending.serverId)) {
+      root.openClaudeSession(pending, isLatest)
+      return
+    }
     if (!root.isT3ServerId(pending.serverId)) return
     if (!root.targetIsCurrent(pending)) return
     var url = T3Activation.threadUrl(pending.serverId, pending.paneId)

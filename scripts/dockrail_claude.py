@@ -4,7 +4,8 @@
 Claude Desktop runs Claude Code sessions as child processes. Claude Code
 hooks report each turn's lifecycle; ``hook`` turns those events into one
 small per-session record that ``provider/claude`` reads to animate the Claude
-Desktop dock icon. Prompts, messages and tool input are never stored.
+Desktop dock icon and sidebar row. Prompts, messages and tool input are never
+stored.
 
 Self-contained: it must also run from a ``--cli-only`` install that ships no
 ``provider/`` directory, so the state-directory rule is duplicated here (a
@@ -16,30 +17,50 @@ hook entry point; reads the Claude Code hook payload on stdin, never fails).
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import hashlib
 import json
 import os
+import re
 import shlex
+import stat
 import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 HOOK_MARKER = "dockrail_claude.py"
 MAX_PAYLOAD_BYTES = 1024 * 1024
 MAX_ANCESTORS = 16
+MAX_RECORD_BYTES = 64 * 1024
+# Hooks for parallel tool calls can overlap; wait briefly for the session lock.
+LOCK_WAIT_SECONDS = 2.0
+LOCK_POLL_SECONDS = 0.02
 SHELL_NAMES = ("sh", "bash", "dash", "zsh", "fish", "env", "timeout", "nice")
-# Event -> whether Claude Code accepts a tool matcher for it.
-HOOK_EVENTS = {
-    "SessionStart": False,
-    "UserPromptSubmit": False,
-    "PostToolUse": True,
-    "Notification": False,
-    "Stop": False,
-    "SessionEnd": False,
+# Event -> tool matcher Claude Code applies to it (None: no matcher).
+HOOK_EVENTS: dict[str, str | None] = {
+    "SessionStart": None,
+    "UserPromptSubmit": None,
+    "PreToolUse": "AskUserQuestion",
+    "PostToolUse": "*",
+    "Notification": None,
+    "Stop": None,
+    "SessionEnd": None,
 }
-BLOCKING_NOTIFICATIONS = ("permission_prompt", "elicitation_dialog")
+BLOCKING_NOTIFICATIONS = (
+    "permission_prompt",
+    "elicitation_dialog",
+    "worker_permission_prompt",
+    "agent_needs_input",
+    "elicitation_url_dialog",
+)
+# Record fields that describe an open prompt and what the session resumes to.
+PROMPT_FIELDS = ("pendingPrompt", "resumeStatus", "resumeUpdatedAtMs")
+ASK_USER_TOOL = "AskUserQuestion"
+# Claude Desktop's end-of-turn tool; a non-empty ``ask`` input is a question.
+WRAP_UP_TOOL = re.compile(r"mcp__.*ccd_turn__wrap_up")
 
 
 class CliError(Exception):
@@ -126,15 +147,37 @@ def process_chain(start: int, proc_root: Path = Path("/proc")) -> tuple[dict[str
     return session, ancestors
 
 
-def status_for(payload: Mapping[str, Any]) -> str | None:
+def is_wrap_up(payload: Mapping[str, Any]) -> bool:
+    tool = payload.get("tool_name")
+    return (
+        payload.get("hook_event_name") == "PostToolUse"
+        and isinstance(tool, str)
+        and WRAP_UP_TOOL.fullmatch(tool) is not None
+    )
+
+
+def asks_user(payload: Mapping[str, Any]) -> bool:
+    """Return whether a PostToolUse carries Claude's end-of-turn question."""
+    tool_input = payload.get("tool_input")
+    return (
+        is_wrap_up(payload)
+        and isinstance(tool_input, dict)
+        and isinstance(tool_input.get("ask"), str)
+        and bool(tool_input["ask"])
+    )
+
+
+def status_for(payload: Mapping[str, Any], awaiting_user: bool = False) -> str | None:
     """Map one hook payload to a session status; ``None`` keeps the record."""
     event = payload.get("hook_event_name")
     if event == "SessionStart":
         return None if payload.get("source") == "compact" else "idle"
+    if event == "PreToolUse":
+        return "blocked" if payload.get("tool_name") == ASK_USER_TOOL else None
     if event in ("UserPromptSubmit", "PostToolUse"):
         return "working"
     if event == "Stop":
-        return "done"
+        return "blocked" if awaiting_user else "done"
     if event == "Notification":
         kind = payload.get("notification_type")
         if kind in BLOCKING_NOTIFICATIONS:
@@ -147,6 +190,34 @@ def status_for(payload: Mapping[str, Any]) -> str | None:
 def record_path(directory: Path, session_id: str) -> Path:
     digest = hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:32]
     return directory / f"{digest}.json"
+
+
+def lock_path(directory: Path, session_id: str) -> Path:
+    return record_path(directory, session_id).with_suffix(".lock")
+
+
+def read_record(directory: Path, session_id: str) -> dict[str, Any]:
+    """Return the stored record for a session, or ``{}`` when none is readable."""
+    try:
+        fd = os.open(record_path(directory, session_id), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return {}
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_RECORD_BYTES:
+            return {}
+        data = os.read(fd, MAX_RECORD_BYTES + 1)
+    except OSError:
+        return {}
+    finally:
+        os.close(fd)
+    if len(data) > MAX_RECORD_BYTES:
+        return {}
+    try:
+        record = json.loads(data)
+    except ValueError:
+        return {}
+    return record if isinstance(record, dict) else {}
 
 
 def write_record(directory: Path, record: dict[str, Any]) -> None:
@@ -165,6 +236,79 @@ def write_record(directory: Path, record: dict[str, Any]) -> None:
         raise
 
 
+@contextlib.contextmanager
+def session_lock(directory: Path, session_id: str) -> Iterator[None]:
+    """Hold an exclusive per-session lock; after a bounded wait, proceed unlocked."""
+    fd: int | None = None
+    try:
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(lock_path(directory, session_id), os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        deadline = time.monotonic() + LOCK_WAIT_SECONDS
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(LOCK_POLL_SECONDS)
+    except OSError:
+        pass
+    try:
+        yield
+    finally:
+        if fd is not None:
+            os.close(fd)  # Closing the descriptor releases the flock.
+
+
+def prompt_fields(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the fields a blocking prompt adds; an open prompt keeps its resume state."""
+    if record.get("pendingPrompt") is True:
+        kept = {key: record[key] for key in ("resumeStatus", "resumeUpdatedAtMs") if key in record}
+        return dict(kept, pendingPrompt=True)
+    previous = record.get("status")
+    fields: dict[str, Any] = {
+        "pendingPrompt": True,
+        "resumeStatus": previous if isinstance(previous, str) and previous else "working",
+    }
+    seen_ms = record.get("updatedAtMs")
+    if isinstance(seen_ms, int):
+        fields["resumeUpdatedAtMs"] = seen_ms
+    return fields
+
+
+def subagent_update(payload: Mapping[str, Any], record: dict[str, Any], now: int) -> dict[str, Any] | None:
+    """Return the record after a subagent event, or ``None`` to leave it unchanged.
+
+    Claude Code does not say which agent a prompt belongs to, so a session tracks
+    one pending prompt. The next completed tool call, from Claude or a subagent,
+    answers it and the state from before the prompt returns. Subagent payloads
+    never supply cwd, transcript or process, and never touch awaitingUser.
+    """
+    if not record or record.get("sessionId") != payload.get("session_id"):
+        return None
+    event = payload.get("hook_event_name")
+    if event == "Notification" and status_for(payload) == "blocked":
+        blocked = dict(record, status="blocked", updatedAtMs=now)
+        blocked.update(prompt_fields(record))
+        return blocked
+    if record.get("pendingPrompt") is True:
+        if event != "PostToolUse":
+            return None
+        resume = record.get("resumeStatus")
+        status = resume if isinstance(resume, str) and resume else "working"
+        resumed = {key: value for key, value in record.items() if key not in PROMPT_FIELDS}
+        resumed["status"] = status
+        # A restored finished or question state keeps the time the user last saw it.
+        seen_ms = record.get("resumeUpdatedAtMs")
+        keeps_seen_time = status in ("done", "blocked") and isinstance(seen_ms, int)
+        resumed["updatedAtMs"] = seen_ms if keeps_seen_time else now
+        return resumed
+    if record.get("status") == "working":
+        return dict(record, updatedAtMs=now)
+    return None
+
+
 def handle_hook(
     payload: Mapping[str, Any],
     env: Mapping[str, str] | None = None,
@@ -177,33 +321,68 @@ def handle_hook(
     session_id = payload.get("session_id")
     if not isinstance(session_id, str) or not 0 < len(session_id) <= 128:
         return "ignored"
+    # Subagent hooks share the parent session_id; they may only mark or answer the
+    # parent's prompt, and SessionEnd from a subagent never removes the record.
+    agent_id = payload.get("agent_id")
+    subagent = isinstance(agent_id, str) and bool(agent_id)
+    event = payload.get("hook_event_name")
+    if subagent and event == "SessionEnd":
+        return "ignored"
     directory = state_dirs(env)[0]
-    if payload.get("hook_event_name") == "SessionEnd":
-        try:
-            os.unlink(record_path(directory, session_id))
-        except OSError:
-            pass
-        return "removed"
-    status = status_for(payload)
-    if status is None:
-        return "ignored"
-    session, ancestors = process_chain(os.getppid() if parent is None else parent, proc_root)
-    if session is None:
-        return "ignored"
-    cwd = payload.get("cwd")
-    transcript = payload.get("transcript_path")
-    write_record(directory, {
-        "version": 1,
-        "sessionId": session_id,
-        "status": status,
-        "event": str(payload.get("hook_event_name")),
-        "cwd": cwd if isinstance(cwd, str) else "",
-        "transcriptPath": transcript if isinstance(transcript, str) else "",
-        "process": session,
-        "ancestors": ancestors,
-        "updatedAtMs": int(time.time() * 1000),
-    })
-    return status
+    with session_lock(directory, session_id):
+        if event == "SessionEnd":
+            for path in (record_path(directory, session_id), lock_path(directory, session_id)):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+            return "removed"
+        record = read_record(directory, session_id)
+        now = int(time.time() * 1000)
+        if subagent:
+            updated = subagent_update(payload, record, now)
+            if updated is None:
+                return "ignored"
+            write_record(directory, updated)
+            return str(updated["status"])
+        # Claude is waiting on the user after its end-of-turn question until the next prompt
+        # or a fresh session; a wrap_up without a question clears a stale flag.
+        awaiting = record.get("awaitingUser") is True
+        if event == "UserPromptSubmit" or (event == "SessionStart" and payload.get("source") != "compact"):
+            awaiting = False
+        elif is_wrap_up(payload):
+            awaiting = asks_user(payload)
+        status = status_for(payload, awaiting)
+        if status is None:
+            return "ignored"
+        prompt: dict[str, Any] = {}
+        if event == "Notification" and status == "blocked":
+            prompt = prompt_fields(record)
+        elif event == "Stop" and record.get("pendingPrompt") is True:
+            # A subagent's prompt is still open: the turn stays input needed until it is answered.
+            prompt = {"pendingPrompt": True, "resumeStatus": status, "resumeUpdatedAtMs": now}
+            status = "blocked"
+        session, ancestors = process_chain(os.getppid() if parent is None else parent, proc_root)
+        if session is None:
+            return "ignored"
+        cwd = payload.get("cwd")
+        transcript = payload.get("transcript_path")
+        new_record: dict[str, Any] = {
+            "version": 1,
+            "sessionId": session_id,
+            "status": status,
+            "event": str(event),
+            "cwd": cwd if isinstance(cwd, str) else "",
+            "transcriptPath": transcript if isinstance(transcript, str) else "",
+            "process": session,
+            "ancestors": ancestors,
+            "updatedAtMs": now,
+        }
+        new_record.update(prompt)
+        if awaiting:
+            new_record["awaitingUser"] = True
+        write_record(directory, new_record)
+        return status
 
 
 def cmd_hook() -> int:
@@ -310,10 +489,10 @@ def installed_events(settings: Mapping[str, Any]) -> list[str]:
 
 def install_hooks(settings: dict[str, Any], command: str) -> dict[str, Any]:
     hooks = without_dockrail_hooks(settings.get("hooks", {}))
-    for event, has_matcher in HOOK_EVENTS.items():
+    for event, matcher in HOOK_EVENTS.items():
         group: dict[str, Any] = {"hooks": [{"type": "command", "command": command, "timeout": 10}]}
-        if has_matcher:
-            group = {"matcher": "*", **group}
+        if matcher is not None:
+            group = {"matcher": matcher, **group}
         hooks[event] = list(hooks.get(event, [])) + [group]
     return dict(settings, hooks=hooks)
 

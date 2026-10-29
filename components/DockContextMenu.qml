@@ -210,6 +210,7 @@ PopupWindow {
         HerdrModel.displayAgentKind(agent.agent || agent.agentKind || ""),
         agent.status, enabled, target)
       record.product = product
+      record.serverId = String(agent.serverId || "")
       records.push(record)
     }
     records.push(DockMenuModel.separatorRecord("herdr:separator"))
@@ -1365,8 +1366,12 @@ PopupWindow {
                 ? Accessible.Button : Accessible.StaticText
               Accessible.name: String(parent.modelData.title || "")
               Accessible.description: parent.modelData.enabled !== false
-                ? (String(parent.modelData.product || "Herdr") === "T3 Code"
-                  ? "Open this T3 thread" : "Focus this Herdr agent pane") : "Remote Herdr agent"
+                ? (String(parent.modelData.serverId || "").indexOf("claude:") === 0
+                  ? "Open this Claude session"
+                  : (String(parent.modelData.product || "Herdr") === "T3 Code"
+                    ? "Open this T3 thread" : "Focus this Herdr agent pane"))
+                : (String(parent.modelData.serverId || "").indexOf("claude:") === 0
+                  ? "Claude session" : "Remote Herdr agent")
               Accessible.onPressAction: if (parent.modelData.enabled !== false)
                 root.dispatchAction(parent.modelData, parent.index)
 

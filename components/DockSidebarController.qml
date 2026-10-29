@@ -529,9 +529,11 @@ Item {
     var ready = !!(root.herdrWindowAgents && root.herdrWindowAgents.snapshotReady)
     var herdrActive = !!herdrView && herdrView.active
     var t3Active = !!t3View && t3View.active
-    var herdrVerified = ready && (herdrActive || t3Active)
+    var claudeOn = DockModel.normalizeSetting("dockClaudeIndicators", root.settings.dockClaudeIndicators)
+    var herdrVerified = ready && (herdrActive || t3Active || claudeOn)
     var verifiedSources = { herdr: ready && herdrActive, t3: ready && t3Active,
-                            t3Present: t3Active }
+                            t3Present: t3Active, claude: ready && claudeOn,
+                            claudePresent: claudeOn }
     var projectInput = {
       desktop: desktop, screens: root.screens,
       monitors: root.monitors, monitorOrder: root.settings.workspaceMonitorOrder || [],
@@ -1380,6 +1382,15 @@ Item {
       ? root.host.browserProfileService : null
     function onRevisionChanged() { root.scheduleRefresh() }
     function onAvailableChanged() { root.scheduleRefresh() }
+  }
+  // Claude has no sidebar Widget lease, so bridge snapshot and association
+  // changes must refresh the projection directly.
+  Connections {
+    target: root.herdrWindowAgents
+    ignoreUnknownSignals: true
+    function onViewRevisionChanged() { root.scheduleRefresh() }
+    function onHerdrAssociationsChanged() { root.scheduleRefresh() }
+    function onSnapshotReadyChanged() { root.scheduleRefresh() }
   }
   Timer {
     id: dropDeadlineTimer

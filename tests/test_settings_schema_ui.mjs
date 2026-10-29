@@ -33,9 +33,9 @@ assert.ok(classic.includes('dockHerdrIndicators'), 'Herdr terminal icon state is
 assert.ok(classic.includes('dockT3Indicators'), 'T3 dock icon state is classic-only');
 assert.equal(ui.dockT3Indicators.surface, 'classic');
 assert.equal(ui.dockT3Indicators.group, 'attention-on-the-dock');
-assert.ok(classic.includes('dockClaudeIndicators'), 'Claude Desktop dock icon state is classic-only');
-assert.equal(ui.dockClaudeIndicators.surface, 'classic');
-assert.equal(ui.dockClaudeIndicators.group, 'attention-on-the-dock');
+assert.ok(!classic.includes('dockClaudeIndicators'), 'Claude Desktop state also drives the sidebar window row');
+assert.equal(ui.dockClaudeIndicators.surface, 'all');
+assert.equal(ui.dockClaudeIndicators.group, 'attention');
 const host = hostHarness({ presentationMode: 'sidebar' });
 assert.deepEqual(plain(host.control.statusData().presentation.inactiveClassicSettings).sort(),
                  classic.slice().sort(), 'the real host projection must use the same inventory');

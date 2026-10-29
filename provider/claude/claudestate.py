@@ -9,14 +9,18 @@ a Herdr-schema-v1 snapshot so the existing ``DockHerdrService`` /
 
 Every function that touches the filesystem takes an explicit root so tests
 can point it at fake trees. No message bodies or prompts are stored or
-emitted; transcripts are only probed for the user-interrupt marker.
+emitted; transcripts are only probed for the user-interrupt marker. Claude
+Desktop's own session files are read only for the title, archive flag and
+last-focus time.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
 import stat as stat_module
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -32,6 +36,10 @@ DONE_RETENTION_MS = 30 * 60 * 1000
 STALE_WORKING_MS = 20 * 60 * 1000
 STATUSES = ("working", "blocked", "done", "idle")
 INTERRUPT_MARKER = "[Request interrupted by user"
+MAX_DESKTOP_SESSION_FILES = 512
+MAX_DESKTOP_SESSION_BYTES = 4 * 1024 * 1024
+MAX_DESKTOP_TITLE = 200
+DESKTOP_SESSION_ID = re.compile(r"local_[A-Za-z0-9-]{1,64}")
 
 # Fragments that identify a Claude Desktop process, matched against its comm,
 # executable path and argv[0] only. The Claude Code CLI itself (`claude`)
@@ -66,6 +74,19 @@ def state_dirs(env: Mapping[str, str] | None = None) -> list[Path]:
         base = Path(home) / ".local" / "state"
     dirs.append(base / "dockrail" / "claude" / "sessions")
     return dirs
+
+
+def desktop_session_dirs(env: Mapping[str, str] | None = None) -> list[Path]:
+    """Return the directory where Claude Desktop keeps its Code-session files."""
+    if env is None:
+        env = os.environ
+    config_home = env.get("XDG_CONFIG_HOME", "")
+    if config_home and Path(config_home).is_absolute():
+        base = Path(config_home)
+    else:
+        home = env.get("HOME", "") or str(Path.home())
+        base = Path(home) / ".config"
+    return [base / "Claude" / "claude-code-sessions"]
 
 
 # -- /proc ---------------------------------------------------------------------
@@ -245,6 +266,15 @@ def parse_record(raw: bytes) -> dict[str, Any] | None:
     for key in ("cwd", "transcriptPath"):
         if not isinstance(record.get(key, ""), str):
             return None
+    # Only an exact true marks a question at the end of a turn; anything else
+    # is dropped rather than rejecting the whole record.
+    if record.get("awaitingUser") is True:
+        record["awaitingUser"] = True
+    else:
+        record.pop("awaitingUser", None)
+    # The same rule keeps a pending-prompt marker only when it is exactly true.
+    if record.get("pendingPrompt") is not True:
+        record.pop("pendingPrompt", None)
     return record
 
 
@@ -318,10 +348,120 @@ def effective_status(
 
 
 def session_title(record: dict[str, Any]) -> str:
+    desktop_title = record.get("desktopTitle", "")
+    if desktop_title:
+        return desktop_title
     cwd = record.get("cwd", "")
     name = Path(cwd).name if cwd else ""
     cleaned = "".join(ch for ch in name if ch.isprintable())[:80]
     return cleaned or "Claude session"
+
+
+# -- Claude Desktop session files -------------------------------------------------
+# Path -> ((st_mtime_ns, st_size), parsed); parsed is None for invalid files.
+_DESKTOP_FILES: dict[Path, tuple[tuple[int, int], tuple[str, dict[str, Any]] | None]] = {}
+
+
+def _desktop_title(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    # Control, format (bidi, zero-width) and lone-surrogate code points are
+    # dropped so titles cannot spoof layout and every frame encodes.
+    kept = "".join(
+        ch for ch in value.strip() if unicodedata.category(ch) not in ("Cc", "Cf", "Cs")
+    )
+    return kept.strip()[:MAX_DESKTOP_TITLE]
+
+
+def _parse_desktop_file(path: Path, info: os.stat_result) -> tuple[str, dict[str, Any]] | None:
+    """Return ``(cliSessionId, metadata)`` for one Desktop session file."""
+    if not stat_module.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
+        return None
+    if info.st_size > MAX_DESKTOP_SESSION_BYTES:
+        return None
+    try:
+        # Re-check the opened descriptor: the lstat above can be raced by a swap.
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if (
+                not stat_module.S_ISREG(opened.st_mode)
+                or opened.st_uid != os.getuid()
+                or opened.st_size > MAX_DESKTOP_SESSION_BYTES
+            ):
+                return None
+            raw = handle.read(MAX_DESKTOP_SESSION_BYTES + 1)
+        value = json.loads(raw)
+    except (OSError, ValueError, RecursionError):
+        return None
+    if len(raw) > MAX_DESKTOP_SESSION_BYTES or not isinstance(value, dict):
+        return None
+    cli_id = value.get("cliSessionId")
+    if not isinstance(cli_id, str) or not 0 < len(cli_id) <= 128:
+        return None
+    desktop_id = value.get("sessionId")
+    if not isinstance(desktop_id, str) or not DESKTOP_SESSION_ID.fullmatch(desktop_id):
+        desktop_id = ""
+    last_focused = value.get("lastFocusedAt")
+    if isinstance(last_focused, bool) or not isinstance(last_focused, int):
+        last_focused = None
+    return cli_id, {
+        "desktopSessionId": desktop_id,
+        "title": _desktop_title(value.get("title")),
+        "archived": value.get("isArchived") is True,
+        "lastFocusedAt": last_focused,
+    }
+
+
+def _desktop_entry(path: Path) -> tuple[str, dict[str, Any], int] | None:
+    """Return ``(cliSessionId, metadata, mtime_ns)``; re-parse only changed files."""
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return None
+    key = (info.st_mtime_ns, info.st_size)
+    hit = _DESKTOP_FILES.get(path)
+    if hit is None or hit[0] != key:
+        hit = (key, _parse_desktop_file(path, info))
+        _DESKTOP_FILES[path] = hit
+    if hit[1] is None:
+        return None
+    cli_id, meta = hit[1]
+    return cli_id, meta, info.st_mtime_ns
+
+
+def desktop_sessions(dirs: list[Path]) -> dict[str, dict[str, Any]]:
+    """Return Desktop session metadata keyed by Claude Code session id."""
+    paths: list[Path] = []
+    for directory in dirs:
+        try:
+            paths.extend(directory.glob("*/*/local_*.json"))
+        except OSError:
+            continue
+    # Keep the newest files when the directory holds more than the cap.
+    dated: list[tuple[int, Path]] = []
+    for path in paths:
+        try:
+            dated.append((-os.lstat(path).st_mtime_ns, path))
+        except OSError:
+            continue
+    dated.sort()
+    paths = [path for _, path in dated[:MAX_DESKTOP_SESSION_FILES]]
+    listed = set(paths)
+    best: dict[str, tuple[tuple[bool, int], dict[str, Any]]] = {}
+    for path in paths:
+        entry = _desktop_entry(path)
+        if entry is None:
+            continue
+        cli_id, meta, mtime_ns = entry
+        # A non-archived file wins over an archived copy; then the newest file.
+        rank = (not meta["archived"], mtime_ns)
+        held = best.get(cli_id)
+        if held is None or rank > held[0]:
+            best[cli_id] = (rank, meta)
+    for stale in [path for path in _DESKTOP_FILES if path not in listed]:
+        del _DESKTOP_FILES[stale]
+    return {cli_id: meta for cli_id, (_, meta) in best.items()}
 
 
 # -- snapshot ---------------------------------------------------------------------
@@ -335,21 +475,53 @@ class BuildState:
 
 
 def collect_sessions(
-    records: list[dict[str, Any]], proc_root: Path, now_ms: int
+    records: list[dict[str, Any]],
+    proc_root: Path,
+    now_ms: int,
+    desktop: Mapping[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Return ``(sessions, clients)`` for Claude Desktop sessions only."""
+    desktop = desktop or {}
     sessions: list[dict[str, Any]] = []
     clients: list[dict[str, Any]] = []
     seen_clients: set[str] = set()
     ordered = sorted(records, key=lambda r: (-r["updatedAtMs"], r["sessionId"]))
-    for record in ordered[:MAX_SESSIONS]:
+    # Hidden records (idle, archived, seen, other hosts) must not use up the
+    # budget, so keep scanning until MAX_SESSIONS are kept; bound the scan itself.
+    for record in ordered[:MAX_SESSIONS * 4]:
+        if len(sessions) >= MAX_SESSIONS:
+            break
         chain = desktop_chain(record["ancestors"], proc_root)
         if chain is None:
             continue
         status = effective_status(record, alive(record["process"], proc_root), now_ms)
         if status is None:
             continue
-        sessions.append(dict(record, status=status))
+        meta = desktop.get(record["sessionId"], {})
+        if meta.get("archived") or status == "idle":
+            continue
+        last_focused = meta.get("lastFocusedAt")
+        # A question ending the turn is answered by opening the session. A pending
+        # prompt (permission, elicitation or a subagent's) waits for an answer and never clears here.
+        question = (
+            status == "blocked"
+            and record.get("awaitingUser") is True
+            and record.get("pendingPrompt") is not True
+        )
+        finished_and_seen = (
+            (status == "done" or question)
+            and isinstance(last_focused, int)
+            and last_focused >= record["updatedAtMs"]
+        )
+        if finished_and_seen:
+            # The user opened the session after it finished or asked; nothing left to show.
+            continue
+        sessions.append(dict(
+            record,
+            status=status,
+            desktopSessionId=meta.get("desktopSessionId", ""),
+            desktopTitle=meta.get("title", ""),
+        ))
         # The desktop main process is the window owner: one client per chain.
         key = json.dumps(chain[-1], sort_keys=True)
         if key not in seen_clients:
@@ -391,6 +563,7 @@ def build_snapshot(
             "tabTitle": "",
             "title": title,
             "agent": "claude",
+            "desktopSessionId": session.get("desktopSessionId", ""),
             "stateChangeSeq": str(session["updatedAtMs"]),
         })
         counts[status] += 1
@@ -411,7 +584,7 @@ def build_snapshot(
             "inventory": True,
             "attention": True,
             "remote": False,
-            "actions": False,
+            "actions": True,
             "desktopNotifications": False,
         },
         "servers": [{
@@ -423,7 +596,7 @@ def build_snapshot(
             "sessions": [],
             "session": "",
             "label": "Claude",
-            "capabilities": {"focusAgent": False},
+            "capabilities": {"focusAgent": True},
             "connectionGeneration": 1,
             "health": "live",
             "connected": True,

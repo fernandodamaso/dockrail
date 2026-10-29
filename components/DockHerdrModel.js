@@ -400,7 +400,7 @@ function agentNoun(server) {
 function focusHint(server) {
   var source = serverSource(server)
   if (source === "t3") return "Click a row to open this thread in T3 Code."
-  if (source === "claude") return "Claude Desktop sessions run in the Claude window."
+  if (source === "claude") return "Click a row to open this session in Claude Desktop."
   return "Click a row to focus its pane."
 }
 

@@ -242,8 +242,13 @@ Errors exit 2 with a one-line message, or `{"ok":false,...}` with `--json`.
 
 `dockrail claude hooks install` adds Claude Code hooks to
 `${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json` so Claude Desktop sessions
-report their state to the dock (`dockClaudeIndicators`). It preserves every
-other key and user hook, is idempotent, and refuses an invalid settings file.
+report their state to the dock and sidebar (`dockClaudeIndicators`). It
+preserves every other key and user hook, is idempotent, and refuses an invalid
+settings file. The hook events are `SessionStart`, `UserPromptSubmit`,
+`PreToolUse` (matcher `AskUserQuestion`), `PostToolUse`, `Notification`,
+`Stop` and `SessionEnd`. Re-run `install` after updating Dockrail to add
+events that newer releases use; `status` reports `installed: false` until it
+does.
 
 ```sh
 dockrail claude hooks install [--json]

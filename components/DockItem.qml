@@ -363,8 +363,10 @@ Item {
     var revision = root.herdrBlockedTransitionRevision
     if (revision <= root.seenHerdrBlockedTransitionRevision) return
     root.seenHerdrBlockedTransitionRevision = revision
+    // Same suppression as urgent motion; a skipped transition is not replayed later.
     if (root.motionReady && root.urgentWindowAnimationEnabled
-        && root.attentionBadgesEnabled) attentionMotion.play()
+        && root.attentionBadgesEnabled && !root.urgentMotionSuppressed
+        && !root.focused) attentionMotion.play()
   }
 
   Component.onCompleted: {

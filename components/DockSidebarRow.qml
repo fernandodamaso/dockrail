@@ -70,6 +70,10 @@ Item {
   readonly property bool herdrAssociated: kind === "window" && row.herdrAssociated === true
   readonly property bool herdrExpandable: herdrAssociated && row.herdrExpandable === true
   readonly property bool herdrFolded: herdrAssociated && row.herdrFolded === true
+  // Claude parents fold sessions; Herdr and T3 parents keep the agents wording.
+  readonly property bool herdrClaudeParent: herdrAssociated
+    && String(row.herdrServerId || "").indexOf("claude:") === 0
+  readonly property string herdrFoldNoun: herdrClaudeParent ? "Sessions" : "Agents"
   readonly property var herdrStatusCounters: {
     if (!herdrAssociated) return []
     var values = row.herdrStatusCounters
@@ -258,14 +262,16 @@ Item {
       return (row.active === true ? "Active tab: " : "Tab: ") + root.windowTitle + alertBits
         + (attention.muted ? " · Alerts excluded from totals" : "")
     if (kind === "herdr-agent")
-      return (row.serverLabel === "T3 Code" ? "T3 Code thread: " : "Herdr agent: ") + liveTitle
+      return (row.serverLabel === "T3 Code" ? "T3 Code thread: "
+          : row.serverLabel === "Claude" ? "Claude session: " : "Herdr agent: ") + liveTitle
         + (root.herdrAgentSubtitle ? " · " + root.herdrAgentSubtitle : "")
         + " · " + InteractionModel.herdrStatusAccessibleText(row.status)
         + (root.herdrActionable && root.controller.herdrFocusErrorFor(root.rowKey)
           ? " · Focus failed (" + root.controller.herdrFocusErrorFor(root.rowKey) + ")"
           : "")
     if (kind === "herdr-state")
-      return (row.serverLabel === "T3 Code" ? "T3 Code: " : "Herdr: ") + liveTitle
+      return (row.serverLabel === "T3 Code" ? "T3 Code: "
+          : row.serverLabel === "Claude" ? "Claude: " : "Herdr: ") + liveTitle
     var titleLabel = kind === "window"
       ? InteractionModel.sidebarWindowTooltipTitle({
         kind: "window",
@@ -296,7 +302,7 @@ Item {
       + alertBits
       + (containsFocusedWindow && row.folded ? " · Contains focused window" : "")
       + (tabsExpandable ? (row.tabsFolded ? " · Tabs folded" : " · Tabs expanded") : "")
-      + (herdrExpandable ? (root.herdrFolded ? " · Agents folded" : " · Agents expanded") : "")
+      + (herdrExpandable ? " · " + root.herdrFoldNoun + (root.herdrFolded ? " folded" : " expanded") : "")
   }
   readonly property var profile: hasArtwork ? controller.profileForRow(row) : null
   readonly property var attention: controller.attentionForRow(row)
@@ -1568,8 +1574,8 @@ Item {
       height: content.height
       iconText: ""
       tooltipText: root.herdrFolded
-        ? "Show agents for " + root.liveTitle
-        : "Hide agents for " + root.liveTitle
+        ? "Show " + root.herdrFoldNoun.toLowerCase() + " for " + root.liveTitle
+        : "Hide " + root.herdrFoldNoun.toLowerCase() + " for " + root.liveTitle
       focusable: false
       enabled: !root.controller.interactionBusy
       onClicked: {

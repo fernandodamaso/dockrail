@@ -86,4 +86,23 @@ TestCase {
     compare(evalOn({ herdrProduct: "T3 Code" }, expression), "Open this T3 thread")
     compare(evalOn({ herdrProduct: "Herdr" }, expression), "Focus this Herdr agent pane")
   }
+
+  function test_rowAccessibilityDescriptionBySource() {
+    var source = previewSource()
+    var start = source.indexOf("Accessible.description: actionable")
+    verify(start >= 0)
+    var end = source.indexOf("Accessible.onPressAction", start)
+    verify(end > start)
+    var expression = source.slice(start + "Accessible.description: ".length, end).trim()
+    var describe = new Function("R", "modelData", "actionable",
+      "return (" + expression.split("root.").join("R.") + ")")
+    var claudeRow = { serverId: "claude:desktop" }
+    var herdrRow = { serverId: "srv" }
+    compare(describe({ herdrProduct: "Claude" }, claudeRow, true), "Open this Claude session")
+    compare(describe({ herdrProduct: "Claude" }, claudeRow, false), "Claude session")
+    compare(describe({ herdrProduct: "Herdr" }, herdrRow, true), "Focus this Herdr agent pane")
+    compare(describe({ herdrProduct: "Herdr" }, herdrRow, false), "Remote Herdr agent")
+    compare(describe({ herdrProduct: "T3 Code" }, { serverId: "t3:thread" }, true),
+      "Open this T3 thread")
+  }
 }

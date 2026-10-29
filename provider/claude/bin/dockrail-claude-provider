@@ -33,6 +33,18 @@ SAFETY_EMIT_EVERY = 60.0
 OUTPUT_TIMEOUT = 2.0
 MAX_STDIN_LINE = 4096
 
+ACTION_ERRORS = (
+    "invalid_request",
+    "inventory_reconciling",
+    "agent_gone",
+    "identity_mismatch",
+    "server_unavailable",
+    "timeout",
+    "provider_unavailable",
+    "unsupported",
+    "unsupported_command",
+)
+
 
 def parse_window_processes_command(raw: bytes) -> dict[str, Any] | None:
     """Parse a bounded window-processes stdin command (Herdr contract)."""
@@ -40,7 +52,7 @@ def parse_window_processes_command(raw: bytes) -> dict[str, Any] | None:
         return None
     try:
         message = json.loads(raw)
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, RecursionError):
         return None
     if not isinstance(message, dict) or set(message) - {"kind", "revision", "pids"}:
         return None
@@ -63,22 +75,100 @@ def parse_window_processes_command(raw: bytes) -> dict[str, Any] | None:
     return {"revision": revision, "pids": normalized}
 
 
+def bounded(value: object, maximum: int) -> str | None:
+    """Return ``value`` when it is a bounded, control-free, encodable string."""
+    if not isinstance(value, str) or not value or len(value) > maximum:
+        return None
+    if any(
+        ord(char) < 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
+        for char in value
+    ):
+        return None
+    return value
+
+
+def parse_focus_agent_command(raw: bytes) -> dict[str, Any] | None:
+    """Parse a focus-agent stdin command (exact Herdr key set)."""
+    if not isinstance(raw, (bytes, bytearray)) or len(raw) > MAX_STDIN_LINE:
+        return None
+    try:
+        message = json.loads(raw)
+    except (ValueError, UnicodeError, TypeError, RecursionError):
+        return None
+    if not isinstance(message, dict):
+        return None
+    allowed = {
+        "kind",
+        "requestId",
+        "providerEpoch",
+        "serverId",
+        "connectionGeneration",
+        "agentId",
+        "paneId",
+        "terminalId",
+    }
+    if set(message) - allowed:
+        return None
+    if message.get("kind") != "focus-agent":
+        return None
+
+    request_id = bounded(message.get("requestId"), 64)
+    epoch = bounded(message.get("providerEpoch"), 64)
+    server_id = bounded(message.get("serverId"), 128)
+    # Agent ids embed server, generation and pane id; 512 leaves headroom.
+    agent_id = bounded(message.get("agentId"), 512)
+    pane_id = bounded(message.get("paneId"), 512)
+    if not request_id or not epoch or not server_id or not agent_id or not pane_id:
+        return None
+    generation = message.get("connectionGeneration")
+    if isinstance(generation, bool):
+        return None
+    if isinstance(generation, float):
+        if not generation.is_integer() or generation <= 0:
+            return None
+        generation = int(generation)
+    elif not isinstance(generation, int) or generation <= 0:
+        return None
+    terminal_raw = message.get("terminalId", "")
+    if terminal_raw in ("", None):
+        terminal = ""
+    else:
+        terminal = bounded(terminal_raw, 128)
+        if terminal is None:
+            return None
+    return {
+        "requestId": request_id,
+        "providerEpoch": epoch,
+        "serverId": server_id,
+        "connectionGeneration": generation,
+        "agentId": agent_id,
+        "paneId": pane_id,
+        "terminalId": terminal,
+    }
+
+
 class Provider:
-    def __init__(self, state_dirs: list[Path], proc_root: Path) -> None:
+    def __init__(
+        self, state_dirs: list[Path], proc_root: Path, desktop_dirs: list[Path]
+    ) -> None:
         self.state_dirs = state_dirs
         self.proc_root = proc_root
+        self.desktop_dirs = desktop_dirs
         self.events: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.epoch = uuid.uuid4().hex
         self.revision = 0
         self.stopping = False
         self.last_emit = 0.0
         self.last_fingerprint = ""
+        self.last_agents: list[dict[str, Any]] = []
         self.wp_revision = 0
         self.wp_identities: list[dict[str, int]] = []
 
     def _stdin(self) -> None:
         for raw in sys.stdin.buffer:
             command = raw.strip()
+            if len(command) > MAX_STDIN_LINE:
+                continue
             if command in (b"refresh", b"quit"):
                 self.events.put(("command", command.decode("ascii")))
                 if command == b"quit":
@@ -87,14 +177,33 @@ class Provider:
             parsed = parse_window_processes_command(command)
             if parsed is not None:
                 self.events.put(("window-processes", parsed))
-            # focus-agent and unknown commands are not supported: the dock
-            # only shows Claude Desktop state, it never drives sessions.
+                continue
+            focus = parse_focus_agent_command(command)
+            if focus is not None:
+                self.events.put(("focus-agent", focus))
+                continue
+            try:
+                message = json.loads(command)
+            except (ValueError, UnicodeError, RecursionError):
+                continue
+            if isinstance(message, dict) and message.get("kind") == "focus-agent":
+                # Echo only a requestId the focus-agent contract would accept.
+                request_id = bounded(message.get("requestId"), 64)
+                if request_id:
+                    self.events.put(
+                        ("action-result", {"requestId": request_id, "error": "invalid_request"})
+                    )
+            # Unknown commands are ignored: the dock only drives agents through
+            # the focus-agent contract, never through a generic command channel.
         self.events.put(("command", "quit"))
 
     def build(self) -> dict[str, Any]:
         now_ms = int(time.time() * 1000)
         records = claudestate.read_records(self.state_dirs)
-        sessions, clients = claudestate.collect_sessions(records, self.proc_root, now_ms)
+        desktop = claudestate.desktop_sessions(self.desktop_dirs)
+        sessions, clients = claudestate.collect_sessions(
+            records, self.proc_root, now_ms, desktop
+        )
         state = claudestate.BuildState(
             epoch=self.epoch,
             revision=self.revision + 1,
@@ -104,14 +213,10 @@ class Provider:
         )
         return claudestate.build_snapshot(state, sessions, clients)
 
-    def emit(self, force: bool = False) -> None:
-        snapshot = self.build()
-        fingerprint = claudestate.snapshot_fingerprint(snapshot)
-        if not force and fingerprint == self.last_fingerprint:
-            return
-        self.revision += 1
-        snapshot["revision"] = self.revision
-        frame = (json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
+    def write_frame(self, payload: dict[str, Any], ensure_ascii: bool = False) -> None:
+        frame = (
+            json.dumps(payload, separators=(",", ":"), ensure_ascii=ensure_ascii) + "\n"
+        ).encode()
         view = memoryview(frame)
         deadline = time.monotonic() + OUTPUT_TIMEOUT
         while view:
@@ -122,8 +227,58 @@ class Provider:
             if written <= 0:
                 raise BrokenPipeError("provider output unavailable")
             view = view[written:]
+
+    def emit(self, force: bool = False) -> None:
+        snapshot = self.build()
+        fingerprint = claudestate.snapshot_fingerprint(snapshot)
+        if not force and fingerprint == self.last_fingerprint:
+            return
+        self.revision += 1
+        snapshot["revision"] = self.revision
+        self.write_frame(snapshot)
         self.last_fingerprint = fingerprint
         self.last_emit = time.monotonic()
+        self.last_agents = snapshot["agents"]
+
+    # -- focus-agent -------------------------------------------------------
+    def emit_action_result(self, request_id: str, ok: bool, error: str = "") -> None:
+        code = error if isinstance(error, str) and error else ""
+        if ok:
+            code = ""
+        elif code not in ACTION_ERRORS:
+            code = "unsupported"
+        # ASCII-only so an odd requestId can never fail to encode and kill the provider.
+        self.write_frame({
+            "kind": "action-result",
+            "requestId": request_id,
+            "ok": ok is True,
+            "error": code,
+        }, ensure_ascii=True)
+
+    def apply_focus_agent(self, request: dict[str, Any]) -> None:
+        """Acknowledge a focus request; the dock raises the window itself."""
+        request_id = str(request.get("requestId") or "")
+        if not request_id:
+            return
+        if request.get("providerEpoch") != self.epoch:
+            self.emit_action_result(request_id, False, "identity_mismatch")
+            return
+        if request.get("serverId") != claudestate.SERVER_ID:
+            self.emit_action_result(request_id, False, "server_unavailable")
+            return
+        if request.get("connectionGeneration") != 1:
+            self.emit_action_result(request_id, False, "identity_mismatch")
+            return
+        agent_id = request["agentId"]
+        pane_id = request["paneId"]
+        match = any(
+            agent.get("id") == agent_id and agent.get("paneId") == pane_id
+            for agent in self.last_agents
+        )
+        if not match:
+            self.emit_action_result(request_id, False, "agent_gone")
+            return
+        self.emit_action_result(request_id, True)
 
     def apply(self, event: tuple[str, Any]) -> bool:
         """Apply one event; return True when the next emit must be forced."""
@@ -139,6 +294,12 @@ class Provider:
                 payload["pids"], self.proc_root
             )
             return True
+        if kind == "focus-agent":
+            self.apply_focus_agent(payload)
+            return False
+        if kind == "action-result":
+            self.emit_action_result(payload["requestId"], False, payload["error"])
+            return False
         return False
 
     def run(self) -> None:
@@ -169,7 +330,7 @@ def main() -> None:
     args = parser.parse_args()
     dirs = [Path(d) for d in args.state_dir] if args.state_dir else claudestate.state_dirs()
     proc_root = Path(args.proc_root) if args.proc_root else Path("/proc")
-    provider = Provider(dirs, proc_root)
+    provider = Provider(dirs, proc_root, claudestate.desktop_session_dirs())
 
     def stop(_signum: int, _frame: object) -> None:
         provider.stopping = True
