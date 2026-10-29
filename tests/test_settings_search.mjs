@@ -1,0 +1,68 @@
+import assert from 'node:assert/strict'
+import { loadModel, read, plain, hostHarness } from './host_harness.mjs'
+const registry=loadModel('DockSettingsRegistry')
+const metadata=JSON.parse(read('config/settings-schema.json'))
+const hits=plain(registry.search(metadata,'glow'))
+assert.ok(hits.length>=3)
+assert.equal(hits[0].key,'hoverGlowEnabled')
+assert.ok(hits.every(hit=>hit.section==='appearance'))
+assert.equal(registry.search(metadata,'NoKeyShouldEverMatch').length,0)
+assert.ok(plain(registry.search(metadata,'herdr')).some(hit=>hit.featureId==='coding-agents'))
+assert.ok(plain(registry.search(metadata,'herdr')).some(hit=>hit.widgetId==='herdr.agents' && hit.label==='Coding agents'))
+assert.ok(plain(registry.search(metadata,'chrome')).some(hit=>hit.featureId==='chrome'))
+assert.ok(plain(registry.search(metadata,'launcher counts')).some(hit=>hit.featureId==='launcher-counts'))
+assert.ok(plain(registry.search(metadata,'controlCommand')).some(hit=>hit.key==='controlCommand'))
+assert.equal(plain(registry.search(metadata,'sortByWorkspace')).some(hit=>hit.key==='sortByWorkspace'),false)
+assert.ok(plain(registry.search(metadata,'sortByWorkspace',['sortByWorkspace']))
+  .some(hit=>hit.key==='sortByWorkspace'))
+assert.ok(plain(registry.search(metadata,'backgroundColorEnabled'))
+  .some(hit=>hit.key==='backgroundColor'))
+assert.equal(plain(registry.search(metadata,'sidebarWidgetCollapsed'))
+  .some(hit=>hit.key==='sidebarWidgetCollapsed'),false)
+assert.ok(plain(registry.search(metadata,'sidebarWidgetCollapsed',['sidebarWidgetCollapsed']))
+  .some(hit=>hit.key==='sidebarWidgetCollapsed'))
+assert.ok(plain(registry.search(metadata,'herdr')).some(hit=>hit.key==='dockHerdrIndicators'))
+assert.ok(plain(registry.search(metadata,'magnification')).some(hit=>hit.key==='magnification'))
+assert.ok(plain(registry.search(metadata,'sidebarMonitor')).every(hit=>hit.key!=='sidebarMonitor'))
+const available={chromeProfilesTabs:{installation:'installed',runtime:'ready'}}
+const missing={chromeProfilesTabs:{installation:'missing',runtime:'unavailable'}}
+for (const key of ['browserProfileBadgesEnabled','sidebarBrowserTabsEnabled']) {
+  assert.equal(registry.chromeToggleEditable(key,{[key]:false},missing),false)
+  assert.equal(registry.chromeToggleEditable(key,{[key]:true},missing),true)
+  assert.equal(registry.chromeToggleEditable(key,{[key]:false},available),true)
+}
+assert.equal(registry.chromeToggleEditable('showTrash',{},missing),true)
+const counts=plain(registry.searchCounts(hits))
+assert.equal(counts.appearance,hits.length)
+assert.equal(registry.firstRun(true,true,'missing'),true)
+assert.equal(registry.firstRun(true,false,'missing'),false)
+assert.equal(registry.firstRun(false,true,'loaded'),false)
+assert.equal(registry.firstRun(true,true,'invalid'),false)
+const input={sidebarMonitor:'HDMI-A-1',presentationModeByMonitor:{'OLD-DP':'classic'}}
+const view={entries:[{connector:'HDMI-A-1',mode:'sidebar',mapped:true},{connector:'DP-1',mode:'sidebar',mapped:false}]}
+const conversion=plain(registry.legacyConversion(input,view))
+assert.deepEqual(conversion.patch.presentationModeByMonitor,
+ {'OLD-DP':'classic','HDMI-A-1':'sidebar','DP-1':'classic'})
+assert.deepEqual(conversion.expected.presentationModeByMonitor,{'OLD-DP':'classic'})
+assert.equal(conversion.patch.sidebarMonitor,'')
+assert.equal(conversion.expected.sidebarMonitor,'HDMI-A-1')
+assert.deepEqual(input.presentationModeByMonitor,{'OLD-DP':'classic'})
+assert.equal(conversion.patch.presentationModeByMonitor['DP-1'],'classic',
+  'unselected connected monitors must become Classic')
+const explicit=plain(registry.legacyConversion({
+  sidebarMonitor:'HDMI-A-1',presentationModeByMonitor:{'DP-1':'sidebar','OLD-DP':'classic'}},
+  {entries:[{connector:'HDMI-A-1',mode:'classic',mapped:true},
+    {connector:'DP-1',mode:'sidebar',mapped:true}]}))
+assert.deepEqual(explicit.patch.presentationModeByMonitor,
+  {'DP-1':'classic','OLD-DP':'classic','HDMI-A-1':'sidebar'},
+  'legacy selected monitor wins, even with pre-existing connected overrides')
+assert.equal(registry.legacyConversion(input,{entries:[{connector:'DP-1',mode:'classic'}]}),null,
+  'do not erase a disconnected legacy selection')
+const h=hostHarness({presentationModeByMonitor:{'OLD-DP':'classic'},sidebarMonitor:'HDMI-A-1'})
+const outcome=h.host.saveSettingsIntent(conversion.patch,conversion.expected)
+assert.equal(outcome.accepted,true)
+assert.deepEqual(plain(h.host.settings.presentationModeByMonitor),conversion.patch.presentationModeByMonitor)
+const stale=h.host.saveSettingsIntent(conversion.patch,conversion.expected)
+assert.equal(stale.accepted,false)
+assert.equal(stale.reply.error.code,'E_STALE')
+console.log('SET-08 search, first-run guard and stale-safe legacy conversion passed')

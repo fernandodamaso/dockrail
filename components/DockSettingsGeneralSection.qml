@@ -184,6 +184,7 @@ Item {
                 property bool hasCursor: root.cursorActive && root.selectedTarget === this
                 readonly property bool popupOpen: false
                 readonly property bool textFocused: false
+                readonly property string key: "workspaceGroups"
                 readonly property var grouped: root.host.settings.workspaceGroups || []
                 readonly property bool editable: root.host.settingsLoadState !== "invalid"
                   && root.host.settingsWriteState !== "saving"

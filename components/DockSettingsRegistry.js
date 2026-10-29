@@ -125,3 +125,92 @@ function displayValue(ui, value) {
   return (ui && ui.unit === "×" ? scaled.toFixed(2) : String(scaled))
     + ((ui && ui.unit) || "")
 }
+
+
+// SET-08: Search uses the canonical registry; hidden/in-place rows are not
+// manufactured as independent editors. Results keep the originating row.
+function search(metadata, term, shownKeys) {
+  var needle=String(term || "").trim().toLocaleLowerCase()
+  if (!needle) return []
+  var visible=shownKeys || []
+  var matches=function(value) {
+    var source=String(value || "").toLocaleLowerCase()
+    return needle.split(/\s+/).every(function(token){return source.indexOf(token)>=0})
+  }
+  var found=[]
+  var seenFeatures=Object.create(null)
+  registry(metadata).forEach(function(section) {
+    section.rows.forEach(function(row) {
+      var ui=row.ui || {}
+      var visibility=ui.visibility
+      if (visibility==="hidden") return
+      if (visibility==="conditional" && visible.indexOf(row.key)<0) return
+      if (visibility==="in-place" && visible.indexOf(row.key)<0) return
+      // Paired controls are represented by their primary editor, not a
+      // second toggle. Search can still locate that primary by either key.
+      if (visibility==="in-place" && ui.pairedWith) return
+      var label=String(ui.label || "")
+      var help=String(ui.help || "")
+      var key=row.key
+      var rank=label.toLocaleLowerCase()===needle ? 0 :
+        matches(label) ? 1 :
+        matches(key) || (ui.pairedWith && matches(ui.pairedWith)) ? 2 :
+        matches(help) ? 3 : -1
+      if (rank>=0) {
+        var widgetHit=key==="sidebarWidgets" && needle.indexOf("herdr")>=0
+        found.push({section:section.id,sectionLabel:section.label,
+          key:key,row:row,rank:rank,label:widgetHit?"Coding agents":label,
+          help:help,widgetId:widgetHit?"herdr.agents":null})
+      }
+      var feature=ui.feature
+      if (!feature || seenFeatures[feature.id]) return
+      seenFeatures[feature.id]=true
+      var featureNames={"chrome":"Chrome",
+        "coding-agents":"Coding agents (Herdr)","launcher-counts":"Launcher badge counts"}
+      var title=featureNames[feature.id] || String(feature.id || "")
+      var haystack=(title+" "+String(feature.id || "")).toLocaleLowerCase()
+      if (matches(haystack)) {
+        found.push({section:"features",sectionLabel:"Features",
+          key:"feature:"+feature.id,featureId:feature.id,row:row,
+          rank:1,label:title,help:"Integration setup and readiness"})
+      }
+    })
+  })
+  return found.sort(function(a,b) {return a.rank-b.rank || order.indexOf(a.section)-order.indexOf(b.section)
+    || a.row.ui.order-b.row.ui.order || a.key.localeCompare(b.key)})
+}
+function searchCounts(results) {
+  var counts={}
+  ;(results || []).forEach(function(row) {counts[row.section]=(counts[row.section] || 0)+1})
+  return counts
+}
+// Shared readiness gate: missing Chrome integration may only be disabled.
+function chromeToggleEditable(key, settings, readiness) {
+  if (key!=="browserProfileBadgesEnabled" && key!=="sidebarBrowserTabsEnabled") return true
+  var chrome=readiness && readiness.chromeProfilesTabs || {}
+  return (chrome.installation==="installed" && chrome.runtime==="ready")
+    || !!(settings && settings[key]===true)
+}
+function firstRun(defaultsInUse, loaded, loadState) {
+  return loaded === true && defaultsInUse === true && loadState !== "invalid"
+}
+// Preserve the connected screens' actual effective modes while migrating
+// legacy monitor selection to explicit per-monitor settings, without deleting
+// the legacy compatibility key or overwriting unknown/disconnected overrides.
+function legacyConversion(settings, presentation) {
+  if (!settings || !settings.sidebarMonitor || !presentation || !presentation.entries
+      || !presentation.entries.length) return null
+  var selected=String(settings.sidebarMonitor)
+  var entries=presentation.entries
+  // A disconnected legacy target cannot be faithfully converted. Do not
+  // silently erase that preference or apply a different monitor choice.
+  if (!entries.some(function(entry){return entry && entry.connector===selected})) return null
+  var existing=settings.presentationModeByMonitor || {}
+  var next=Object.assign({},existing)
+  entries.forEach(function(entry) {
+    if (!entry || !entry.connector) return
+    next[entry.connector]=entry.connector===selected ? "sidebar" : "classic"
+  })
+  return {patch:{presentationModeByMonitor:next,sidebarMonitor:""},
+    expected:{presentationModeByMonitor:Object.assign({},existing),sidebarMonitor:settings.sidebarMonitor}}
+}

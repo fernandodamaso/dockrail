@@ -124,11 +124,19 @@ PopupWindow {
     root.windows = Array.isArray(value.windows) ? value.windows : []
     root.openedSettings = DockIconModel.iconSettingsSnapshot(root.settings)
     // Title rules only describe a specific window; the app page never adopts one.
-    root.current = DockIconModel.currentIconTarget({
-      settings: root.openedSettings, desktopId: root.desktopId, profileKey: root.profileKey,
-      appId: value.specificWindow === true ? root.windowAppId : "",
-      title: String(value.title || "")
-    })
+    // Settings' Custom icons list selects an exact persisted title rule,
+    // not an arbitrary live window that might match a different earlier rule.
+    var exactRule = value.existingTitlePattern
+      ? DockIconModel.windowIconTarget(root.openedSettings, root.windowAppId,
+        String(value.existingTitlePattern)) : null
+    root.current = exactRule
+      ? {kind:"window",key:exactRule.key,appId:exactRule.appId,
+         titlePattern:exactRule.titlePattern,source:exactRule.source}
+      : DockIconModel.currentIconTarget({
+          settings: root.openedSettings, desktopId: root.desktopId, profileKey: root.profileKey,
+          appId: value.specificWindow === true ? root.windowAppId : "",
+          title: String(value.title || "")
+        })
     root.selectedSource = root.current.source
     var sources = root.current.source ? [root.current.source] : []
     DockIconModel.recentIconSources(root.settings, 7).forEach(function(source) {

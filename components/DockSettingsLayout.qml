@@ -93,6 +93,28 @@ Item {
     }
     return result
   }
+  function focusSetting(key) {
+    var target=null
+    for (var i=0;i<targets.length;i++)
+      if (targets[i] && targets[i].key===key) {target=targets[i];break}
+    var displays=cards.itemAt(0)
+    if (!target && (key==="presentationModeByMonitor" || key==="presentationMode"))
+      target=displays && displays.monitors.itemAt(0)
+    if (!target && key==="sidebarCollapsedByMonitor" && displays) {
+      for (var j=0;j<displays.monitors.count;j++) {
+        var monitor=displays.monitors.itemAt(j)
+        if (monitor && monitor.rail.visible) {target=monitor.rail;break}
+      }
+      if (!target) target=displays.monitors.itemAt(0)
+    }
+    if (!target && key==="workspaceMonitorOrder")
+      target=displays && displays.orderToggle
+    var at=targets.indexOf(target)
+    if (at>=0) {focusTarget(at);return true}
+    if (["presentationModeByMonitor","sidebarCollapsedByMonitor","workspaceMonitorOrder"].indexOf(key)>=0
+        && displays) {reveal(displays);return true}
+    return false
+  }
   function focusTarget(index) {
     cursor=Math.max(0,Math.min(targets.length-1,index)); cursorActive=true
     if (selectedTarget) reveal(selectedTarget)
