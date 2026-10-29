@@ -56,7 +56,17 @@ Item {
   }
   // Focused output for keyboard/CLI/IPC summon. Hyprland monitor names match
   // Quickshell screen connectors; fall back to the remembered connector.
+  // The authoritative focused monitor is Hyprland.focusedMonitor — the
+  // per-monitor `focused` flag is not maintained on Quickshell 0.3.2, so the
+  // monitor-list scan alone resolves nothing on a fresh summon and degrades to
+  // candidates[0]. Prefer the singleton, then the monitor scan (test fixtures),
+  // then the remembered connector.
   function focusedSettingsConnector() {
+    var focusedMonitor = focusedHyprlandMonitor
+    if (focusedMonitor) {
+      var fmName = String(focusedMonitor.name || "").trim()
+      if (fmName) return fmName
+    }
     var monitors = hyprMonitors || []
     for (var i = 0; i < monitors.length; ++i) {
       var monitor = monitors[i]
@@ -214,6 +224,7 @@ Item {
     || root.sidebarWidgetActive("t3.threads")
   readonly property var connectedScreens: Quickshell.screens
   readonly property var hyprMonitors: Hyprland.monitors ? Hyprland.monitors.values || [] : []
+  readonly property var focusedHyprlandMonitor: Hyprland.focusedMonitor
   readonly property var hyprWorkspaces: Hyprland.workspaces ? Hyprland.workspaces.values || [] : []
   readonly property var desktopToplevels: ToplevelManager.toplevels.values || []
   readonly property var hyprToplevels: Hyprland.toplevels ? Hyprland.toplevels.values || [] : []

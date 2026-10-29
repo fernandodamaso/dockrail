@@ -124,6 +124,11 @@ TestCase {
     host.releaseIconDialog(dialog)
   }
   function test_focused_connector_prefers_hyprland_focus() {
+    host.focusedHyprlandMonitor={name:"DP-3"}
+    host.hyprMonitors=[{name:"DP-1",focused:false},{name:"DP-2",focused:true}]
+    host.settingsConnector="DP-1"
+    compare(host.focusedSettingsConnector(),"DP-3")
+    host.focusedHyprlandMonitor=null
     host.hyprMonitors=[{name:"DP-1",focused:false},{name:"DP-2",focused:true}]
     host.settingsConnector="DP-1"
     compare(host.focusedSettingsConnector(),"DP-2")

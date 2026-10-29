@@ -42,6 +42,7 @@ function createHost(parent) {
     property var applications:[]
     property var connectedScreens:[]
     property var hyprMonitors:[]
+    property var focusedHyprlandMonitor:null
     property var sidebarWidgetRegistry: ({})
     property var modeGestureFeedbackByMonitor: ({})
     property string modeMenuWriteConnector:""

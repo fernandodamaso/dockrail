@@ -45,6 +45,18 @@ const vis2={visible:true,width:30,height:30,QsWindow:{window:{screen:{name:'DP-2
 h.host.registerSettingsAnchor(vis1,'DP-1','classic')
 h.host.registerSettingsAnchor(vis2,'DP-2','classic')
 h.host.settingsPanel={panelOpen:false,openFor(anchor,edge,section){this.anchor=anchor;this.section=section;this.panelOpen=true;return true},close(){this.panelOpen=false}}
+// The authoritative Hyprland.focusedMonitor wins over the monitor-list scan.
+h.host.focusedHyprlandMonitor={name:'DP-1'}
+assert.equal(h.host.focusedSettingsConnector(),'DP-1')
+assert.equal(h.host.openSettingsForFocused(),true)
+assert.equal(h.host.settingsPanel.anchor,vis1)
+assert.equal(h.host.settingsConnector,'DP-1')
+// With no focusedMonitor handle, fall back to the monitor-list focused flag.
+h.host.focusedHyprlandMonitor=null
+h.host.settingsAnchors=[]
+h.host.registerSettingsAnchor(vis1,'DP-1','classic')
+h.host.registerSettingsAnchor(vis2,'DP-2','classic')
+h.host.settingsPanel.panelOpen=false
 assert.equal(h.host.focusedSettingsConnector(),'DP-2')
 assert.equal(h.host.openSettingsForFocused(),true)
 assert.equal(h.host.settingsPanel.anchor,vis2)
