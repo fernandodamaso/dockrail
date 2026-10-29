@@ -167,7 +167,7 @@ Item {
         readonly property var feature:Features.aggregate(root.metadata,modelData.id)
         readonly property string state:feature ? Features.shortcutState(root.host.settings,feature) : "unavailable"
         readonly property string status:Features.badge(probe)
-        readonly property bool canToggle:!!feature && status!=="Not set up" && status!=="Checking"
+        readonly property bool canToggle:!!feature && state!=="unavailable"
         property bool detailsOpen:false
         property bool agentsOpen:false
         width:stack.width
