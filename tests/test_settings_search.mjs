@@ -39,7 +39,16 @@ assert.equal(conversion.patch.sidebarMonitor,'')
 assert.equal(conversion.expected.sidebarMonitor,'HDMI-A-1')
 assert.deepEqual(input.presentationModeByMonitor,{'OLD-DP':'classic'})
 assert.equal(conversion.patch.presentationModeByMonitor['DP-1'],'classic',
-  'an unselected inherited sidebar must not become a second sidebar')
+  'unselected connected monitors must become Classic')
+const explicit=plain(registry.legacyConversion({
+  sidebarMonitor:'HDMI-A-1',presentationModeByMonitor:{'DP-1':'sidebar','OLD-DP':'classic'}},
+  {entries:[{connector:'HDMI-A-1',mode:'classic',mapped:true},
+    {connector:'DP-1',mode:'sidebar',mapped:true}]}))
+assert.deepEqual(explicit.patch.presentationModeByMonitor,
+  {'DP-1':'classic','OLD-DP':'classic','HDMI-A-1':'sidebar'},
+  'legacy selected monitor wins, even with pre-existing connected overrides')
+assert.equal(registry.legacyConversion(input,{entries:[{connector:'DP-1',mode:'classic'}]}),null,
+  'do not erase a disconnected legacy selection')
 const h=hostHarness({presentationModeByMonitor:{'OLD-DP':'classic'},sidebarMonitor:'HDMI-A-1'})
 const outcome=h.host.saveSettingsIntent(conversion.patch,conversion.expected)
 assert.equal(outcome.accepted,true)
