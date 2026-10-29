@@ -142,6 +142,32 @@ Item {
     if(dragGrip)dragGrip.y=0
     dragGrip=null;dragId="";dragExpected=null
   }
+  // Specialized Apps editors are not generated schema rows.
+  function focusSetting(key) {
+    var target=null, fallback=null
+    if (key==="pinned") {target=pinnedList.itemAt(0) || pinButton;fallback=pinnedBody}
+    else if (key==="hiddenApplications") {
+      target=hiddenList.itemAt(0) || (showAllButton.visible ? showAllButton : null)
+      fallback=hiddenBody
+    } else if (key==="iconOverrides" || key==="windowIconOverrides") {
+      for (var i=0;i<iconList.count;i++) {
+        var icon=iconList.itemAt(i)
+        if (icon && (icon.modelData.kind==="window")===(key==="windowIconOverrides")) {
+          target=icon;break
+        }
+      }
+      fallback=iconBody
+    } else if (key==="browserProfileBadgesEnabled") target=badgeToggle
+    else if (key==="sidebarBrowserTabsEnabled") target=tabsToggle
+    else if (key==="browserActivityMutedServices") target=mutedSelect
+    else if (key==="showTrash") target=trashToggle
+    else if (key==="controlCommand") target=commandField
+    else return false
+    var at=targets.indexOf(target)
+    if (at>=0) {focusTarget(at);return true}
+    if (fallback) {reveal(fallback);return true}
+    return false
+  }
   function focusTarget(index) {
     cursor=Math.max(0,Math.min(targets.length-1,index))
     selectedAppId=targets[cursor] && targets[cursor].appId || ""
@@ -527,7 +553,8 @@ Item {
           id:badgeToggle
           width:parent.width;row:root.rowFor("browserProfileBadgesEnabled")
           host:root.host;hasCursor:root.selectedTarget===this&&root.cursorActive
-          enabled:root.chromeReady || root.host.settings.browserProfileBadgesEnabled === true
+          enabled:Registry.chromeToggleEditable("browserProfileBadgesEnabled",root.host.settings,
+            root.host.featureReadinessBridge.lastGoodFeatures)
           onHovered:root.hovered(badgeToggle)
           onEdited:root.changed()
         }
@@ -535,7 +562,8 @@ Item {
           id:tabsToggle
           width:parent.width;row:root.rowFor("sidebarBrowserTabsEnabled")
           host:root.host;hasCursor:root.selectedTarget===this&&root.cursorActive
-          enabled:root.chromeReady || root.host.settings.sidebarBrowserTabsEnabled === true
+          enabled:Registry.chromeToggleEditable("sidebarBrowserTabsEnabled",root.host.settings,
+            root.host.featureReadinessBridge.lastGoodFeatures)
           onHovered:root.hovered(tabsToggle)
           onEdited:root.changed()
         }

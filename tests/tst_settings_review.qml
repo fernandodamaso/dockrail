@@ -106,6 +106,20 @@ TestCase {
     compare(panel.focusPane,"settings")
     compare(panel.selectedSection,"layout")
   }
+  function test_workspace_group_search_has_a_canonical_target() {
+    var host=createTemporaryObject(pairHostFactory,testCase)
+    var groupSchema={settings:{workspaceGroups:{type:"array",ui:{
+      section:"behavior",group:"windows",order:1,control:"app-list",visibility:"normal",
+      label:"Window groups",help:"Manage workspace groups"}}}}
+    var view=createTemporaryObject(generalFactory,host,{
+      host:host,metadata:groupSchema,section:"behavior"})
+    verify(view!==null)
+    tryVerify(function(){return view.targets.length===1})
+    compare(view.targets[0].key,"workspaceGroups")
+    view.focusTarget(0)
+    compare(view.selectedTarget.key,"workspaceGroups")
+  }
+
   function test_retry_handles_raw_host_envelope() {
     var host=createTemporaryObject(hostFactory,testCase)
     var panel=createTemporaryObject(panelFactory,host,{host:host,metadata:metadata})
