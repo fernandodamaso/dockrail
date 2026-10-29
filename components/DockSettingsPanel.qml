@@ -21,7 +21,14 @@ Item {
   property bool showHelp: false
   property string rowFeedback: ""
   property string searchTerm: ""
-  readonly property var searchResults: Registry.search(metadata,searchTerm)
+  readonly property var searchVisibleKeys: {
+    var groups=Registry.layoutGroups(metadata,(host.connectedScreens || []).length,host.settings.workspaceLayout || "flat")
+    var keys=[]
+    groups.forEach(function(group){group.rows.forEach(function(row){keys.push(row.key)})})
+    if ((host.settings.sidebarWidgets || []).length) keys.push("sidebarWidgetCollapsed")
+    return keys
+  }
+  readonly property var searchResults: Registry.search(metadata,searchTerm,searchVisibleKeys)
   readonly property var searchMatchCounts: Registry.searchCounts(searchResults)
   readonly property bool searching: searchTerm.trim().length > 0
   readonly property bool welcomeVisible: !searching && Registry.firstRun(host.settingsDefaultsInUse,host.settingsLoaded,host.settingsLoadState)
@@ -414,11 +421,13 @@ Item {
                     width:parent.width
                     spacing:Style.space(5)
                     Text {
-                      text:searchEntry.modelData.sectionLabel+" › "+searchEntry.modelData.row.ui.group
+                      text:searchEntry.modelData.sectionLabel+" › "+
+                        (searchEntry.modelData.featureId ? "Integrations" : searchEntry.modelData.row.ui.group)
                       color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.caption
                     }
                     DockSettingsRow {
-                      visible:searchEntry.modelData.section!=="layout" && !searchEntry.modelData.row.ui.pairedWith
+                      visible:searchEntry.modelData.section!=="layout" && !searchEntry.modelData.featureId
+                        && !searchEntry.modelData.row.ui.pairedWith
                         && ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)>=0
                       width:parent.width;host:root.host;row:searchEntry.modelData.row
                       monitorCount:(root.host.connectedScreens || []).length
@@ -426,10 +435,13 @@ Item {
                       onEdited:root.rowFeedback=""
                     }
                     Ui.Button {
-                      visible:searchEntry.modelData.section==="layout" || !!searchEntry.modelData.row.ui.pairedWith
+                      visible:searchEntry.modelData.section==="layout" || !!searchEntry.modelData.featureId
+                        || !!searchEntry.modelData.row.ui.pairedWith
                         || ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)<0
                       text:"Open "+searchEntry.modelData.label
-                      onClicked:root.openSearchResult(searchEntry.modelData)
+                      onClicked:searchEntry.modelData.featureId
+                        ? root.openFeature(searchEntry.modelData.featureId)
+                        : root.openSearchResult(searchEntry.modelData)
                     }
                   }
                 }
