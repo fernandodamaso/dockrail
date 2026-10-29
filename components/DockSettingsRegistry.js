@@ -125,3 +125,53 @@ function displayValue(ui, value) {
   return (ui && ui.unit === "×" ? scaled.toFixed(2) : String(scaled))
     + ((ui && ui.unit) || "")
 }
+
+
+// SET-08: Search uses the canonical registry; hidden/in-place rows are not
+// manufactured as independent editors. Results keep the originating row.
+function search(metadata, term, shownKeys) {
+  var needle=String(term || "").trim().toLocaleLowerCase()
+  if (!needle) return []
+  var visible=shownKeys || null
+  var found=[]
+  registry(metadata).forEach(function(section) {
+    section.rows.forEach(function(row) {
+      if (row.ui.visibility !== "normal") return
+      if (visible && visible.indexOf(row.key) < 0) return
+      var label=String(row.ui.label || "")
+      var help=String(row.ui.help || "")
+      var key=row.key
+      var rank=label.toLocaleLowerCase()===needle ? 0 :
+        label.toLocaleLowerCase().indexOf(needle)>=0 ? 1 :
+        key.toLocaleLowerCase().indexOf(needle)>=0 ? 2 :
+        help.toLocaleLowerCase().indexOf(needle)>=0 ? 3 : -1
+      if (rank >= 0) found.push({section:section.id, sectionLabel:section.label,
+        key:key, row:row, rank:rank, label:label, help:help})
+    })
+  })
+  return found.sort(function(a,b) {return a.rank-b.rank || order.indexOf(a.section)-order.indexOf(b.section)
+    || a.row.ui.order-b.row.ui.order || a.key.localeCompare(b.key)})
+}
+function searchCounts(results) {
+  var counts={}
+  ;(results || []).forEach(function(row) {counts[row.section]=(counts[row.section] || 0)+1})
+  return counts
+}
+function firstRun(defaultsInUse, loaded, loadState) {
+  return loaded === true && defaultsInUse === true && loadState !== "invalid"
+}
+// Preserve the connected screens' actual effective modes while migrating
+// legacy monitor selection to explicit per-monitor settings, without deleting
+// the legacy compatibility key or overwriting unknown/disconnected overrides.
+function legacyConversion(settings, presentation) {
+  if (!settings || !settings.sidebarMonitor || !presentation || !presentation.entries
+      || !presentation.entries.length) return null
+  var existing=settings.presentationModeByMonitor || {}
+  var next=Object.assign({},existing)
+  presentation.entries.forEach(function(entry) {
+    if (entry && entry.connector && (entry.mode==="classic" || entry.mode==="sidebar"))
+      next[entry.connector]=entry.mode
+  })
+  return {patch:{presentationModeByMonitor:next},
+    expected:{presentationModeByMonitor:Object.assign({},existing)}}
+}
