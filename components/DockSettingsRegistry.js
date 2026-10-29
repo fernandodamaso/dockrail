@@ -133,6 +133,10 @@ function search(metadata, term, shownKeys) {
   var needle=String(term || "").trim().toLocaleLowerCase()
   if (!needle) return []
   var visible=shownKeys || []
+  var matches=function(value) {
+    var source=String(value || "").toLocaleLowerCase()
+    return needle.split(/\s+/).every(function(token){return source.indexOf(token)>=0})
+  }
   var found=[]
   var seenFeatures=Object.create(null)
   registry(metadata).forEach(function(section) {
@@ -149,10 +153,9 @@ function search(metadata, term, shownKeys) {
       var help=String(ui.help || "")
       var key=row.key
       var rank=label.toLocaleLowerCase()===needle ? 0 :
-        label.toLocaleLowerCase().indexOf(needle)>=0 ? 1 :
-        key.toLocaleLowerCase().indexOf(needle)>=0 ||
-        String(ui.pairedWith || "").toLocaleLowerCase().indexOf(needle)>=0 ? 2 :
-        help.toLocaleLowerCase().indexOf(needle)>=0 ? 3 : -1
+        matches(label) ? 1 :
+        matches(key) || (ui.pairedWith && matches(ui.pairedWith)) ? 2 :
+        matches(help) ? 3 : -1
       if (rank>=0) found.push({section:section.id,sectionLabel:section.label,
         key:key,row:row,rank:rank,label:label,help:help})
       var feature=ui.feature
@@ -162,7 +165,7 @@ function search(metadata, term, shownKeys) {
         "coding-agents":"Coding agents (Herdr)","launcher-counts":"Launcher badge counts"}
       var title=featureNames[feature.id] || String(feature.id || "")
       var haystack=(title+" "+String(feature.id || "")).toLocaleLowerCase()
-      if (haystack.indexOf(needle)>=0) {
+      if (matches(haystack)) {
         found.push({section:"features",sectionLabel:"Features",
           key:"feature:"+feature.id,featureId:feature.id,row:row,
           rank:1,label:title,help:"Integration setup and readiness"})
