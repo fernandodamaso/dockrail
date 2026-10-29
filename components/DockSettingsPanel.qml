@@ -142,8 +142,12 @@ Item {
       }
     }
     pendingSearchResult=null
-    if (focused) focusPane="settings"
-    else rowFeedback="This setting has no available editing target."
+    if (focused) {
+      focusPane="settings"
+      // SearchField can retain active focus after a result click. Restore the
+      // panel catcher so j/k and h/l operate on the selected canonical row.
+      keyboard.forceActiveFocus()
+    } else rowFeedback="This setting has no available editing target."
   }
   function openSearchResult(result) {
     if (!result || !selectSection(result.section)) return false
