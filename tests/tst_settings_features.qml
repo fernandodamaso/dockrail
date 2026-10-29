@@ -101,7 +101,10 @@ TestCase {
     compare(findChild(section,"feature-card-agent-launchers").status,"Not set up")
     compare(findChild(section,"feature-card-chrome").state,"off",
       "readiness must not decide configuration")
-    verify(!findChild(section,"feature-card-launcher-counts").canToggle)
+    verify(findChild(section,"feature-card-launcher-counts").canToggle)
+    verify(section.toggleFeature("launcher-counts"))
+    compare(section.host.settings.launcherBadgeMode,"automatic")
+    compare(findChild(section,"feature-card-launcher-counts").status,"Not set up")
   }
   function test_mixed_switch_commits_one_atomic_patch(){
     var section=makeSection()
