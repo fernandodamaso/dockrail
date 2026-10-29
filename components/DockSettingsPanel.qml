@@ -151,6 +151,17 @@ Item {
       savedFade.restart()
     } else savedFade.stop()
   }
+  onSearchingChanged: {
+    if (!searching) return
+    dismissAppsPopups()
+    if (layoutSection) layoutSection.cancelPending()
+    if (appearanceSection) appearanceSection.cancelPending()
+    if (behaviorSection) behaviorSection.cancelPending()
+    if (widgetsSection) widgetsSection.cancelPending()
+    if (featuresSection) featuresSection.cancelPending()
+    if (appsLoader.item) appsLoader.item.cancelPending()
+    focusPane="sections"
+  }
   onPanelOpenChanged: {
     if (host.featureReadinessBridge) {
       host.featureReadinessBridge.panelVisible = panelOpen
@@ -386,7 +397,7 @@ Item {
                   color:Commons.Color.foreground;font.family:Style.font.family;font.bold:true
                 }
                 Text {width:parent.width;wrapMode:Text.WordWrap;color:Commons.Color.foreground
-                  text:"Convert the currently connected monitors into explicit per-monitor choices. Disconnected entries are preserved."}
+                  text:"Convert connected monitors into per-monitor choices. Where the legacy selector left a monitor without a sidebar, it becomes Classic dock. Disconnected choices are preserved."}
                 Ui.Button {
                   text:"Convert to per-monitor settings"
                   enabled:root.host.settingsLoadState!=="invalid" && root.host.settingsWriteState!=="saving"
