@@ -34,7 +34,7 @@ Item {
   property int savedRevision: 0
   property string focusPane: "sections"
   readonly property alias layoutView: layoutSection
-  readonly property var activeSectionView: selectedSection === "layout" ? layoutSection
+  readonly property var activeSectionView: searching ? null : selectedSection === "layout" ? layoutSection
     : selectedSection === "appearance" ? appearanceSection
     : selectedSection === "behavior" ? behaviorSection
     : selectedSection === "sidebar-widgets" ? widgetsSection
@@ -68,6 +68,7 @@ Item {
     if (section) selectSection(section)
     panelOpen = true
     if (!wasOpen) {
+      searchTerm = ""
       focusPane = "sections"
       rowFeedback = ""
     }
@@ -96,6 +97,7 @@ Item {
   }
   function selectSection(id) {
     if (Registry.order.indexOf(id) < 0) return false
+    searchTerm = ""
     if (selectedSection === "apps" && id !== selectedSection) dismissAppsPopups()
     if (selectedSection === "sidebar-widgets" && id !== selectedSection) widgetsSection.cancelPending()
     if (selectedSection === "apps" && id !== selectedSection && appsLoader.item) appsLoader.item.cancelPending()
@@ -110,6 +112,22 @@ Item {
   function openFeature(id) {
     if (!selectSection("features")) return false
     Qt.callLater(function(){featuresSection.focusFeature(id)})
+    return true
+  }
+  function openSearchResult(result) {
+    if (!result || !selectSection(result.section)) return false
+    Qt.callLater(function(){
+      var section=activeSectionView
+      if (!section || !section.targets) return
+      for(var i=0;i<section.targets.length;i++) {
+        var target=section.targets[i]
+        if(target && target.key===result.key) {
+          section.focusTarget(i)
+          focusPane="settings"
+          return
+        }
+      }
+    })
     return true
   }
   function reportWrite(outcome) {
@@ -376,11 +394,17 @@ Item {
                 width:parent.width
                 visible:root.searching
                 spacing:Style.space(12)
-                Text {
-                  width:parent.width
-                  text:root.searchResults.length+" settings match “"+root.searchTerm+"”"
-                  textFormat:Text.PlainText;wrapMode:Text.WordWrap
-                  color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.title
+                Row {
+                  width:parent.width;spacing:Style.space(5)
+                  Text {
+                    text:root.searchResults.length+" settings match"
+                    color:Commons.Color.foreground;font.family:Style.font.family;font.pixelSize:Style.font.title
+                  }
+                  Text {
+                    text:"“"+root.searchTerm+"”"
+                    font.bold:true;color:Commons.Color.accent
+                    font.family:Style.font.family;font.pixelSize:Style.font.title
+                  }
                 }
                 Repeater {
                   model:root.searchResults
@@ -405,7 +429,7 @@ Item {
                       visible:searchEntry.modelData.section==="layout" || !!searchEntry.modelData.row.ui.pairedWith
                         || ["toggle","slider","dropdown","number","segmented"].indexOf(searchEntry.modelData.row.ui.control)<0
                       text:"Open "+searchEntry.modelData.label
-                      onClicked:{root.searchTerm="";root.selectSection(searchEntry.modelData.section)}
+                      onClicked:root.openSearchResult(searchEntry.modelData)
                     }
                   }
                 }
