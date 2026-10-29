@@ -5,6 +5,7 @@ import fcntl
 import importlib.util
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -470,10 +471,87 @@ class HooksInstallTests(unittest.TestCase):
         self.settings = self.tmp / ".claude" / "settings.json"
         self.settings.parent.mkdir()
         patcher = mock.patch.dict(os.environ, {"HOME": str(self.tmp),
+                                               "XDG_DATA_HOME": str(self.tmp / "data"),
                                                "XDG_RUNTIME_DIR": str(self.tmp / "run")})
         patcher.start()
         self.addCleanup(patcher.stop)
         os.environ.pop("CLAUDE_CONFIG_DIR", None)
+
+    def stable_script(self) -> Path:
+        return self.tmp / "data" / "dockrail-cli" / "hooks" / "dockrail_claude.py"
+
+    def test_hook_command_targets_the_stable_path(self) -> None:
+        stable = self.stable_script()
+        self.assertEqual(dockrail_claude.stable_hook_script(), stable)
+        command = dockrail_claude.hook_command()
+        self.assertIn(shlex.quote(str(stable)), command)
+        self.assertNotIn(str(REPO / "scripts"), command)
+        self.assertTrue(command.endswith("|| true"))
+
+    def test_install_copies_the_script_to_the_stable_path(self) -> None:
+        data = dockrail_claude.cmd_hooks("install")
+        stable = self.stable_script()
+        source = REPO / "scripts" / "dockrail_claude.py"
+        self.assertEqual(stable.read_bytes(), source.read_bytes())
+        self.assertEqual(stable.stat().st_mode & 0o777, 0o644)
+        self.assertEqual(stable.parent.stat().st_mode & 0o777, 0o755)
+        self.assertEqual(data["scriptPath"], str(stable))
+        self.assertTrue(data["scriptExists"])
+        self.assertTrue(data["scriptCurrent"])
+        self.assertTrue(data["installed"])
+
+    def test_status_flags_a_deleted_script(self) -> None:
+        dockrail_claude.cmd_hooks("install")
+        self.stable_script().unlink()
+        data = dockrail_claude.cmd_hooks("status")
+        self.assertFalse(data["installed"])
+        self.assertEqual(data["scriptPath"], str(self.stable_script()))
+        self.assertFalse(data["scriptExists"])
+        self.assertFalse(data["scriptCurrent"])
+
+    def test_status_flags_old_script_paths(self) -> None:
+        old_paths = (
+            self.tmp / ".local" / "share" / "dockrail-cli" / "scripts" / "dockrail_claude.py",
+            self.tmp / ".config" / "omarchy" / "plugins" /
+            "io.github.fernandodamaso.dockrail" / "scripts" / "dockrail_claude.py",
+        )
+        for old in old_paths:
+            with self.subTest(old=old):
+                shutil.rmtree(self.settings.parent)
+                self.settings.parent.mkdir()
+                old.parent.mkdir(parents=True)
+                old.write_text("# old hook\n")
+                command = f"python3 -B {shlex.quote(str(old))} hook >/dev/null 2>&1 || true"
+                self.settings.write_text(json.dumps(dockrail_claude.install_hooks({}, command)))
+                data = dockrail_claude.cmd_hooks("status")
+                self.assertFalse(data["installed"])
+                self.assertEqual(data["scriptPath"], str(old))
+                self.assertTrue(data["scriptExists"])
+                self.assertFalse(data["scriptCurrent"])
+
+    def test_install_repairs_a_missing_script_and_old_paths(self) -> None:
+        user_hook = {"matcher": "Bash", "hooks": [{"type": "command", "command": "my-lint"}]}
+        old = self.tmp / ".local" / "share" / "dockrail-cli" / "scripts" / "dockrail_claude.py"
+        old.parent.mkdir(parents=True)
+        old.write_text("# old hook\n")
+        for stale in (old, self.stable_script()):
+            with self.subTest(stale=stale):
+                settings = dockrail_claude.install_hooks({}, dockrail_claude.hook_command(old))
+                settings["hooks"]["PostToolUse"] = [user_hook] + settings["hooks"]["PostToolUse"]
+                self.settings.write_text(json.dumps(settings))
+                if stale != old:
+                    dockrail_claude.cmd_hooks("install")
+                    stale.unlink()
+                data = dockrail_claude.cmd_hooks("install")
+                self.assertTrue(data["installed"])
+                self.assertTrue(data["scriptCurrent"])
+                written = json.loads(self.settings.read_text())
+                self.assertEqual(written["hooks"]["PostToolUse"][0], user_hook)
+                for event, groups in written["hooks"].items():
+                    entries = [entry for group in groups for entry in group.get("hooks", [])
+                               if dockrail_claude.is_dockrail_hook(entry)]
+                    self.assertEqual(len(entries), 1, event)
+                    self.assertIn(shlex.quote(str(self.stable_script())), entries[0]["command"])
 
     def test_install_preserves_user_hooks_and_is_idempotent(self) -> None:
         user_hook = {"matcher": "Bash", "hooks": [{"type": "command", "command": "my-lint"}]}

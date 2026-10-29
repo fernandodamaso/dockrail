@@ -25,10 +25,20 @@ hooks. The sidebar uses the same setting; it needs no separate configuration.
 installed and how many session records exist; `dockrail claude hooks
 uninstall` removes only Dockrail's hook entries.
 
-After you update Dockrail, run `dockrail claude hooks install` again. Newer
-releases add hook events (for example `PreToolUse` for Claude's questions),
-and `dockrail claude hooks status` reports `installed: false` until the
-re-run adds them.
+After you update Dockrail or switch install modes (source bundle, `--cli-only`
+or the Omarchy plugin), run `dockrail claude hooks install` again, then start
+a new Claude Desktop session. Newer releases add hook events (for example
+`PreToolUse` for Claude's questions), and sessions already running keep the
+hook commands they started with, so a re-run only fixes new sessions.
+
+Each installed command runs
+`${XDG_DATA_HOME:-~/.local/share}/dockrail-cli/hooks/dockrail_claude.py`, a
+CLI-owned copy that survives `install.sh` in either mode, `omarchy plugin
+update` and `dockrail dev use/reset`. `hooks install` also refreshes that copy,
+so it repairs an install whose old commands pointed at a checkout or plugin
+path. `hooks status` checks that the script exists at that path, so a missing
+script or commands pointing elsewhere report `installed: false` instead of a
+silently dead hook.
 
 `hooks install` edits `${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`,
 keeping every other key and every hook you added yourself, and is safe to run

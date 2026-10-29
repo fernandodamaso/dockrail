@@ -101,6 +101,23 @@ def claude_settings_path(env: Mapping[str, str] | None = None) -> Path:
     return Path(home) / ".claude" / "settings.json"
 
 
+def stable_hook_script(env: Mapping[str, str] | None = None) -> Path:
+    """Return the CLI-owned hook entry point that installed commands run.
+
+    This path does not depend on which copy ran ``hooks install``: source
+    checkouts, plugin checkouts and ``dockrail dev`` symlinks all point here.
+    """
+    if env is None:
+        env = os.environ
+    data_home = env.get("XDG_DATA_HOME", "")
+    if data_home:
+        base = Path(data_home)
+    else:
+        home = env.get("HOME", "") or str(Path.home())
+        base = Path(home) / ".local" / "share"
+    return base / "dockrail-cli" / "hooks" / "dockrail_claude.py"
+
+
 # -- hook ------------------------------------------------------------------------
 def _stat(pid: int, proc_root: Path) -> tuple[int, int, str] | None:
     """Return ``(ppid, startTime, comm)`` for a same-uid process."""
@@ -413,8 +430,40 @@ def cmd_hook() -> int:
 def hook_command(script: Path | None = None) -> str:
     # Exit 2 from a hook can block a prompt, so a missing script or Python
     # must still succeed silently.
-    script = (script or Path(__file__)).resolve()
+    script = script or stable_hook_script()
     return f"python3 -B {shlex.quote(str(script))} hook >/dev/null 2>&1 || true"
+
+
+def install_hook_script(env: Mapping[str, str] | None = None) -> Path:
+    """Copy this file to the stable path when its content differs."""
+    target = stable_hook_script(env)
+    try:
+        data = Path(__file__).read_bytes()
+    except OSError as exc:
+        raise CliError("script_unreadable", f"cannot read {Path(__file__)}: {exc.strerror}")
+    try:
+        if target.read_bytes() == data:
+            return target
+    except OSError:
+        pass
+    try:
+        target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+        target.parent.chmod(0o755)
+        fd, temp = tempfile.mkstemp(prefix=".dockrail-claude-", dir=target.parent)
+    except OSError as exc:
+        raise CliError("script_unwritable", f"cannot write {target}: {exc.strerror}")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            os.fchmod(handle.fileno(), 0o644)
+            handle.write(data)
+        os.replace(temp, target)
+    except BaseException:
+        try:
+            os.unlink(temp)
+        except OSError:
+            pass
+        raise
+    return target
 
 
 def is_dockrail_hook(entry: object) -> bool:
@@ -423,6 +472,41 @@ def is_dockrail_hook(entry: object) -> bool:
         and isinstance(entry.get("command"), str)
         and HOOK_MARKER in entry["command"]
     )
+
+
+def hook_script_path(command: str) -> Path | None:
+    """Return the script an installed hook command runs, when it has one."""
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return None
+    for part in parts:
+        if Path(part).name == HOOK_MARKER:
+            return Path(part)
+    return None
+
+
+def installed_script_paths(settings: Mapping[str, Any]) -> list[Path]:
+    """Return the distinct hook script paths in Dockrail's installed commands."""
+    paths: list[Path] = []
+    hooks = settings.get("hooks", {})
+    for groups in (hooks.values() if isinstance(hooks, dict) else []):
+        for group in groups if isinstance(groups, list) else []:
+            entries = group.get("hooks") if isinstance(group, dict) else None
+            for entry in entries if isinstance(entries, list) else []:
+                if not is_dockrail_hook(entry):
+                    continue
+                path = hook_script_path(entry["command"])
+                if path is not None and path not in paths:
+                    paths.append(path)
+    return paths
+
+
+def script_content_matches(path: Path) -> bool:
+    try:
+        return path.read_bytes() == Path(__file__).read_bytes()
+    except OSError:
+        return False
 
 
 def load_settings(path: Path) -> dict[str, Any]:
@@ -534,17 +618,26 @@ def cmd_hooks(action: str) -> dict[str, Any]:
     path = claude_settings_path()
     settings = load_settings(path)
     if action == "install":
-        save_settings(path, install_hooks(settings, hook_command()))
+        script = install_hook_script()
+        save_settings(path, install_hooks(settings, hook_command(script)))
         settings = load_settings(path)
     elif action == "uninstall":
         if installed_events(settings):
             save_settings(path, uninstall_hooks(settings))
             settings = load_settings(path)
     events = installed_events(settings)
+    stable = stable_hook_script()
+    scripts = installed_script_paths(settings)
+    script_path = str(scripts[0]) if scripts else None
+    script_exists = bool(scripts) and all(script.exists() for script in scripts)
+    on_stable_path = bool(scripts) and all(script == stable for script in scripts)
     return {
         "settingsPath": str(path),
-        "installed": events == sorted(HOOK_EVENTS),
+        "installed": events == sorted(HOOK_EVENTS) and script_exists and on_stable_path,
         "events": events,
+        "scriptPath": script_path,
+        "scriptExists": script_exists,
+        "scriptCurrent": on_stable_path and script_content_matches(stable),
         "stateDir": str(state_dirs()[0]),
         "sessionRecords": count_sessions(),
     }
@@ -574,12 +667,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if data["installed"]:
         print(f"Claude Code hooks installed in {data['settingsPath']}.")
-        print("Restart Claude Desktop sessions so they load the hooks.")
-    elif data["events"]:
-        print(f"Claude Code hooks partially installed ({', '.join(data['events'])}); "
-              "run: dockrail claude hooks install")
-    else:
+        print("Start a new Claude Desktop session so it loads the hooks.")
+    elif not data["events"]:
         print(f"Claude Code hooks not installed in {data['settingsPath']}.")
+    elif sorted(data["events"]) != sorted(HOOK_EVENTS):
+        print(f"Claude Code hooks partially installed ({', '.join(data['events'])}).")
+    else:
+        print("Claude Code hooks point at a missing or stale script "
+              f"({data['scriptPath'] or 'unknown'}).")
+    if not data["installed"]:
+        print("run: dockrail claude hooks install")
     print(f"Session records: {data['sessionRecords']} in {data['stateDir']}")
     return 0
 
