@@ -975,21 +975,31 @@ PanelWindow {
     return true
   }
 
-  function updateGroupedPinTarget(position) {
-    if (!root.groupedPinSourceId) return
+  function groupedPinTargetAt(scenePoint) {
+    if (!root.groupedPinSourceId || !scenePoint
+        || !isFinite(scenePoint.x) || !isFinite(scenePoint.y)
+        || !groupedLayout.containsScenePoint(scenePoint)) return ""
+    var point = groupedPinRow.mapFromItem(null, scenePoint.x, scenePoint.y)
+    if (point.x < 0 || point.x >= groupedPinRow.width
+        || point.y < 0 || point.y >= groupedPinRow.height) return ""
     var list = root.workspacePresentation.globalLaunchers || []
     var nearest = ""
     var distance = Infinity
     for (var i = 0; i < list.length; ++i) {
       var tile = groupedPinRepeater.itemAt(i)
       if (!tile) continue
-      var delta = Math.abs(Number(position) - (tile.x + tile.width / 2))
+      var delta = Math.abs(point.x - (tile.x + tile.width / 2))
       if (delta < distance) {
         distance = delta
         nearest = String(list[i].desktopId || "")
       }
     }
-    root.groupedPinTargetId = nearest
+    return nearest
+  }
+
+  function updateGroupedPinTarget(scenePoint) {
+    if (root.groupedPinSourceId)
+      root.groupedPinTargetId = root.groupedPinTargetAt(scenePoint)
   }
 
   function groupedPinOffset(index) {
@@ -1008,9 +1018,9 @@ PanelWindow {
     root.groupedPinOrder = []
   }
 
-  function finishGroupedPinReorder() {
+  function finishGroupedPinReorder(scenePoint) {
     var from = root.groupedPinSourceId
-    var to = root.groupedPinTargetId
+    var to = root.groupedPinTargetAt(scenePoint)
     root.cancelGroupedPinReorder()
     if (from && to && from !== to
         && root.groupedPinIndex(from) >= 0 && root.groupedPinIndex(to) >= 0)
@@ -1097,8 +1107,14 @@ PanelWindow {
     root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("screen changed")
   }
-  onWidthChanged: root.cancelWorkspaceGesture("surface resized")
-  onHeightChanged: root.cancelWorkspaceGesture("surface resized")
+  onWidthChanged: {
+    root.cancelGroupedPinReorder()
+    root.cancelWorkspaceGesture("surface resized")
+  }
+  onHeightChanged: {
+    root.cancelGroupedPinReorder()
+    root.cancelWorkspaceGesture("surface resized")
+  }
   onVisibleChanged: if (!visible) {
     root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("surface hidden")
@@ -1119,10 +1135,12 @@ PanelWindow {
     if (grouped) Qt.callLater(root.revealActiveWorkspace)
   }
   onDockHyprMonitorChanged: {
+    root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("monitor mapping changed")
     root.scheduleVisibleItemsRefresh()
   }
   onHyprMonitorsChanged: {
+    root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("monitor inventory changed")
     root.scheduleVisibleItemsRefresh()
   }
@@ -1511,6 +1529,7 @@ PanelWindow {
           animationsEnabled: root.interfaceAnimationsEnabled
         }
         Row {
+          id: groupedPinRow
           spacing: Math.max(0, root.pinnedIconGap - (root.itemSize - root.iconSize))
           Repeater {
           id: groupedPinRepeater
@@ -1941,12 +1960,12 @@ PanelWindow {
         root.dragTarget = itemIndex
       }
     }
-    onDragMoved: mainPosition => {
-      if (appItem.pinReorderEnabled) root.updateGroupedPinTarget(mainPosition)
+    onDragMoved: (mainPosition, scenePoint) => {
+      if (appItem.pinReorderEnabled) root.updateGroupedPinTarget(scenePoint)
       else root.updateDragTarget(mainPosition)
     }
-    onDragFinished: {
-      if (appItem.pinReorderEnabled) root.finishGroupedPinReorder()
+    onDragFinished: scenePoint => {
+      if (appItem.pinReorderEnabled) root.finishGroupedPinReorder(scenePoint)
       else root.finishDrag()
     }
     onDragCancelled: {

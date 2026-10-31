@@ -126,4 +126,12 @@ assert.equal(pending.accepted, true)
 assert.equal(pending.pending, true)
 assert.equal(controller.mutationFeedback, '')
 
+const controllerQml = read('components/DockSidebarController.qml')
+assert.match(controllerQml, /onMonitorsChanged: \{\s*root\.cancelPinReorder\(\)/,
+  'compositor monitor changes cancel sidebar pin drag')
+assert.match(stripQml, /if \(active && root\.beginPinDrag\(pinCell\.rowKey\)\) \{\s*pinCell\.forceActiveFocus\(Qt\.MouseFocusReason\)/,
+  'drag moves keyboard focus to the source cell for Escape')
+assert.match(stripQml, /if \(event\.key === Qt\.Key_Escape && root\.dragSourceKey === pinCell\.rowKey\) \{\s*root\.cancelPinDrag\(\)/,
+  'Escape explicitly cancels the active cell drag')
+
 console.log('sidebar pinned strip layout and reorder: PASS')

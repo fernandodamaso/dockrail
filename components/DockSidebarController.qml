@@ -1416,7 +1416,10 @@ Item {
     root.cancelPinReorder()
     root.refresh()
   }
-  onMonitorsChanged: root.scheduleRefresh()
+  onMonitorsChanged: {
+    root.cancelPinReorder()
+    root.scheduleRefresh()
+  }
   onWorkspacesChanged: root.scheduleRefresh()
   onApplicationsChanged: root.scheduleRefresh()
   onToplevelsChanged: root.scheduleRefresh()

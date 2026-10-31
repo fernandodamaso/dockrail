@@ -179,8 +179,8 @@ Item {
   property real wheelRemainder: 0
   property double lastWheelTimestamp: 0
   signal dragStarted(int itemIndex)
-  signal dragMoved(real mainPosition)
-  signal dragFinished()
+  signal dragMoved(real mainPosition, point scenePosition)
+  signal dragFinished(point scenePosition)
   signal dragCancelled()
   signal addApplicationRequested()
   signal removeRequested(string desktopId)
@@ -898,7 +898,7 @@ Item {
     }
     // Cancellation also deactivates DragHandler: commit only on release.
     onGrabChanged: function(transition, point) {
-      if (transition === PointerDevice.UngrabExclusive) root.dragFinished()
+      if (transition === PointerDevice.UngrabExclusive) root.dragFinished(point.scenePosition)
       else if (transition === PointerDevice.CancelGrabExclusive
                || transition === PointerDevice.CancelGrabPassive)
         root.dragCancelled()
@@ -906,7 +906,8 @@ Item {
     onActiveTranslationChanged: {
       if (active)
         root.dragMoved((root.vertical ? root.y + root.height / 2 : root.x + root.width / 2)
-          + (root.vertical ? activeTranslation.y : activeTranslation.x))
+          + (root.vertical ? activeTranslation.y : activeTranslation.x),
+          centroid.scenePosition)
     }
   }
 

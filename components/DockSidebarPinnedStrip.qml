@@ -451,6 +451,11 @@ Item {
           }
 
           Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Escape && root.dragSourceKey === pinCell.rowKey) {
+              root.cancelPinDrag()
+              event.accepted = true
+              return
+            }
             if (!pinCell.modelData || pinCell.exiting) return
             pinCell.mouseFocused = false
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
@@ -509,8 +514,10 @@ Item {
               && (!root.controller.interactionBusy
                 || root.dragSourceKey === pinCell.rowKey)
             onActiveChanged: {
-              if (active && root.beginPinDrag(pinCell.rowKey))
+              if (active && root.beginPinDrag(pinCell.rowKey)) {
+                pinCell.forceActiveFocus(Qt.MouseFocusReason)
                 root.updatePinDrag(centroid.scenePosition)
+              }
             }
             onActiveTranslationChanged: {
               if (active && root.dragSourceKey === pinCell.rowKey)
