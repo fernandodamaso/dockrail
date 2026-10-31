@@ -725,7 +725,9 @@ Item {
     if (!entry || !DockWindowModel.monitorForScreen(entry.screen, hyprMonitors))
       return dockControl.failure("E_STALE",
         "The focused monitor is not a connected Dockrail output; no presentation was changed.")
-    var destination = entry.mode === "sidebar" ? "classic" : "sidebar"
+    // An inherited sidebar can be intentionally unmapped by sidebarMonitor.
+    // First reveal that screen's sidebar; only a visible sidebar toggles to dock.
+    var destination = entry.mode === "sidebar" && entry.mapped ? "classic" : "sidebar"
     var token = ScreenPresentationModel.modeGestureToken(current, connector)
     // Scope a failed save to this output, as the existing menu switch does.
     var previousOrigin = modeMenuWriteConnector
@@ -737,7 +739,7 @@ Item {
     // A rejected/busy preflight is only a proposal, not a mode switch.
     if (outcome.accepted && outcome.reply && outcome.reply.data)
       outcome.reply.data.modeSwitch = {
-        connector: connector, from: entry.mode, to: destination
+        connector: connector, from: entry.mapped ? entry.mode : "unmapped", to: destination
       }
     return outcome.reply
   }

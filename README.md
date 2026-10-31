@@ -857,7 +857,8 @@ Omarchy versions supporting that helper. After editing, run
 `hyprctl reload` and `hyprctl configerrors`. The monitor is selected by
 Hyprland focus, **not** by pointer hover. The command updates just that
 output's `presentationModeByMonitor` entry through the host's existing
-settings writer; all other monitor overrides survive unchanged.
+settings writer; all other monitor overrides survive unchanged. An inherited
+sidebar hidden by a `sidebarMonitor` pin is revealed on the first toggle.
 For an `E_BUSY` or `E_PERSISTENCE` response, inspect
 `dockrail status --json` before assuming the choice was saved.
 See the [CLI reference](docs/CLI_REFERENCE.md#focused-monitor-presentation-shortcut).

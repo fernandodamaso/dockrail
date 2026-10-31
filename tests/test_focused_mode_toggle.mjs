@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import {hostHarness, plain} from './host_harness.mjs'
+import {hostHarness, plain, loadModel} from './host_harness.mjs'
+import {qmlMethods} from './sidebar_interaction_fixture.mjs'
 
 const {host, request, writes} = hostHarness({})
 host.connectedScreens = [{name: 'DP-1'}, {name: 'DP-2'}]
@@ -122,4 +123,72 @@ for (const malformed of [null, []]) {
   assert.deepEqual(plain(invalid.host.settings.presentationModeByMonitor), {'DP-1': 'sidebar'})
   assert.equal(invalid.writes.length, 1)
 }
-console.log('focused monitor mode toggle: PASS')
+// A sidebar inherited from the global default may be intentionally unmapped
+// by the legacy sidebarMonitor pin. The first toggle must reveal it, not dock it.
+const pinned = hostHarness({presentationMode: 'sidebar', sidebarMonitor: 'DP-1'})
+pinned.host.connectedScreens = [{name: 'DP-1'}, {name: 'DP-2'}]
+pinned.host.hyprMonitors = [{name: 'DP-1', x: 0}, {name: 'DP-2', x: 1920}]
+pinned.host.focusedHyprlandMonitor = {name: 'DP-2'}
+assert.equal(pinned.host.currentPresentation().entries.find(e => e.connector === 'DP-2').mapped, false)
+reply = pinned.request('mode.toggle')
+assert.equal(reply.ok, true)
+assert.deepEqual(reply.data.modeSwitch, {connector: 'DP-2', from: 'unmapped', to: 'sidebar'})
+assert.deepEqual(plain(pinned.host.settings.presentationModeByMonitor), {'DP-2': 'sidebar'})
+assert.equal(pinned.host.settings.sidebarMonitor, 'DP-1', 'legacy pin is unchanged')
+assert.deepEqual(pinned.host.currentPresentation().sidebarScreens.map(s => s.name).sort(),
+  ['DP-1', 'DP-2'])
+reply = pinned.request('mode.toggle')
+assert.equal(reply.ok, true)
+assert.deepEqual(reply.data.modeSwitch, {connector: 'DP-2', from: 'sidebar', to: 'classic'})
+assert.equal(pinned.host.currentPresentation().entries.find(e => e.connector === 'DP-1').mode, 'sidebar')
+assert.equal(pinned.writes.length, 2)
+
+const solo = hostHarness({})
+solo.host.connectedScreens = [{name: 'eDP-1'}]
+solo.host.hyprMonitors = [{name: 'eDP-1'}]
+solo.host.focusedHyprlandMonitor = {name: 'eDP-1'}
+assert.equal(solo.request('mode.toggle').data.modeSwitch.to, 'sidebar')
+assert.equal(solo.request('mode.toggle').data.modeSwitch.to, 'classic')
+assert.equal(solo.writes.length, 2)
+
+// The sidebar controller executes membership reconciliation while one panel
+// owns a row drag. A foreign panel entering/leaving must not abort that drag,
+// but removal of the origin panel must still cancel it.
+function membershipChange(previous, overrides, origin) {
+  const screens = [{name: 'DP-1'}, {name: 'DP-2'}]
+  const controller = qmlMethods('DockSidebarController.qml', {
+    DockModel: loadModel('DockModel'),
+    SidebarModel: loadModel('DockSidebarModel'),
+    ScreenPresentationModel: loadModel('DockScreenPresentationModel'),
+    screens, monitors: [{name: 'DP-1'}, {name: 'DP-2'}],
+    mappedScreens: screens.filter(s => previous.includes(s.name)),
+    selectedScreen: screens[0], registry: {nextToken: 1, entries: []}, toplevels: [],
+    settings: {presentationMode: 'classic', presentationModeByMonitor: overrides,
+      sidebarMonitor: '', workspaceMonitorOrder: []},
+    dragSession: {connector: origin}, interactionBusy: true, resizeActive: false,
+    refreshPending: false
+  })
+  let cancellations = 0
+  controller.rowDragIsCurrent = () => true
+  controller.cancelRowDrag = () => { cancellations++; controller.dragSession = null }
+  controller.syncWidgets = () => {}
+  controller.refreshBody()
+  return {controller, cancellations}
+}
+let membership = membershipChange(['DP-1'],
+  {'DP-1': 'sidebar', 'DP-2': 'sidebar'}, 'DP-1')
+assert.equal(membership.cancellations, 0, 'adding DP-2 must not cancel DP-1 drag')
+assert.equal(membership.controller.dragSession.connector, 'DP-1')
+assert.deepEqual(plain(membership.controller.mappedScreens.map(s => s.name)), ['DP-1', 'DP-2'])
+assert.equal(membership.controller.refreshPending, true, 'busy projection stays deferred')
+
+membership = membershipChange(['DP-1', 'DP-2'],
+  {'DP-1': 'sidebar', 'DP-2': 'classic'}, 'DP-1')
+assert.equal(membership.cancellations, 0, 'removing DP-2 must not cancel DP-1 drag')
+assert.equal(membership.controller.dragSession.connector, 'DP-1')
+
+membership = membershipChange(['DP-1', 'DP-2'],
+  {'DP-1': 'classic', 'DP-2': 'sidebar'}, 'DP-1')
+assert.equal(membership.cancellations, 1, 'removing the origin sidebar must cancel its drag')
+assert.equal(membership.controller.dragSession, null)
+console.log('focused monitor mode toggle and sidebar membership isolation: PASS')

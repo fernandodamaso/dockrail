@@ -301,6 +301,11 @@ The host reads `Hyprland.focusedMonitor` when the shortcut runs; if there is
 no focused or connected output, it fails rather than choosing the first screen
 or using a remembered Settings anchor.
 
+When an output inherits `sidebar` but is **unmapped** because
+`sidebarMonitor` selects another output, the first toggle explicitly maps its
+sidebar (`modeSwitch.from: "unmapped"`, `to: "sidebar"`). The next toggle
+switches it to the classic dock; the existing `sidebarMonitor` pin is unchanged.
+
 The command reuses the mode gesture's live token validation and the sole
 FileView settings writer. It changes only the focused connector's
 `presentationModeByMonitor` entry. It preserves other connected/disconnected
