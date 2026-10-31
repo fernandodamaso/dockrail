@@ -26,7 +26,6 @@ PanelWindow {
   property var menuAnchor: null
   property var menuMembers: []
   property var menuEntry: null
-  property bool headerMenuActive: false
   readonly property string preferenceFeedback: root.modeDragError !== ""
     ? root.modeDragError
     : !host ? "" : host.settingsWriteState === "error"
@@ -137,7 +136,6 @@ PanelWindow {
 
   function closeSurfaces() {
     sidebarContext.closeAll()
-    root.headerMenuActive = false
     picker.visible = false
     if (root.pinStrip) root.pinStrip.close()
     sidebarViewport.cancelInputs("surface-close")
@@ -171,23 +169,9 @@ PanelWindow {
       if (!root.controller.targetIsCurrent(target)) return false
     }
     root.menuTarget = row || target
-    root.headerMenuActive = false
     root.menuAnchor = anchorItem
     root.menuMembers = InteractionModel.contextMenuMembers(root.menuTarget, anchorItem)
     root.menuEntry = anchorItem.entry || (root.menuTarget.item && root.menuTarget.item.entry) || null
-    sidebarContext.open()
-    return true
-  }
-
-  function openHeaderMenu() {
-    if (root.controller.interactionBusy || !root.screen || !headerMenuButton.visible)
-      return false
-    root.headerMenuActive = true
-    root.menuTarget = null
-    root.menuAnchor = headerMenuButton
-    root.menuMembers = []
-    root.menuEntry = null
-    sidebarContext.modeSwitchToken = root.modeGestureToken
     sidebarContext.open()
     return true
   }
@@ -217,12 +201,6 @@ PanelWindow {
 
   function refreshContext() {
     if (!sidebarContext.visible && !sidebarContext.iconDialogOpen) {
-      root.refreshPickerAnchor()
-      return
-    }
-    if (root.headerMenuActive) {
-      if (!headerMenuButton.visible || !root.screen) sidebarContext.closeAll()
-      else sidebarContext.updatePopupAnchors()
       root.refreshPickerAnchor()
       return
     }
@@ -342,7 +320,7 @@ PanelWindow {
           visible: !root.panelCollapsed
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          anchors.right: headerMenuButton.left
+          anchors.right: widgetManage.left
           anchors.rightMargin: Style.space(8)
           spacing: 0
           Accessible.role: Accessible.StaticText
@@ -391,8 +369,7 @@ PanelWindow {
           focusable: true
           enabled: !root.controller.interactionBusy
           onClicked: root.controller.requestCollapse(root.screen)
-          // Summon anchor for keyboard/IPC/CLI Settings in both expanded and
-          // rail modes; the header menu button covers expanded only.
+          // Summon anchor for keyboard/IPC/CLI Settings in both expanded and rail modes.
           Component.onCompleted: if (root.host)
             root.host.registerSettingsAnchor(collapseButton,root.screen ? root.screen.name : "", "sidebar")
           Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(collapseButton)
@@ -452,35 +429,6 @@ PanelWindow {
             iconSize: 14
             tint: Commons.Color.foreground
             visible: widgetManage.visible
-          }
-        }
-        Ui.Button {
-          id: headerMenuButton
-          visible: !root.panelCollapsed
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.right: widgetManage.left
-          anchors.rightMargin: Style.space(8)
-          width: visible ? Style.space(30) : 0
-          height: Style.space(30)
-          iconText: ""
-          tooltipText: "Sidebar menu"
-          Accessible.role: Accessible.Button
-          Accessible.name: tooltipText
-          focusable: visible
-          enabled: !root.controller.interactionBusy
-          onClicked: root.openHeaderMenu()
-          // Sidebar summon anchor for keyboard/IPC/CLI Settings while expanded.
-          Component.onCompleted: if (root.host)
-            root.host.registerSettingsAnchor(headerMenuButton,root.screen ? root.screen.name : "", "sidebar")
-          Component.onDestruction: if (root.host) root.host.unregisterSettingsAnchor(headerMenuButton)
-          DockLucideIcon {
-            anchors.centerIn: parent
-            width: 14
-            height: 14
-            iconName: "settings-2"
-            iconSize: 14
-            tint: Commons.Color.foreground
-            visible: headerMenuButton.visible
           }
         }
       }
@@ -783,12 +731,9 @@ PanelWindow {
     windowActions: root.host.windowActions
     originOnly: true
     sidebarMode: true
-    sidebarHeaderMenu: root.headerMenuActive
     workspaceContext: root.menuTarget && root.menuTarget.kind === "workspace" ? root.menuTarget : null
     externalTargetValidator: function() {
-      return root.headerMenuActive
-        ? !!root.screen && headerMenuButton.visible
-        : root.controller.targetIsCurrent(root.menuTarget)
+      return root.controller.targetIsCurrent(root.menuTarget)
     }
     interfaceAnimationsEnabled: root.controller.settings.interfaceAnimationsEnabled !== false
     onOpenNewWindow: {
@@ -796,13 +741,9 @@ PanelWindow {
     }
     onVisibleChanged: root.syncInteractionBusy()
     onIconDialogOpenChanged: root.syncInteractionBusy()
-    onSettingsRequested: if (root.host) root.host.openSettings(headerMenuButton,
+    onSettingsRequested: if (root.host) root.host.openSettings(root.panelCollapsed ? railSettingsGear : settingsGear,
       root.screen ? root.screen.name : "")
     onKeyboardDismissed: root.controller.releaseNavigationFocus()
-    onSwitchPresentationRequested: (destination, token) => {
-      if (destination === "classic" && root.screen)
-        root.host.commitMonitorModeMenu(root.screen.name, destination, token)
-    }
   }
   Connections {
     target: sidebarViewport.listView
