@@ -65,6 +65,8 @@ assert.match(stripQml, /PointerDevice\.CancelGrabExclusive[\s\S]*?root\.cancelPi
   'grab loss cancels without committing a reorder')
 assert.match(stripQml, /root\.controller\.finishPinReorder\(key, !key\)/,
   'sidebar uses the shared host reorder path rather than writing config')
+assert.match(stripQml, /root\.hiddenCount > 0[\s\S]*?point\.x >= root\.visibleCount \* \(root\.cell \+ root\.pinGap\)/,
+  'overflow control is outside the active pin drop region')
 
 // Hidden (+N) pins keep the visible tiles' context menu, including Unpin.
 assert.match(stripQml, /acceptedButtons: Qt\.RightButton\s*\n\s*onTapped: root\.openOverflowContext\(hiddenPin\.modelData\)/,

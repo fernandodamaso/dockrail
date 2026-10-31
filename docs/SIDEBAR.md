@@ -118,7 +118,11 @@ records, not an invented per-window share of an app total.
 
 The sidebar pinned shelf supports left-button drag-to-reorder of visible pins.
 The classic dock uses the same saved pin ordering; both surfaces submit to the
-host's existing application move intent and single FileView writer. Plain
+host's existing application move intent and single FileView writer. Flat classic
+pins already support dragging; grouped classic docks also allow dragging closed
+pins in the global launcher row. Running pinned apps in grouped workspace cards
+keep their existing window-drag action, rather than silently changing its purpose.
+Plain
 click still focuses/launches; right-click and keyboard activation are unchanged.
 An outside drop or cancelled grab does not save. Overflowed (+N) launchers
 remain selectable through the popup but are not draggable from that popup;
