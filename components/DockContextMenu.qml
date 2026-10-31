@@ -25,7 +25,6 @@ PopupWindow {
   property bool interfaceAnimationsEnabled: true
   property bool originOnly: false
   property bool controlItem: false
-  property bool sidebarHeaderMenu: false
   property var modeSwitchToken: null
   // Optional sidebar adapters; classic menus retain their saved grouping and
   // numeric move page. The owning controller supplies exact-target validation.
@@ -131,8 +130,7 @@ PopupWindow {
       ? root.targetContexts[0] : null
     root.groupCandidateSnapshot = root.captureGroupCandidateSnapshot()
     root.openedWorkspaceGroupsSignature = root.workspaceGroupsSignature()
-    root.page = root.sidebarHeaderMenu ? "controls"
-      : root.sidebarMode && root.workspaceContext ? "sidebar-workspace" : DockMenuModel.initialPage(
+    root.page = root.sidebarMode && root.workspaceContext ? "sidebar-workspace" : DockMenuModel.initialPage(
       root.controlItem, root.targetContexts.length, root.pageTarget !== null,
       root.representedWorkspaceGrouped())
     root.feedbackTitle = ""
@@ -906,14 +904,6 @@ PopupWindow {
   }
 
   function controlPageActions() {
-    if (root.sidebarHeaderMenu) return [
-      DockMenuModel.headerRecord("sidebar-controls:header", "Sidebar", ""),
-      DockMenuModel.actionRecord("sidebar-controls:settings", "Dockrail Settings…",
-        "settings", true, "open-settings", null),
-      DockMenuModel.actionRecord("sidebar-controls:switch", "Switch to dock",
-        "panel-bottom", true, "switch-presentation", null,
-        { destination: "classic" })
-    ]
     return [
       DockMenuModel.headerRecord("controls:header", "Dock Controls", ""),
       DockMenuModel.actionRecord(
@@ -1018,7 +1008,7 @@ PopupWindow {
   function baselinePageActions() {
     if (root.sidebarMode && root.workspaceContext)
       return root.page === "sidebar-monitors" ? root.sidebarMonitorActions() : root.sidebarWorkspaceActions()
-    if (root.controlItem || root.sidebarHeaderMenu || root.page === "controls")
+    if (root.controlItem || root.page === "controls")
       return root.controlPageActions()
     if (root.page === "window") return root.windowPageActions()
     if (root.page === "chooser") return root.chooserPageActions()
