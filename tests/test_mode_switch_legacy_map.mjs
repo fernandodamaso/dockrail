@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import vm from 'node:vm'
 import {hostHarness,loadModel,plain} from './host_harness.mjs'
-import {qmlMethods} from './sidebar_interaction_fixture.mjs'
+
+// Execute the two production Settings methods without parsing child QML markup.
+function settingsMethods(state) {
+  const source = fs.readFileSync(new URL('../components/DockSettingsLayout.qml', import.meta.url), 'utf8')
+  const methods = [...source.matchAll(/^  function (?:report|chooseMonitor)\([^]*?^  }/gm)]
+    .map(match => match[0])
+  assert.equal(methods.length, 2)
+  const context = vm.createContext({console, ...state})
+  context.root = context
+  vm.runInContext(methods.join('\n'), context, {filename:'DockSettingsLayout.qml'})
+  return context
+}
 
 const ScreenModel = loadModel('DockScreenPresentationModel')
 const Registry = loadModel('DockSettingsRegistry')
@@ -39,7 +52,7 @@ expectOneWrite(drag, 'sidebar')
 // Settings -> actual DockSettingsLayout method, not a separately implemented writer.
 const settings = fixture()
 let notifications = 0
-const layout = qmlMethods('DockSettingsLayout.qml', {
+const layout = settingsMethods( {
   host: settings.host, Registry, writerBusy:false, feedback:'',
   changed() { notifications++ }
 })
@@ -50,7 +63,7 @@ expectOneWrite(settings, 'sidebar')
 
 // Settings reset to inherited/default is likewise able to repair a junk legacy map.
 const reset = fixture()
-const resetLayout = qmlMethods('DockSettingsLayout.qml', {
+const resetLayout = settingsMethods( {
   host:reset.host,Registry,writerBusy:false,feedback:'',changed(){}
 })
 assert.equal(resetLayout.chooseMonitor('DP-2','default',token(reset.host,'DP-2')), true)
@@ -72,7 +85,7 @@ for (const invalid of [null, []]) {
   assert.equal(dragBad.writes.length,1)
 
   const settingsBad = fixture(invalid)
-  const layoutBad = qmlMethods('DockSettingsLayout.qml',{
+  const layoutBad = settingsMethods({
     host:settingsBad.host,Registry,writerBusy:false,feedback:'',changed(){}
   })
   assert.equal(layoutBad.chooseMonitor('DP-1','sidebar',token(settingsBad.host)),true)
