@@ -118,9 +118,12 @@ function workspaceIdentity(workspace) {
   }
 
   var ipc = workspace.lastIpcObject || workspace
-  var name = String(ipc.name !== undefined ? ipc.name : workspace.name || "").trim()
-  var id = Number(ipc.id !== undefined ? ipc.id : workspace.id)
+  // Native properties follow rename/renumber events before the IPC snapshot.
+  var name = String(workspace.name !== undefined ? workspace.name : ipc.name || "").trim()
+  var id = Number(workspace.id !== undefined ? workspace.id : ipc.id)
   if (name.indexOf("special:") === 0) return name
+  // Quickshell early-init placeholders (id -1) for numbered workspaces alias the real one.
+  if (id === -1 && /^[1-9][0-9]*$/.test(name)) return "id:" + String(Number(name))
   if (Number.isInteger(id) && id > 0) return "id:" + id
   if (name) return name.indexOf("name:") === 0 ? name : "name:" + name
   return ""
@@ -376,7 +379,7 @@ function shouldRefreshWindowScope(eventName) {
     "openwindow", "closewindow", "movewindow", "movewindowv2",
     "workspace", "workspacev2", "createworkspace", "createworkspacev2",
     "destroyworkspace", "destroyworkspacev2", "moveworkspace", "moveworkspacev2",
-    "renameworkspace", "focusedmon", "focusedmonv2", "configreloaded",
+    "renameworkspace", "changeworkspaceid", "focusedmon", "focusedmonv2", "configreloaded",
     "activewindow", "activewindowv2", "fullscreen", "urgent", "pin",
     "monitoradded", "monitoraddedv2", "monitorremoved", "monitorremovedv2"
   ].indexOf(String(eventName || "")) >= 0

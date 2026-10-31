@@ -105,7 +105,9 @@ Item {
       var name = String(
         ipc.name !== undefined ? ipc.name : workspace.name || "").trim()
       if (!name || name.indexOf("special:") === 0) return ""
-      target = name.indexOf("name:") === 0 ? name : "name:" + name
+      // Numbered Quickshell placeholders (id -1) alias the real workspace.
+      if (id === -1 && /^[1-9][0-9]*$/.test(name)) target = name
+      else target = name.indexOf("name:") === 0 ? name : "name:" + name
     }
     return DockModel.normalizeWorkspaceTarget(target)
   }
@@ -338,6 +340,8 @@ Item {
       var descriptor = workspaces[i]
       if (!descriptor || DockWindowModel.workspaceIdentity(descriptor) !== identity) continue
       var ipc = descriptor.lastIpcObject || descriptor
+      // Unhydrated Quickshell placeholders carry no authoritative owner.
+      if (descriptor.id === -1 && descriptor.lastIpcObject && Object.keys(ipc).length === 0) continue
       if (identity.indexOf("name:") === 0) {
         var name = String(ipc.name !== undefined ? ipc.name : descriptor.name || "")
         if ((name.indexOf("name:") === 0 ? name : "name:" + name) !== target) return null
