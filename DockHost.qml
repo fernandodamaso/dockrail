@@ -723,7 +723,9 @@ Item {
         "Hyprland has no focused monitor; no presentation was changed.")
     var current = currentPresentation()
     var entry = ScreenPresentationModel.entryFor(current, connector)
-    if (!entry)
+    // During hotplug Quickshell may still list a screen Hyprland has removed.
+    // Require the connector in both inventories before applying a shortcut.
+    if (!entry || !DockWindowModel.monitorForScreen(entry.screen, hyprMonitors))
       return dockControl.failure("E_STALE",
         "The focused monitor is not a connected Dockrail output; no presentation was changed.")
     var destination = entry.mode === "sidebar" ? "classic" : "sidebar"

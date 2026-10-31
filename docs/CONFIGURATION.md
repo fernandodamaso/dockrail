@@ -71,8 +71,6 @@ Defaults below are JSON literals. `tests/test_cli_docs.py` checks these 58 rows 
 | `hiddenApplications` | `[]` | Safe desktop ID array with no new canonical duplicates; independent of pins and retained by preference reset. |
 | `pinned` | `["org.gnome.Nautilus","com.google.Chrome","com.mitchellh.ghostty","code","obsidian","chatgpt"]` | Ordered safe desktop ID array, including unavailable/hidden apps; no new canonical duplicates; retained by preference reset. |
 
-For a focused-monitor keyboard toggle, use `dockrail mode toggle`; it updates only the Hyprland-focused output through the existing host writer. Opt-in Omarchy keybinding instructions are in [CLI_REFERENCE.md](CLI_REFERENCE.md#focused-monitor-presentation-shortcut).
-
 ## Requested, effective and rendered
 
 Requested settings retain accepted intent: `hoverGlowOpacity: 0.72` projects to 0.70, `hoverGlowRadius: 28` to 30, and `backgroundOpacity: 0.88` to 0.90. A requested grouped layout survives moving to a vertical edge; effective layout becomes flat and effective workspaceMonitorScope becomes all. Auto-hide makes effective reserveSpace false without rewriting the requested value. New pointer writes require canonical values; stored legacy `focus`/`launch` aliases read effectively as `focus-or-launch` without an unrelated rewrite. Stored legacy `groupWindows: true` remains visible in requested readback but its effective value is always false; no startup rewrite or automatic local-group migration occurs. Use `workspaceGroups` or the context-menu **Group Windows** action instead.
