@@ -393,4 +393,17 @@ assert.equal(DockWindowModel.workspaceIdentity({ id: -1, name: '11', lastIpcObje
 assert.equal(DockWindowModel.workspaceIdentity({ id: -1, name: 'Design', lastIpcObject: {} }),
   'name:Design')
 
+// Live incident: focusedmon gave the placeholder another monitor than the real 11.
+const crossPlaceholder = { id: -1, name: '11', monitor: right, lastIpcObject: {} }
+const crossed = WorkspaceModel.buildWorkspacePresentation(
+  [app('alias-a', aliasWindowA)],
+  [record(aliasWindowA, DockWindowModel.workspaceIdentity(crossPlaceholder), 'id:0')],
+  [crossPlaceholder, real11], {
+    monitorScope: 'all', monitor: 'id:0', activeWorkspace: 'id:1',
+    monitors, groupWindows: true
+  })
+const crossedGroups = crossed.groups.filter(g => g.label === '11' || g.identity === 'id:11')
+assert.equal(crossedGroups.length, 1, 'a cross-monitor placeholder still collapses into workspace 11')
+assert.equal(crossedGroups[0].monitorIdentity, 'id:0', 'the real workspace owner wins')
+
 console.log('workspace monitor model: PASS')
