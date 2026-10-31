@@ -44,10 +44,11 @@ const settingsChanged = dock.match(/^  onSettingsChanged: \{(.*)\}$/m)?.[1];
 assert.ok(settingsChanged);
 const reloadCalls = [];
 vm.runInNewContext(settingsChanged, { root: {
+  cancelGroupedPinReorder() { reloadCalls.push(['cancel-pin-drag']); },
   cancelWorkspaceGesture(reason) { reloadCalls.push(['cancel', reason]); },
   scheduleVisibleItemsRefresh() { reloadCalls.push(['refresh']); },
 } });
-assert.deepEqual(reloadCalls, [['cancel', 'settings changed'], ['refresh']]);
+assert.deepEqual(reloadCalls, [['cancel-pin-drag'], ['cancel', 'settings changed'], ['refresh']]);
 assert.match(dock, /onApplicationSelected: desktopId => root\.pinRequested\(desktopId\)/);
 for (const component of ['DockWindowPreview', 'DockAppPicker', 'DockTrashItem', 'DockWorkspaceStrip'])
   assert.match(dock, new RegExp('\\b' + component + '\\s*\\{'));
