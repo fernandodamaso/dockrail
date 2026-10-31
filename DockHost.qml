@@ -696,17 +696,14 @@ Item {
       return { accepted: false, pending: false,
         reply: dockControl.failure("E_STALE",
           "Preference changed after the interaction started; refresh before retrying.") }
-    // Copy the live map — never a captured one — and touch only this gesture's
-    // connector. Disconnected entries and foreign overrides are preserved; the
-    // writer's stale check compares against that same live map.
+    // Preserve the existing mode-switch contract shared by menu, drag and
+    // Settings: normalize malformed legacy values before constructing a new
+    // validated map. Do not turn a shortcut-only hardening change into a
+    // rejection for unrelated, disconnected invalid entries.
+    // The writer's stale check still compares the entire live raw value.
     var expected = settings.presentationModeByMonitor
-    if (!ConfigModel.isObject(expected))
-      return { accepted: false, pending: false,
-        reply: dockControl.failure("E_CONFIG_INVALID",
-          "Stored monitor overrides are invalid; repair them before changing presentation.") }
-    // Do not silently discard invalid legacy or disconnected entries.
-    // Validation rejects malformed retained values instead of erasing them.
-    var nextMap = Object.assign(Object.create(null), expected)
+    var nextMap = Object.assign({},
+      DockModel.normalizeSetting("presentationModeByMonitor", expected))
     if (mode === "default") delete nextMap[name]
     else nextMap[name] = mode
     return saveSettingIntent("presentationModeByMonitor", nextMap, expected)

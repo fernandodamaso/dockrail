@@ -96,21 +96,30 @@ assert.match(failed.host.modeGestureDisplayFor('DP-1'), /Unsaved preferences/)
 assert.equal(failed.host.modeGestureDisplayFor('DP-2'), '',
   'shortcut save failure must not show on other monitors')
 
-const legacy = hostHarness({presentationModeByMonitor: {'OLD-DP': 'unknown-mode'}})
+// Historical switch behavior: malformed/disconnected entries normalize away,
+ // rather than blocking unrelated monitor operations. Raw expected values still
+ // participate in the writer's stale-state comparison.
+const legacy = hostHarness({presentationModeByMonitor: {
+  'OLD-DP': 'unknown-mode', 'HDMI-A-1': 'classic'
+}})
 legacy.host.connectedScreens = [{name: 'DP-1'}]
 legacy.host.hyprMonitors = [{name: 'DP-1', x: 0}]
 legacy.host.focusedHyprlandMonitor = {name: 'DP-1'}
 reply = legacy.request('mode.toggle')
-assert.equal(reply.ok, false)
-assert.equal(reply.error.code, 'E_VALIDATION')
-assert.equal(legacy.writes.length, 0, 'malformed legacy override must not be erased')
-assert.equal(legacy.host.settings.presentationModeByMonitor['OLD-DP'], 'unknown-mode')
+assert.equal(reply.ok, true)
+assert.deepEqual(plain(legacy.host.settings.presentationModeByMonitor), {
+  'HDMI-A-1': 'classic', 'DP-1': 'sidebar'
+})
+assert.equal(legacy.writes.length, 1)
 
-const invalid = hostHarness({presentationModeByMonitor: []})
-invalid.host.connectedScreens = [{name: 'DP-1'}]
-invalid.host.hyprMonitors = [{name: 'DP-1', x: 0}]
-invalid.host.focusedHyprlandMonitor = {name: 'DP-1'}
-reply = invalid.request('mode.toggle')
-assert.equal(reply.error.code, 'E_CONFIG_INVALID')
-assert.equal(invalid.writes.length, 0)
+for (const malformed of [null, []]) {
+  const invalid = hostHarness({presentationModeByMonitor: malformed})
+  invalid.host.connectedScreens = [{name: 'DP-1'}]
+  invalid.host.hyprMonitors = [{name: 'DP-1', x: 0}]
+  invalid.host.focusedHyprlandMonitor = {name: 'DP-1'}
+  reply = invalid.request('mode.toggle')
+  assert.equal(reply.ok, true, 'invalid map must use the historical empty fallback')
+  assert.deepEqual(plain(invalid.host.settings.presentationModeByMonitor), {'DP-1': 'sidebar'})
+  assert.equal(invalid.writes.length, 1)
+}
 console.log('focused monitor mode toggle: PASS')
