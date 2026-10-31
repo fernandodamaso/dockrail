@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { hostHarness, loadModel } from './host_harness.mjs'
 import { qmlMethods } from './sidebar_interaction_fixture.mjs'
 
@@ -25,23 +26,14 @@ assert.equal(classicPopup.opened, 1)
 assert.equal(classicPopup.modeSwitchToken.connector, 'DP-1',
   'the dock menu captures its own connector token when opened')
 
-const sidebarPopup = { modeSwitchToken: null, opened: 0,
-  open() { this.opened++ } }
-const headerButton = { visible: true }
-const sidebarPanel = qmlMethods('DockSidebar.qml', {
-  host, screen: { name: 'DP-1' }, controller: { interactionBusy: false },
-  headerMenuButton: headerButton, sidebarContext: sidebarPopup,
-  modeGestureToken: tokenFor('DP-1')
-})
-assert.equal(sidebarPanel.openHeaderMenu(), true)
-assert.equal(sidebarPopup.opened, 1)
-assert.equal(sidebarPanel.menuAnchor, headerButton)
-assert.equal(sidebarPopup.modeSwitchToken.connector, 'DP-1',
-  'the sidebar header menu captures its own connector token when opened')
+const sidebarSource = readFileSync(new URL('../components/DockSidebar.qml', import.meta.url), 'utf8')
+assert.doesNotMatch(sidebarSource, /id: headerMenuButton|tooltipText: "Sidebar menu"|function openHeaderMenu/)
+assert.match(sidebarSource, /id: settingsGear[\s\S]*?tooltipText: "Dockrail Settings"/,
+  'expanded sidebar keeps its direct Settings control')
 
 let switchObservedDismissed = false
 const menu = qmlMethods('DockContextMenu.qml', {
-  DockMenuModel, DockModel, controlItem: true, sidebarHeaderMenu: false,
+  DockMenuModel, DockModel, controlItem: true,
   autoHide: false, sidebarMode: false, page: 'controls',
   pageStack: [], herdrMenuRecords: [], activeMenuIndex: -1,
   setActiveMenuIndex() {}, dismiss() {},
@@ -76,18 +68,8 @@ assert.deepEqual(JSON.parse(modeWrites()[0]).presentationModeByMonitor,
   { 'DP-1': 'sidebar', 'DP-2': 'sidebar', 'HDMI-A-1': 'classic' },
   'the menu retains other connected and disconnected connector overrides')
 
-menu.controlItem = false
-menu.sidebarHeaderMenu = true
-menu.sidebarMode = true
-menu.modeSwitchToken = tokenFor('DP-1')
-selectSwitch('Switch to dock', 'panel-bottom', 'classic')
-assert.equal(modeWrites().length, 2, 'the reverse menu activation writes once')
-assert.deepEqual(JSON.parse(modeWrites()[1]).presentationModeByMonitor,
-  { 'DP-1': 'classic', 'DP-2': 'sidebar', 'HDMI-A-1': 'classic' })
-
-const staleToken = menu.modeSwitchToken
-selectSwitch('Switch to dock', 'panel-bottom', 'classic')
-assert.equal(modeWrites().length, 2, 'a stale menu action does not write')
+selectSwitch('Switch to sidebar', 'panel-left-open', 'sidebar')
+assert.equal(modeWrites().length, 1, 'a stale menu action does not write')
 assert.match(host.modeGestureFeedbackFor('DP-1'), /Preferences were not saved/)
 assert.equal(host.modeGestureDisplayFor('DP-2'), '',
   'the existing feedback for a rejected action stays on its source monitor')
@@ -121,4 +103,4 @@ failed.host.handlePositionRequest('DP-2', 'left', 'bottom', dragToken)
 assert.match(failed.host.modeGestureDisplayFor('DP-2'), /Unsaved preferences/,
   'a later drag retains the existing host-wide persistence feedback')
 
-console.log('presentation menu model and monitor-scoped writes: PASS')
+console.log('classic presentation menu and monitor-scoped writes: PASS')
