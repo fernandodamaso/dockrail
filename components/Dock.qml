@@ -1104,7 +1104,7 @@ PanelWindow {
     root.cancelWorkspaceGesture("surface hidden")
   }
   onDockShownChanged: if (!dockShown && workspaceMonitorDrag && workspaceMonitorDrag.active && workspaceMonitorDrag.hoveredTarget === root) workspaceMonitorDrag.cancel("destination hidden")
-  onPinnedChanged: { root.cancelGroupedPinReorder(); root.scheduleVisibleItemsRefresh() }
+  onPinnedChanged: root.scheduleVisibleItemsRefresh()
   onWorkspaceMonitorScopeChanged: root.scheduleVisibleItemsRefresh()
   onWorkspaceMonitorOrderChanged: root.scheduleVisibleItemsRefresh()
   onFocusedScopeWorkspaceChanged: root.scheduleVisibleItemsRefresh()
