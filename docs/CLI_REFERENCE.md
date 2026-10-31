@@ -293,7 +293,7 @@ prints nothing, always exits 0). Errors exit 2 with a one-line message, or
 
 ## Focused-monitor presentation shortcut
 
-`dockrail mode toggle [--json]` switches **Hyprland's focused, connected
+`mode toggle` (`dockrail mode toggle [--json]`) switches **Hyprland's focused, connected
 output** from `classic` to `sidebar`, or vice versa. It uses the selected
 running host; use `--runtime` or `--instance` when multiple hosts exist.
 The client passes no connector argument and never edits configuration.
