@@ -255,6 +255,7 @@ const lifecycle = vm.createContext({
   visibleItemsRefreshTimer: { restart() { events.push(['restart']) }, stop() { events.push(['stop']) } },
   windowPreview: { dismissImmediately() { events.push(['dismiss']) } },
   cancelWorkspaceGesture(reason) { events.push(['cancel', reason]) },
+  cancelGroupedPinReorder() {},
   workspaceMonitorDrag: { unregisterDock() { events.push(['unregister']) } },
   badgeTracker: { syncWorkspaceScopes(owner, items) { events.push(['badges', owner, plain(items)]) } },
   screen: { name: 'DP-1' }, grouped: false
