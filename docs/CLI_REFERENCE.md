@@ -219,7 +219,7 @@ Every response uses `apiVersion: 1`, Boolean `ok`, object `data`, array `warning
 | 3 | `E_RUNTIME_NOT_FOUND`, `E_RUNTIME_AMBIGUOUS` | Discover/choose the intended exact host; do not start one automatically. |
 | 4 | `E_PERSISTENCE`, `E_EXPORT` | Inspect live state and save/export error; a live change can remain unsaved. |
 | 5 | `E_TRANSPORT`, `E_PROTOCOL`, `E_TIMEOUT` | Verify installed compatibility and selected-host state; applied outcome can be unknown. |
-| 6 | `E_BUSY`, `E_CONFIG_INVALID` | Re-read once pending work settles, or explicitly repair the invalid file; do not replace defaults or retry forever. |
+| 6 | `E_BUSY`, `E_CONFIG_INVALID`, `E_STALE` | Re-read once pending work settles, explicitly repair an invalid file, or retry only after resolving a stale/disconnected focused-monitor target; do not replace defaults or retry forever. |
 
 ## Installation and lifecycle boundary
 
