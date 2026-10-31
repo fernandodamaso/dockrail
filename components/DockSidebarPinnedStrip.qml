@@ -77,7 +77,9 @@ Item {
     var point = pinArea.mapFromItem(null, scenePoint.x, scenePoint.y)
     // Dropping outside the pin shelf cancels the reorder, not a window action.
     if (point.x < 0 || point.x >= pinArea.width
-        || point.y < 0 || point.y >= pinArea.height) {
+        || point.y < 0 || point.y >= pinArea.height
+        || (root.hiddenCount > 0
+          && point.x >= root.visibleCount * (root.cell + root.pinGap))) {
       root.dragTargetIndex = -1
       return
     }
