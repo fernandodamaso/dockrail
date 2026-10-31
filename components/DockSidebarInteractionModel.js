@@ -448,6 +448,16 @@ function pinnedStripLayout(rowWidth, pinCount, tileWidth, addWidth, gap) {
   return { slots: slots, visible: visible, hidden: count - visible }
 }
 
+// Center-nearest visible pin; the overflow button and add action are not targets.
+function pinnedStripDragTargetIndex(pointerX, visibleCount, tileWidth, gap) {
+  var count = Math.max(0, Math.floor(Number(visibleCount) || 0))
+  var x = Number(pointerX)
+  if (count === 0 || !isFinite(x)) return -1
+  var tile = Math.max(1, Number(tileWidth) || 1)
+  var step = tile + Math.max(0, Number(gap) || 0)
+  return Math.max(0, Math.min(count - 1, Math.round((x - tile / 2) / step)))
+}
+
 // ListView inline anchors dismiss on leave/destroy; footer anchors may reanchor.
 function pickerAnchorDecision(anchor, options) {
   var opts = options || {}

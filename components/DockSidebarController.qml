@@ -87,6 +87,9 @@ Item {
   property string widgetPopupId: ""
   property Item widgetPopupAnchor: null
   property string widgetDragId: ""
+  // One shared gesture across mirrored panels; no new settings writer.
+  property string pinDragKey: ""
+  readonly property bool pinReorderActive: pinDragKey !== ""
   readonly property bool widgetReorderActive: widgetDragId !== ""
   // Widget work follows actual sidebar membership, never the global default:
   // in a mixed layout only the outputs showing a sidebar may lease widgets.
@@ -230,6 +233,45 @@ Item {
     return root.setWidgetCollapsed(id, !root.widgetCollapsedFor(id))
   }
 
+  function beginPinReorder(key) {
+    if (root.interactionBusy || root.resizeActive || root.rowDragActive
+        || root.widgetReorderActive) return false
+    var wanted = String(key || "")
+    if (!wanted || !(root.projection.launchers || []).some(function(pin) {
+      return String(pin.key || "") === wanted
+    })) return false
+    root.pinDragKey = wanted
+    root.interactionBusy = true
+    return true
+  }
+
+  function finishPinReorder(targetKey, cancelled) {
+    var sourceKey = root.pinDragKey
+    root.pinDragKey = ""
+    if (!root.resizeActive && !root.rowDragActive && !root.widgetReorderActive
+        && !root.widgetPopupId) root.interactionBusy = false
+    var noChange = {accepted:true,pending:false,noop:true,
+      reply:{ok:true,data:{applied:false,changedKeys:[]},warnings:[]}}
+    if (!sourceKey || cancelled === true || !targetKey || sourceKey === targetKey)
+      return noChange
+    var pins = root.projection.launchers || []
+    var source = pins.find(function(pin) { return String(pin.key || "") === sourceKey })
+    var target = pins.find(function(pin) { return String(pin.key || "") === targetKey })
+    if (!source || !target || !source.desktopId || !target.desktopId) return noChange
+    var reply = root.host.reorderPinned(source.desktopId, target.desktopId)
+    var applied = !!(reply && reply.data && reply.data.applied === true)
+    var accepted = !!(reply && (reply.ok || applied))
+    root.mutationFeedback = accepted ? ""
+      : String(reply && reply.error && reply.error.message || "Pinned order was not saved.")
+    return {accepted:accepted,
+      pending:applied && !reply.ok && reply.error && reply.error.code === "E_BUSY",
+      reply:reply}
+  }
+
+  function cancelPinReorder() {
+    if (root.pinDragKey) root.finishPinReorder("", true)
+  }
+
   function beginWidgetReorder(id) {
     if (root.interactionBusy || root.resizeActive || root.rowDragActive)
       return false
@@ -323,6 +365,7 @@ Item {
     root.syncWidgets()
   }
   onSurfaceInvalidated: {
+    root.cancelPinReorder()
     root.closeWidgetPopup()
     root.cancelWidgetReorder()
   }
@@ -1340,6 +1383,7 @@ Item {
   }
 
   onSettingsChanged: {
+    root.cancelPinReorder()
     if (root.resizePreferenceConflict()) root.cancelResize("preference-conflict")
     root.syncWidgets()
     root.scheduleRefresh()
@@ -1363,11 +1407,15 @@ Item {
   // captured the previous host mapping, then refresh with the busy flag cleared
   // so selectScreens resolves the new pin instead of preserving the old set.
   onSidebarMonitorPinChanged: {
+    root.cancelPinReorder()
     root.cancelResize("host-changed")
     root.cancelRowDrag("host-changed")
     root.scheduleRefresh()
   }
-  onScreensChanged: root.refresh()
+  onScreensChanged: {
+    root.cancelPinReorder()
+    root.refresh()
+  }
   onMonitorsChanged: root.scheduleRefresh()
   onWorkspacesChanged: root.scheduleRefresh()
   onApplicationsChanged: root.scheduleRefresh()

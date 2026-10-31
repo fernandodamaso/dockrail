@@ -50,6 +50,82 @@ Item {
   property bool overflowOpen: false
   property bool overflowOpenedByKeyboard: false
   property double overflowDismissedAt: 0
+  property string dragSourceKey: ""
+  property int dragSourceIndex: -1
+  property int dragTargetIndex: -1
+  property var dragOrderKeys: []
+
+  function pinKeys() {
+    return (root.pins || []).map(function(pin) { return String(pin.key || "") })
+  }
+
+  function beginPinDrag(key) {
+    if (root.collapsed || root.overflowOpen || root.dragSourceKey) return false
+    var index = root.pinKeys().indexOf(key)
+    if (index < 0 || index >= root.visibleCount
+        || !root.controller.beginPinReorder(key)) return false
+    root.dragSourceKey = key
+    root.dragSourceIndex = index
+    root.dragTargetIndex = index
+    root.dragOrderKeys = root.pinKeys()
+    root.close()
+    return true
+  }
+
+  function updatePinDrag(scenePoint) {
+    if (!root.dragSourceKey) return
+    var point = pinArea.mapFromItem(null, scenePoint.x, scenePoint.y)
+    // Dropping outside the pin shelf cancels the reorder, not a window action.
+    if (point.x < 0 || point.x >= pinArea.width
+        || point.y < 0 || point.y >= pinArea.height) {
+      root.dragTargetIndex = -1
+      return
+    }
+    root.dragTargetIndex = InteractionModel.pinnedStripDragTargetIndex(
+      point.x, root.visibleCount, root.cell, root.pinGap)
+  }
+
+  function dragShift(index) {
+    if (root.dragSourceIndex < 0 || root.dragTargetIndex < 0) return 0
+    var step = root.cell + root.pinGap
+    if (root.dragSourceIndex < root.dragTargetIndex
+        && index > root.dragSourceIndex && index <= root.dragTargetIndex) return -step
+    if (root.dragSourceIndex > root.dragTargetIndex
+        && index >= root.dragTargetIndex && index < root.dragSourceIndex) return step
+    return 0
+  }
+
+  function cancelPinDrag() {
+    var owned = root.dragSourceKey !== ""
+      && root.controller.pinDragKey === root.dragSourceKey
+    root.dragSourceKey = ""
+    root.dragSourceIndex = -1
+    root.dragTargetIndex = -1
+    root.dragOrderKeys = []
+    if (owned) root.controller.cancelPinReorder()
+  }
+
+  function finishPinDrag() {
+    if (!root.dragSourceKey) return
+    var target = root.dragTargetIndex >= 0 && root.dragTargetIndex < root.visibleCount
+      ? root.pins[root.dragTargetIndex] : null
+    var key = target ? String(target.key || "") : ""
+    var owned = root.controller.pinDragKey === root.dragSourceKey
+    root.dragSourceKey = ""
+    root.dragSourceIndex = -1
+    root.dragTargetIndex = -1
+    root.dragOrderKeys = []
+    if (owned) root.controller.finishPinReorder(key, !key)
+  }
+
+  Keys.onEscapePressed: function(event) {
+    if (!root.dragSourceKey) return
+    root.cancelPinDrag()
+    event.accepted = true
+  }
+  onVisibleCountChanged: if (root.dragSourceKey) root.cancelPinDrag()
+  onVisibleChanged: if (!visible) root.cancelPinDrag()
+  Component.onDestruction: root.cancelPinDrag()
 
   HoverHandler { cursorShape: Qt.ArrowCursor }
   // Hidden pin whose context menu is open. The popup closes when the menu
@@ -106,10 +182,13 @@ Item {
   }
 
   onHiddenCountChanged: if (hiddenCount === 0) close()
-  onCollapsedChanged: if (collapsed) close()
-  onWidthChanged: shownKeys = (pins || []).slice(0, visibleCount).map(function(pin) {
-    return String(pin.key || "")
-  })
+  onCollapsedChanged: if (collapsed) { close(); cancelPinDrag() }
+  onWidthChanged: {
+    if (root.dragSourceKey) root.cancelPinDrag()
+    shownKeys = (pins || []).slice(0, visibleCount).map(function(pin) {
+      return String(pin.key || "")
+    })
+  }
   onOverflowOpenChanged: {
     if (!overflowOpen) return
     Qt.callLater(function() {
@@ -214,7 +293,12 @@ Item {
     })
   }
 
-  onPinsChanged: syncDisplay()
+  onPinsChanged: {
+    if (root.dragSourceKey
+        && JSON.stringify(root.pinKeys()) !== JSON.stringify(root.dragOrderKeys))
+      root.cancelPinDrag()
+    syncDisplay()
+  }
   Component.onCompleted: {
     syncDisplay()
     root.stripReady = true
@@ -222,6 +306,10 @@ Item {
   Connections {
     target: root.controller
     function onRefreshed() { root.syncDisplay() }
+    function onPinDragKeyChanged() {
+      if (root.dragSourceKey && root.controller.pinDragKey !== root.dragSourceKey)
+        root.cancelPinDrag()
+    }
   }
 
   Ui.PanelSeparator {
@@ -295,6 +383,17 @@ Item {
           width: root.cell
           height: root.cellHeight
           x: (exiting && exitSlot >= 0 ? exitSlot : index) * (root.cell + root.pinGap)
+          z: pinDrag.active ? 2 : 0
+          transform: Translate {
+            x: pinDrag.active && root.dragSourceKey === pinCell.rowKey
+              ? pinDrag.activeTranslation.x : root.dragShift(pinCell.index)
+            y: pinDrag.active && root.dragSourceKey === pinCell.rowKey
+              ? pinDrag.activeTranslation.y : 0
+            Behavior on x {
+              enabled: root.animationsEnabled && !pinDrag.active
+              NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+            }
+          }
           transformOrigin: Item.Center
           opacity: exiting ? 0 : (settled ? 1 : 0)
           scale: exiting ? 0.55 : (settled ? 1 : 0.55)
@@ -392,6 +491,37 @@ Item {
           }
 
           HoverHandler { id: pinHover }
+          DragHandler {
+            id: pinDrag
+            target: null
+            acceptedButtons: Qt.LeftButton
+            acceptedModifiers: Qt.NoModifier
+            cursorShape: Qt.ClosedHandCursor
+            enabled: !!pinCell.modelData && !pinCell.exiting
+              && pinCell.index < root.visibleCount && !root.collapsed
+              && (!root.controller.interactionBusy
+                || root.dragSourceKey === pinCell.rowKey)
+            onActiveChanged: {
+              if (active && root.beginPinDrag(pinCell.rowKey))
+                root.updatePinDrag(centroid.scenePosition)
+            }
+            onActiveTranslationChanged: {
+              if (active && root.dragSourceKey === pinCell.rowKey)
+                root.updatePinDrag(centroid.scenePosition)
+            }
+            // Qt drops active on cancellation too: only an actual release saves.
+            onGrabChanged: function(transition, point) {
+              if (transition === PointerDevice.UngrabExclusive
+                  && root.dragSourceKey === pinCell.rowKey)
+                root.finishPinDrag()
+              else if (transition === PointerDevice.CancelGrabExclusive
+                       || transition === PointerDevice.CancelGrabPassive)
+                if (root.dragSourceKey === pinCell.rowKey) root.cancelPinDrag()
+            }
+            onEnabledChanged: {
+              if (!enabled && root.dragSourceKey === pinCell.rowKey) root.cancelPinDrag()
+            }
+          }
           TapHandler {
             id: pinPress
             acceptedButtons: Qt.LeftButton
@@ -415,6 +545,7 @@ Item {
             anchorItem: pinCell
             position: "bottom"
             requestedVisible: pinHover.hovered && !root.controller.rowDragActive
+              && !root.controller.pinReorderActive
               && !!pinCell.modelData && !pinCell.exiting
             text: String((pinCell.modelData && (pinCell.modelData.label || pinCell.modelData.desktopId)) || "Pinned app")
               + (pinCell.modelData && pinCell.modelData.running ? " · Running" : "")

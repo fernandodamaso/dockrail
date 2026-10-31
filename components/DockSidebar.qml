@@ -132,14 +132,15 @@ PanelWindow {
     root.controller.interactionBusy = sidebarContext.visible || sidebarContext.iconDialogOpen
       || picker.visible || pinnedStrip.overflowOpen || root.controller.resizeActive
       || root.controller.rowDragActive || root.controller.widgetPopupId !== ""
-      || !!root.controller.widgetDragId || !!(root.host && root.host.iconDialogActive)
+      || !!root.controller.widgetDragId || root.controller.pinReorderActive
+      || !!(root.host && root.host.iconDialogActive)
   }
 
   function closeSurfaces() {
     sidebarContext.closeAll()
     root.headerMenuActive = false
     picker.visible = false
-    if (root.pinStrip) root.pinStrip.close()
+    if (root.pinStrip) { root.pinStrip.cancelPinDrag(); root.pinStrip.close() }
     sidebarViewport.cancelInputs("surface-close")
     root.controller.cancelResize("surface-close")
     // A dying or hidden panel must not carry a half-finished mode gesture.
