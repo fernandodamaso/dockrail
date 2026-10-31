@@ -32,8 +32,8 @@ expectOneWrite(menu, 'sidebar')
 
 // Drag -> same shared host request (the gesture's captured output identity wins).
 const drag = fixture()
-const dragReply = drag.host.handlePositionRequest('DP-1', 'left', 'bottom', token(drag.host))
-assert.equal(dragReply.accepted, true)
+const dragFeedback = drag.host.handlePositionRequest('DP-1', 'left', 'bottom', token(drag.host))
+assert.equal(dragFeedback, '', 'successful drag returns no error feedback')
 expectOneWrite(drag, 'sidebar')
 
 // Settings -> actual DockSettingsLayout method, not a separately implemented writer.
@@ -68,7 +68,7 @@ for (const invalid of [null, []]) {
 
   const dragBad = fixture(invalid)
   assert.equal(dragBad.host.handlePositionRequest(
-    'DP-1','left','bottom',token(dragBad.host)).accepted,true)
+    'DP-1','left','bottom',token(dragBad.host)), '')
   assert.equal(dragBad.writes.length,1)
 
   const settingsBad = fixture(invalid)
