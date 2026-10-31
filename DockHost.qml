@@ -700,8 +700,13 @@ Item {
     // connector. Disconnected entries and foreign overrides are preserved; the
     // writer's stale check compares against that same live map.
     var expected = settings.presentationModeByMonitor
-    var nextMap = Object.assign({},
-      DockModel.normalizeSetting("presentationModeByMonitor", expected))
+    if (!ConfigModel.isObject(expected))
+      return { accepted: false, pending: false,
+        reply: dockControl.failure("E_CONFIG_INVALID",
+          "Stored monitor overrides are invalid; repair them before changing presentation.") }
+    // Do not silently discard invalid legacy or disconnected entries.
+    // Validation rejects malformed retained values instead of erasing them.
+    var nextMap = Object.assign(Object.create(null), expected)
     if (mode === "default") delete nextMap[name]
     else nextMap[name] = mode
     return saveSettingIntent("presentationModeByMonitor", nextMap, expected)

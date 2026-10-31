@@ -79,4 +79,14 @@ assert.equal(reply.data.persisted, false)
 assert.match(failed.host.modeGestureDisplayFor('DP-1'), /Unsaved preferences/)
 assert.equal(failed.host.modeGestureDisplayFor('DP-2'), '',
   'shortcut save failure must not show on other monitors')
+
+const legacy = hostHarness({presentationModeByMonitor: {'OLD-DP': 'unknown-mode'}})
+legacy.host.connectedScreens = [{name: 'DP-1'}]
+legacy.host.hyprMonitors = [{name: 'DP-1', x: 0}]
+legacy.host.focusedHyprlandMonitor = {name: 'DP-1'}
+reply = legacy.request('mode.toggle')
+assert.equal(reply.ok, false)
+assert.equal(reply.error.code, 'E_VALIDATION')
+assert.equal(legacy.writes.length, 0, 'malformed legacy override must not be erased')
+assert.equal(legacy.host.settings.presentationModeByMonitor['OLD-DP'], 'unknown-mode')
 console.log('focused monitor mode toggle: PASS')
