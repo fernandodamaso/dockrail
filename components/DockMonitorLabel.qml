@@ -57,7 +57,7 @@ Item {
     anchors.leftMargin: Style.spacing.labelGap
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: String(root.monitorNumber)
+    text: root.monitorNumber > 0 ? String(root.monitorNumber) : "?"
     color: root.focused ? Color.foreground : Color.muted
     font.family: Style.font.family
     font.pixelSize: Style.font.body

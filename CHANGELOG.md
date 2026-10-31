@@ -14,6 +14,10 @@
 
 ### Fixed
 
+- Ghost and duplicate workspace sections no longer appear when workspaces are
+  destroyed or renumbered quickly. Quickshell can keep stale stand-in
+  workspaces (id -1) from late window-list replies; empty ones are now hidden,
+  and numbered ones merge into the real workspace with that number.
 - Claude Desktop hooks no longer break when the CLI is reinstalled from the
   Omarchy plugin. Installed commands use a stable CLI-owned hook script and
   `dockrail claude hooks status` reports a missing or stale script.
