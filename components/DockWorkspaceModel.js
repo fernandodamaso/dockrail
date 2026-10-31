@@ -345,9 +345,11 @@ function buildWorkspacePresentation(appItems, records, workspaces, context) {
     var workspaceIpc = workspaceDescriptor.lastIpcObject || workspaceDescriptor
     // Late client replies can recreate deleted workspaces as empty placeholders.
     // Live records below still keep real windows reachable during initialization.
-    if (workspaceDescriptor.id === -1 && !workspaceDescriptor.monitor
-        && workspaceDescriptor.lastIpcObject
-        && Object.keys(workspaceIpc).length === 0) continue
+    // Numbered placeholders alias the real workspace with that number, so drop them.
+    if (workspaceDescriptor.id === -1 && workspaceDescriptor.lastIpcObject
+        && Object.keys(workspaceIpc).length === 0
+        && (!workspaceDescriptor.monitor
+          || /^[1-9][0-9]*$/.test(String(workspaceDescriptor.name || "")))) continue
     var rawOwner = workspaceIpc.monitorID !== undefined ? workspaceIpc.monitorID
       : workspaceIpc.monitor !== undefined ? workspaceIpc.monitor : workspaceDescriptor.monitor
     var descriptorOwner = DockWindowModel.canonicalMonitorIdentity(rawOwner, context.monitors)

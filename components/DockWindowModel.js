@@ -122,6 +122,8 @@ function workspaceIdentity(workspace) {
   var name = String(workspace.name !== undefined ? workspace.name : ipc.name || "").trim()
   var id = Number(workspace.id !== undefined ? workspace.id : ipc.id)
   if (name.indexOf("special:") === 0) return name
+  // Quickshell early-init placeholders (id -1) for numbered workspaces alias the real one.
+  if (id === -1 && /^[1-9][0-9]*$/.test(name)) return "id:" + String(Number(name))
   if (Number.isInteger(id) && id > 0) return "id:" + id
   if (name) return name.indexOf("name:") === 0 ? name : "name:" + name
   return ""

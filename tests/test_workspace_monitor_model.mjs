@@ -364,4 +364,33 @@ assert.deepEqual(Array.from(capturedPresentation.groups, g => g.identity).sort()
 assert.equal(capturedPresentation.monitorGroups.length, 2,
   'the captured live cache renders exactly two real monitor sections')
 
+// Quickshell early-init placeholder aliases the real numbered workspace 11.
+const placeholder11 = { id: -1, name: '11', monitor: left, lastIpcObject: {} }
+const real11 = { id: 11, name: '11', monitor: left,
+  lastIpcObject: { id: 11, name: '11', monitorID: 0 } }
+const aliasWindowA = { appId: 'alias-a' }
+const aliasWindowB = { appId: 'alias-b' }
+const aliased = WorkspaceModel.buildWorkspacePresentation(
+  [app('alias-a', aliasWindowA), app('alias-b', aliasWindowB)],
+  [record(aliasWindowA, DockWindowModel.workspaceIdentity(placeholder11), 'id:0'),
+    record(aliasWindowB, DockWindowModel.workspaceIdentity(real11), 'id:0')],
+  [placeholder11, real11], {
+    monitorScope: 'all', monitor: 'id:0', activeWorkspace: 'id:1',
+    monitors, groupWindows: true
+  })
+const aliasGroups = aliased.groups.filter(g => g.label === '11' || g.identity === 'id:11')
+assert.equal(aliasGroups.length, 1, 'placeholder and real workspace 11 collapse to one section')
+assert.equal(aliasGroups[0].identity, 'id:11')
+assert.equal(aliasGroups[0].count, 2, 'both windows stay in the collapsed workspace 11 section')
+
+const aliasEmpty = WorkspaceModel.buildWorkspacePresentation([], [], [placeholder11], {
+  monitorScope: 'all', monitor: 'id:0', activeWorkspace: 'id:1',
+  monitors, groupWindows: true
+})
+assert.ok(!aliasEmpty.groups.some(g => ['id:11', 'name:11'].includes(g.identity)),
+  'empty numbered placeholder does not create a workspace 11 section')
+assert.equal(DockWindowModel.workspaceIdentity({ id: -1, name: '11', lastIpcObject: {} }), 'id:11')
+assert.equal(DockWindowModel.workspaceIdentity({ id: -1, name: 'Design', lastIpcObject: {} }),
+  'name:Design')
+
 console.log('workspace monitor model: PASS')
