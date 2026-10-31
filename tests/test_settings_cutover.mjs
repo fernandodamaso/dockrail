@@ -97,12 +97,12 @@ for (const [object, key, value] of [[scope.windowPointer, 'hovered', true],
   scope.updateAutoHideState();
   assert.equal(scope.keepAutoHideOpen, false, key);
 }
-assert.equal(stops, 9);
-assert.equal(restarts, 9);
+assert.equal(stops, 10);
+assert.equal(restarts, 10);
 scope.autoHide = false;
 scope.updateAutoHideState();
 assert.equal(scope.autoHideRevealed, false);
-assert.equal(stops, 10);
+assert.equal(stops, 11);
 
 // Requested values still reach the actual dock normalizers after preview state
 // is removed. Evaluate production binding expressions, not a copied normalizer.
