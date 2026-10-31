@@ -1088,11 +1088,7 @@ PanelWindow {
       root.cancelGroupedPinReorder()
   }
   onShowPreviewsChanged: if (!showPreviews) windowPreview.dismissImmediately()
-  onSettingsChanged: {
-    root.cancelGroupedPinReorder()
-    root.cancelWorkspaceGesture("settings changed")
-    root.scheduleVisibleItemsRefresh()
-  }
+  onSettingsChanged: { root.cancelGroupedPinReorder(); root.cancelWorkspaceGesture("settings changed"); root.scheduleVisibleItemsRefresh() }
   onPositionChanged: {
     root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("dock edge changed")
