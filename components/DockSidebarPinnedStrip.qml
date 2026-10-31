@@ -62,9 +62,14 @@ Item {
   function beginPinDrag(key) {
     if (root.collapsed || root.overflowOpen || root.dragSourceKey) return false
     var index = root.pinKeys().indexOf(key)
-    if (index < 0 || index >= root.visibleCount
-        || !root.controller.beginPinReorder(key)) return false
+    if (index < 0 || index >= root.visibleCount) return false
+    // Claim the local handler before the shared busy flag changes, otherwise
+    // enabled may turn false synchronously and cancel our exclusive grab.
     root.dragSourceKey = key
+    if (!root.controller.beginPinReorder(key)) {
+      root.dragSourceKey = ""
+      return false
+    }
     root.dragSourceIndex = index
     root.dragTargetIndex = index
     root.dragOrderKeys = root.pinKeys()
