@@ -135,7 +135,7 @@ assert.equal(reply.ok, true)
 assert.deepEqual(reply.data.modeSwitch, {connector: 'DP-2', from: 'unmapped', to: 'sidebar'})
 assert.deepEqual(plain(pinned.host.settings.presentationModeByMonitor), {'DP-2': 'sidebar'})
 assert.equal(pinned.host.settings.sidebarMonitor, 'DP-1', 'legacy pin is unchanged')
-assert.deepEqual(pinned.host.currentPresentation().sidebarScreens.map(s => s.name).sort(),
+assert.deepEqual(plain(pinned.host.currentPresentation().sidebarScreens.map(s => s.name).sort()),
   ['DP-1', 'DP-2'])
 reply = pinned.request('mode.toggle')
 assert.equal(reply.ok, true)
