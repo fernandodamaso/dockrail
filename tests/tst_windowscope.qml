@@ -329,7 +329,7 @@ TestCase {
       "openwindow", "closewindow", "movewindow", "movewindowv2",
       "workspace", "workspacev2", "createworkspace", "createworkspacev2",
       "destroyworkspace", "destroyworkspacev2", "moveworkspace", "moveworkspacev2",
-      "renameworkspace", "focusedmon", "focusedmonv2", "configreloaded",
+      "renameworkspace", "changeworkspaceid", "focusedmon", "focusedmonv2", "configreloaded",
       "urgent", "fullscreen", "monitoradded", "monitoraddedv2",
       "monitorremoved", "monitorremovedv2"
     ]

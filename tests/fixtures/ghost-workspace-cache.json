@@ -1,0 +1,100 @@
+{
+  "monitors": [
+    {
+      "id": 0,
+      "name": "HDMI-A-1",
+      "ipc": {
+        "id": 0,
+        "name": "HDMI-A-1",
+        "activeWorkspace": {
+          "id": 11,
+          "name": "11"
+        },
+        "focused": false,
+        "disabled": false,
+        "dpmsStatus": true
+      }
+    },
+    {
+      "id": 1,
+      "name": "DP-1",
+      "ipc": {
+        "id": 1,
+        "name": "DP-1",
+        "activeWorkspace": {
+          "id": 1,
+          "name": "1"
+        },
+        "focused": true,
+        "disabled": false,
+        "dpmsStatus": true
+      }
+    }
+  ],
+  "workspaces": [
+    {
+      "id": -1,
+      "name": "4",
+      "monitor": null,
+      "ipc": {}
+    },
+    {
+      "id": -1,
+      "name": "3",
+      "monitor": null,
+      "ipc": {}
+    },
+    {
+      "id": 1,
+      "name": "1",
+      "monitor": "DP-1",
+      "ipc": {
+        "id": 1,
+        "name": "1",
+        "monitorID": 1,
+        "monitor": "DP-1",
+        "windows": 1,
+        "ispersistent": true
+      }
+    },
+    {
+      "id": 2,
+      "name": "2",
+      "monitor": "DP-1",
+      "ipc": {
+        "id": 3,
+        "name": "3",
+        "monitorID": 1,
+        "monitor": "DP-1",
+        "windows": 1,
+        "ispersistent": false
+      }
+    },
+    {
+      "id": 11,
+      "name": "11",
+      "monitor": "HDMI-A-1",
+      "ipc": {
+        "id": 11,
+        "name": "11",
+        "monitorID": 0,
+        "monitor": "HDMI-A-1",
+        "windows": 1,
+        "ispersistent": false
+      }
+    },
+    {
+      "id": 99,
+      "name": "Work",
+      "monitor": "HDMI-A-1",
+      "ipc": {
+        "id": 99,
+        "name": "Work",
+        "monitorID": 0,
+        "monitor": "HDMI-A-1",
+        "windows": 0,
+        "ispersistent": true
+      }
+    }
+  ]
+}

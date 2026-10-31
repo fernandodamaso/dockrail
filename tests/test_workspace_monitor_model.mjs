@@ -288,4 +288,80 @@ assert.deepEqual(Array.from(currentMonitor.monitorGroups || []), [],
 assert.deepEqual(Array.from(currentMonitor.groups, group => group.identity), ['id:1', 'id:10'])
 assert.deepEqual(Array.from(currentMonitor.groups.filter(group => group.active), group => group.identity), ['id:1'])
 
+
+// Captured 2026-10-31: stale client responses recreate deleted/renumbered
+// workspaces as name-only Quickshell objects with no authoritative data.
+const orphan3 = { id: -1, name: '3', monitor: null, lastIpcObject: {} }
+const orphan4 = { id: -1, name: '4', monitor: null, lastIpcObject: {} }
+function buildWithOrphans(descriptors, items = [], locations = []) {
+  return WorkspaceModel.buildWorkspacePresentation(items, locations, descriptors, {
+    monitorScope: 'all', monitor: 'id:0', activeWorkspace: 'id:1', monitors,
+    groupWindows: true
+  })
+}
+const withoutGhosts = buildWithOrphans([orphan3, orphan4])
+assert.ok(!withoutGhosts.groups.some(g => ['name:3', 'name:4'].includes(g.identity)),
+  'uninitialized orphan descriptors cannot create empty workspace cards')
+assert.ok(!withoutGhosts.monitorGroups.some(g => !g.identity),
+  'orphan descriptors cannot create a phantom monitor section')
+
+const initializingWindow = { appId: 'initializing' }
+const initializing = buildWithOrphans([orphan3], [app('initializing', initializingWindow)],
+  [record(initializingWindow, 'name:3', '')])
+assert.equal(initializing.groups.find(g => g.identity === 'name:3')?.count, 1,
+  'a real window remains reachable while its workspace is uninitialized')
+assert.ok(initializing.monitorGroups.some(g => !g.identity),
+  'legitimate unresolved window ownership remains visible')
+
+const knownWindow = buildWithOrphans([orphan3], [app('initializing', initializingWindow)],
+  [record(initializingWindow, 'name:3', 'id:0')])
+assert.equal(knownWindow.groups.find(g => g.identity === 'name:3')?.monitorIdentity, 'id:0',
+  'a placeholder is not authoritative evidence against a known live owner')
+
+const initializingNumbered = buildWithOrphans([
+  { id: 8, name: '8', monitor: null, lastIpcObject: {} }
+])
+assert.ok(initializingNumbered.groups.some(g => g.identity === 'id:8'),
+  'new workspaces with a valid ID remain visible before hydration')
+const initializingNamed = buildWithOrphans([
+  { id: -1, name: 'Design', monitor: left, lastIpcObject: {} }
+])
+assert.equal(initializingNamed.groups.find(g => g.identity === 'name:Design')?.monitorIdentity, 'id:0',
+  'named workspaces with a known native monitor remain visible')
+const hydratedNamed = buildWithOrphans([
+  { id: -5, name: 'Design', monitor: null,
+    lastIpcObject: { id: -5, name: 'Design', monitorID: 0 } }
+])
+assert.equal(hydratedNamed.groups.find(g => g.identity === 'name:Design')?.monitorIdentity, 'id:0',
+  'hydrated named empty workspaces remain visible')
+
+assert.equal(DockWindowModel.shouldRefreshWindowScope('changeworkspaceid'), true,
+  'automatic workspace renumbering must refresh cached locations')
+
+const renumbered = { id: 2, name: '2', monitor: left,
+  lastIpcObject: { id: 3, name: '3', monitorID: 0 } }
+assert.equal(DockWindowModel.workspaceIdentity(renumbered), 'id:2',
+  'native workspace ID takes precedence over the older IPC snapshot after renumbering')
+const afterRenumber = buildWithOrphans([renumbered])
+assert.equal(afterRenumber.groups.find(g => g.identity === 'id:2')?.label, '2',
+  'workspace label also follows the native rename')
+assert.equal(DockWindowModel.workspaceIdentity({ id: -5, name: 'New name',
+  lastIpcObject: { id: -5, name: 'Old name' } }), 'name:New name')
+assert.equal(DockWindowModel.workspaceIdentity({ id: 2, name: '2',
+  lastIpcObject: { id: -7, name: 'special:old' } }), 'id:2')
+
+const capturedCache = JSON.parse(fs.readFileSync(
+  new URL('./fixtures/ghost-workspace-cache.json', import.meta.url), 'utf8'))
+const capturedPresentation = WorkspaceModel.buildWorkspacePresentation([], [],
+  capturedCache.workspaces.map(w => ({ ...w, lastIpcObject: w.ipc,
+    monitor: capturedCache.monitors.find(m => m.name === w.monitor) || null })), {
+    monitorScope: 'all', monitor: 'id:1', activeWorkspace: 'id:2',
+    monitors: capturedCache.monitors.map(m => ({ ...m, lastIpcObject: m.ipc }))
+  })
+assert.deepEqual(Array.from(capturedPresentation.groups, g => g.identity).sort(),
+  ['id:1', 'id:11', 'id:2', 'id:99'],
+  'the captured live cache renders only the four real workspaces')
+assert.equal(capturedPresentation.monitorGroups.length, 2,
+  'the captured live cache renders exactly two real monitor sections')
+
 console.log('workspace monitor model: PASS')
