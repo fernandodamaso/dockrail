@@ -73,7 +73,7 @@ let stops = 0, restarts = 0;
 const scope = vm.createContext({
   windowPointer: { hovered: false }, appPicker: { visible: false },
   windowPreview: { interactionActive: false }, positionDragSurface: { pressed: false },
-  openMenuCount: 0, dragSource: -1,
+  openMenuCount: 0, dragSource: -1, groupedPinSourceId: "",
   autoHide: true, autoHideRevealed: false, workspaceDragActive: false,
   workspaceMonitorDragSourceActive: false, dragRevealed: false,
   hideTimer: { stop() { stops++; }, restart() { restarts++; } },
