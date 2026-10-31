@@ -85,6 +85,7 @@ assert.equal(scope.keepAutoHideOpen, false);
 for (const [object, key, value] of [[scope.windowPointer, 'hovered', true],
   [scope.appPicker, 'visible', true], [scope.windowPreview, 'interactionActive', true],
   [scope, 'openMenuCount', 1], [scope, 'dragSource', 0],
+  [scope, 'groupedPinSourceId', 'org.A'],
   [scope, 'workspaceDragActive', true], [scope.positionDragSurface, 'pressed', true],
   [scope, 'workspaceMonitorDragSourceActive', true], [scope, 'dragRevealed', true]]) {
   const old = object[key];
