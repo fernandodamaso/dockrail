@@ -634,7 +634,7 @@ PanelWindow {
     ? compactMainExtent - groupedSurfaceTrim + groupedSurfaceGutter * 2 : compactMainExtent
   readonly property bool keepAutoHideOpen: windowPointer.hovered
     || appPicker.visible || openMenuCount > 0
-    || dragSource >= 0 || windowPreview.interactionActive || workspaceDragActive
+    || dragSource >= 0 || groupedPinSourceId !== "" || windowPreview.interactionActive || workspaceDragActive
     || workspaceMonitorDragSourceActive || positionDragSurface.pressed || dragRevealed
   readonly property bool dockShown: !autoHide || autoHideRevealed || dragRevealed
   readonly property real pointerPosition: !pointer.hovered
