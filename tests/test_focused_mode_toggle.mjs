@@ -63,11 +63,12 @@ assert.equal(reply.data.persisted, false)
 assert.equal(pending.writes.length, 1)
 reply = pending.request('mode.toggle')
 assert.equal(reply.error.code, 'E_BUSY')
+assert.equal(reply.data.modeSwitch, undefined, 'rejected intent must not claim a switch')
 assert.equal(pending.writes.length, 1, 'repeated shortcut is rejected while saving')
 
 const failed = hostHarness({})
-failed.host.connectedScreens = [{name: 'DP-1'}]
-failed.host.hyprMonitors = [{name: 'DP-1', x: 0}]
+failed.host.connectedScreens = [{name: 'DP-1'}, {name: 'DP-2'}]
+failed.host.hyprMonitors = [{name: 'DP-1', x: 0}, {name: 'DP-2', x: 1920}]
 failed.host.sidebarState = {mappedScreens: failed.host.connectedScreens, interactionBusy: false}
 failed.host.focusedHyprlandMonitor = {name: 'DP-1'}
 failed.fault.save = true
@@ -76,4 +77,6 @@ assert.equal(reply.ok, false)
 assert.equal(reply.error.code, 'E_PERSISTENCE')
 assert.equal(reply.data.persisted, false)
 assert.match(failed.host.modeGestureDisplayFor('DP-1'), /Unsaved preferences/)
+assert.equal(failed.host.modeGestureDisplayFor('DP-2'), '',
+  'shortcut save failure must not show on other monitors')
 console.log('focused monitor mode toggle: PASS')

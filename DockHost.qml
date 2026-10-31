@@ -723,9 +723,15 @@ Item {
         "The focused monitor is not a connected Dockrail output; no presentation was changed.")
     var destination = entry.mode === "sidebar" ? "classic" : "sidebar"
     var token = ScreenPresentationModel.modeGestureToken(current, connector)
+    // Scope a failed save to this output, as the existing menu switch does.
+    var previousOrigin = modeMenuWriteConnector
+    modeMenuWriteConnector = connector
     var outcome = monitorModeIntent(connector, destination, token)
-    setModeGestureFeedback(connector, DockModel.modeDragWriteError(outcome))
-    if (outcome.reply && outcome.reply.data)
+    var feedback = DockModel.modeDragWriteError(outcome)
+    setModeGestureFeedback(connector, feedback)
+    if (feedback) modeMenuWriteConnector = previousOrigin
+    // A rejected/busy preflight is only a proposal, not a mode switch.
+    if (outcome.accepted && outcome.reply && outcome.reply.data)
       outcome.reply.data.modeSwitch = {
         connector: connector, from: entry.mode, to: destination
       }
