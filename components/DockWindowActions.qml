@@ -338,6 +338,8 @@ Item {
       var descriptor = workspaces[i]
       if (!descriptor || DockWindowModel.workspaceIdentity(descriptor) !== identity) continue
       var ipc = descriptor.lastIpcObject || descriptor
+      // Unhydrated Quickshell placeholders carry no authoritative owner.
+      if (descriptor.id === -1 && descriptor.lastIpcObject && Object.keys(ipc).length === 0) continue
       if (identity.indexOf("name:") === 0) {
         var name = String(ipc.name !== undefined ? ipc.name : descriptor.name || "")
         if ((name.indexOf("name:") === 0 ? name : "name:" + name) !== target) return null
