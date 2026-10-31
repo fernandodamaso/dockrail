@@ -707,6 +707,31 @@ Item {
     return saveSettingIntent("presentationModeByMonitor", nextMap, expected)
   }
 
+  // A shortcut targets Hyprland's currently focused output, never the
+  // Settings panel's remembered connector or the first connected display.
+  // Reuse the same token guard and sole FileView writer as menu/drag switching.
+  function toggleFocusedMonitorMode() {
+    var focused = focusedHyprlandMonitor
+    var connector = focused ? String(focused.name || "").trim() : ""
+    if (!connector)
+      return dockControl.failure("E_RUNTIME_NOT_FOUND",
+        "Hyprland has no focused monitor; no presentation was changed.")
+    var current = currentPresentation()
+    var entry = ScreenPresentationModel.entryFor(current, connector)
+    if (!entry)
+      return dockControl.failure("E_STALE",
+        "The focused monitor is not a connected Dockrail output; no presentation was changed.")
+    var destination = entry.mode === "sidebar" ? "classic" : "sidebar"
+    var token = ScreenPresentationModel.modeGestureToken(current, connector)
+    var outcome = monitorModeIntent(connector, destination, token)
+    setModeGestureFeedback(connector, DockModel.modeDragWriteError(outcome))
+    if (outcome.reply && outcome.reply.data)
+      outcome.reply.data.modeSwitch = {
+        connector: connector, from: entry.mode, to: destination
+      }
+    return outcome.reply
+  }
+
   // One position request from either renderer. Dragging the bottom dock's empty
   // background left switches that output to the sidebar; dragging empty sidebar
   // background down switches that output back to the classic dock. The gesture
