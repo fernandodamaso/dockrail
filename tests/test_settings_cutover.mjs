@@ -44,10 +44,11 @@ const settingsChanged = dock.match(/^  onSettingsChanged: \{(.*)\}$/m)?.[1];
 assert.ok(settingsChanged);
 const reloadCalls = [];
 vm.runInNewContext(settingsChanged, { root: {
+  cancelGroupedPinReorder() { reloadCalls.push(['cancel-pin-drag']); },
   cancelWorkspaceGesture(reason) { reloadCalls.push(['cancel', reason]); },
   scheduleVisibleItemsRefresh() { reloadCalls.push(['refresh']); },
 } });
-assert.deepEqual(reloadCalls, [['cancel', 'settings changed'], ['refresh']]);
+assert.deepEqual(reloadCalls, [['cancel-pin-drag'], ['cancel', 'settings changed'], ['refresh']]);
 assert.match(dock, /onApplicationSelected: desktopId => root\.pinRequested\(desktopId\)/);
 for (const component of ['DockWindowPreview', 'DockAppPicker', 'DockTrashItem', 'DockWorkspaceStrip'])
   assert.match(dock, new RegExp('\\b' + component + '\\s*\\{'));
@@ -72,7 +73,7 @@ let stops = 0, restarts = 0;
 const scope = vm.createContext({
   windowPointer: { hovered: false }, appPicker: { visible: false },
   windowPreview: { interactionActive: false }, positionDragSurface: { pressed: false },
-  openMenuCount: 0, dragSource: -1,
+  openMenuCount: 0, dragSource: -1, groupedPinSourceId: "",
   autoHide: true, autoHideRevealed: false, workspaceDragActive: false,
   workspaceMonitorDragSourceActive: false, dragRevealed: false,
   hideTimer: { stop() { stops++; }, restart() { restarts++; } },
@@ -84,6 +85,7 @@ assert.equal(scope.keepAutoHideOpen, false);
 for (const [object, key, value] of [[scope.windowPointer, 'hovered', true],
   [scope.appPicker, 'visible', true], [scope.windowPreview, 'interactionActive', true],
   [scope, 'openMenuCount', 1], [scope, 'dragSource', 0],
+  [scope, 'groupedPinSourceId', 'org.A'],
   [scope, 'workspaceDragActive', true], [scope.positionDragSurface, 'pressed', true],
   [scope, 'workspaceMonitorDragSourceActive', true], [scope, 'dragRevealed', true]]) {
   const old = object[key];
@@ -95,12 +97,12 @@ for (const [object, key, value] of [[scope.windowPointer, 'hovered', true],
   scope.updateAutoHideState();
   assert.equal(scope.keepAutoHideOpen, false, key);
 }
-assert.equal(stops, 9);
-assert.equal(restarts, 9);
+assert.equal(stops, 10);
+assert.equal(restarts, 10);
 scope.autoHide = false;
 scope.updateAutoHideState();
 assert.equal(scope.autoHideRevealed, false);
-assert.equal(stops, 10);
+assert.equal(stops, 11);
 
 // Requested values still reach the actual dock normalizers after preview state
 // is removed. Evaluate production binding expressions, not a copied normalizer.
