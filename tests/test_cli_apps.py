@@ -72,14 +72,19 @@ class AppCliTests(unittest.TestCase):
             self.assertEqual(request['arguments']['id'], 'Code.desktop')
             self.assertEqual(managed.parent, Path(self.env['XDG_DATA_HOME']) / 'dockrail/icons')
             self.assertEqual(managed.read_bytes(), original.read_bytes())
-        before = self.calls.read_text()
+        def icon_set_calls():
+            calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+            return [json.loads(call[-1]) for call in calls
+                    if call[:2] == ['ipc', '--pid']
+                    and json.loads(call[-1]).get('command') == 'icons.set']
+        previous_sets = len(icon_set_calls())
         for source in ('https://example.invalid/a.png', 'data:image/png,bad',
                        str(self.tmp / 'does-not-exist.png')):
             self.reply_data()
             self.assertEqual(self.response(('icons', 'set', 'Code.desktop',
                                             source, '--json'), 2)['error']['code'], 'E_VALIDATION')
-            self.assertEqual(self.calls.read_text(), before,
-                             'Invalid source must not submit an IPC mutation')
+            self.assertEqual(len(icon_set_calls()), previous_sets,
+                             'Host discovery is allowed, but no invalid icon set may dispatch')
         self.assertFalse(Path(self.env['XDG_CONFIG_HOME']).exists())
         self.assertFalse(Path(self.env['XDG_CACHE_HOME']).exists())
 
