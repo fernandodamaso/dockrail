@@ -91,6 +91,8 @@ def _open_source(path):
 def ingest(source, env=None):
     path = source_path(source)
     managed_dir = icon_directory(env)
+    if managed_dir.is_symlink():
+        raise IconAssetError("Managed icon directory must not be a symlink")
     # Existing managed paths use exactly the same validation; no separate
     # shortcut bypasses validation or hash/filename checks.
     data = _open_source(path)
@@ -149,8 +151,8 @@ def migration(config_path, env=None):
     raw = json.loads(Path(config_path).read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise IconAssetError("Configuration must be a JSON object")
-    expected_icons = raw.get("iconOverrides")
-    expected_rules = raw.get("windowIconOverrides")
+    expected_icons = raw.get("iconOverrides", {})
+    expected_rules = raw.get("windowIconOverrides", [])
     new_icons = dict(expected_icons) if isinstance(expected_icons, dict) else None
     new_rules = [dict(row) if isinstance(row, dict) else row
                  for row in expected_rules] if isinstance(expected_rules, list) else None
