@@ -1,4 +1,5 @@
 """CLI-03 transport tests; host/model tests own identity and artwork validation."""
+import base64
 import json
 import os
 from pathlib import Path
@@ -61,7 +62,7 @@ class AppCliTests(unittest.TestCase):
         svg = self.tmp / 'My Ícone.svg'
         svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding='utf-8')
         png = self.tmp / 'My Ícone.png'
-        png.write_bytes(b'\x89PNG\r\n\x1a\n' + b'fixture')
+        png.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="))
         for source, original in [(str(svg), svg), (svg.as_uri(), svg),
                                  (str(png), png)]:
             self.reply_data()
@@ -133,7 +134,7 @@ class AppCliTests(unittest.TestCase):
         self.assertEqual(self.response(('icons', 'list', '--json'), 5)['error']['code'], 'E_PROTOCOL')
         self.reply_data(renderVerified=True)
         png = self.tmp / 'valid.png'
-        png.write_bytes(b'\x89PNG\r\n\x1a\n' + b'fixture')
+        png.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="))
         self.assertEqual(self.response(('icons', 'set', 'code', str(png), '--json'), 5)['error']['code'], 'E_PROTOCOL')
 
 
