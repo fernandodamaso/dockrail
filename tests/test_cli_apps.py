@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 import unittest
 import test_cli as fixtures
 
@@ -56,19 +57,31 @@ class AppCliTests(unittest.TestCase):
             self.assertEqual(self.last_request()['command'], 'apps.list')
         self.assert_no_state()
 
-    def test_icon_paths_are_resolved_only_not_revalidated_by_client(self):
-        for source, expected in [('Pictures/My Ícone.svg', os.path.abspath('Pictures/My Ícone.svg')),
-                                 ('/tmp/My Ícone.png', '/tmp/My Ícone.png'),
-                                 ('file:///tmp/My%20%C3%8Dcone.svg', 'file:///tmp/My%20%C3%8Dcone.svg'),
-                                 ('https://example.invalid/a.png', 'https://example.invalid/a.png'),
-                                 ('data:image/png,bad', 'data:image/png,bad')]:
+    def test_icon_paths_are_ingested_before_host_request(self):
+        svg = self.tmp / 'My Ícone.svg'
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding='utf-8')
+        png = self.tmp / 'My Ícone.png'
+        png.write_bytes(b'\x89PNG\r\n\x1a\n' + b'fixture')
+        for source, original in [(str(svg), svg), (svg.as_uri(), svg),
+                                 (str(png), png)]:
             self.reply_data()
             self.response(('icons', 'set', 'Code.desktop', source, '--json'))
-            self.assertEqual(self.last_request()['command'], 'icons.set')
-            self.assertEqual(self.last_request()['arguments'], {'id': 'Code.desktop', 'source': expected})
-        # The fixture intentionally accepts invalid URLs: the real host/model,
-        # not a duplicate Python icon validator, is responsible for rejecting them.
-        self.assert_no_state()
+            request = self.last_request()
+            self.assertEqual(request['command'], 'icons.set')
+            managed = Path(unquote(urlsplit(request['arguments']['source']).path))
+            self.assertEqual(request['arguments']['id'], 'Code.desktop')
+            self.assertEqual(managed.parent, Path(self.env['XDG_DATA_HOME']) / 'dockrail/icons')
+            self.assertEqual(managed.read_bytes(), original.read_bytes())
+        before = self.calls.read_text()
+        for source in ('https://example.invalid/a.png', 'data:image/png,bad',
+                       str(self.tmp / 'does-not-exist.png')):
+            self.reply_data()
+            self.assertEqual(self.response(('icons', 'set', 'Code.desktop',
+                                            source, '--json'), 2)['error']['code'], 'E_VALIDATION')
+            self.assertEqual(self.calls.read_text(), before,
+                             'Invalid source must not submit an IPC mutation')
+        self.assertFalse(Path(self.env['XDG_CONFIG_HOME']).exists())
+        self.assertFalse(Path(self.env['XDG_CACHE_HOME']).exists())
 
     def test_icon_list_reset_and_reload_are_primitive_requests(self):
         self.reply_data(overrides={'code': 'file:///missing/icon.svg'})
@@ -114,7 +127,9 @@ class AppCliTests(unittest.TestCase):
         self.reply_data(overrides=[], renderVerified=False)
         self.assertEqual(self.response(('icons', 'list', '--json'), 5)['error']['code'], 'E_PROTOCOL')
         self.reply_data(renderVerified=True)
-        self.assertEqual(self.response(('icons', 'set', 'code', '/tmp/a.png', '--json'), 5)['error']['code'], 'E_PROTOCOL')
+        png = self.tmp / 'valid.png'
+        png.write_bytes(b'\x89PNG\r\n\x1a\n' + b'fixture')
+        self.assertEqual(self.response(('icons', 'set', 'code', str(png), '--json'), 5)['error']['code'], 'E_PROTOCOL')
 
 
 if __name__ == '__main__':
