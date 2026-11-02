@@ -113,6 +113,40 @@ class ManagedIconTests(unittest.TestCase):
         self.assertEqual(assets.collect(self.config, self.env), [])
         self.assertTrue(assets.source_path(source).exists())
 
+    def test_cli_set_uses_managed_copy_before_host_request(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        script = MODULE.parent / "smartdock_cli.py"
+        cli_spec = importlib.util.spec_from_file_location("dockrail_cli_for_icons", script)
+        cli = importlib.util.module_from_spec(cli_spec)
+        cli_spec.loader.exec_module(cli)
+        calls = []
+
+        class Transport:
+            def request(self, instance, command, arguments):
+                calls.append((command, arguments))
+                # A failed host reply still proves the ingester ran before IPC.
+                return {"apiVersion": 1, "ok": False,
+                        "error": {"code": "E_BUSY", "message": "fixture"}, "data": {},
+                        "warnings": []}
+
+        args = SimpleNamespace(group="icons", action="set", id="editor",
+                               source=str(self.original), profile=None,
+                               title_pattern=None)
+        with patch.dict(os.environ, self.env, clear=False):
+            reply = cli.app_icon_request(Transport(), object(), args)
+        self.assertFalse(reply["ok"])
+        self.assertEqual(calls[0][0], "icons.set")
+        managed = assets.source_path(calls[0][1]["source"])
+        self.assertEqual(managed.read_bytes(), PNG)
+        self.assertEqual(managed.parent, assets.icon_directory(self.env))
+        calls.clear()
+        args.source = str(self.root / "missing.png")
+        with patch.dict(os.environ, self.env, clear=False):
+            with self.assertRaises(cli.CliError):
+                cli.app_icon_request(Transport(), object(), args)
+        self.assertFalse(calls, "Failed copy must not reach the host")
+
     def test_name_traversal_and_symlink_destination_not_deleted(self):
         source = assets.ingest(str(self.original), self.env)
         managed = assets.source_path(source)
