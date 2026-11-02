@@ -665,8 +665,12 @@ artwork does not split browser groups.
 Only local static PNG/SVG files are accepted. Ordinary relative paths supplied
 to the CLI are resolved from its current directory; the host accepts absolute
 local paths and local `file:///` URLs, preserving spaces and Unicode. Remote
-URLs and other formats are rejected. Files are referenced in place, not copied,
-so keep them outside the plugin checkout. Per-app set/reset preserves unrelated
+URLs and other formats are rejected. Accepted artwork is copied into
+Dockrail-managed persistent storage under the XDG data directory
+(`$XDG_DATA_HOME/dockrail/icons`); the managed reference — never the source
+path — is persisted, and the original file is never moved, modified or deleted.
+Managed copies keep custom icons working across restarts and plugin updates
+even if the original file moves. Per-app set/reset preserves unrelated
 map entries. Preference reset also preserves `iconOverrides`.
 
 The bounded fallback is **custom file → original desktop icon →
@@ -926,8 +930,7 @@ connected, each monitor section is introduced inline before its first present
 workspace card by a small display glyph and a bounded informational label. With
 only one connected monitor, Dockrail omits that redundant glyph and label. The compact label prefers the live
 monitor model, then description, connector/name, and `Monitor N`; the full
-description/connector remains available in the tooltip/accessibility text. The
-prefix is not clickable, does not take keyboard focus, and is not a workspace-drop target.
+description/connector remains available in the tooltip/accessibility text. The prefix is not clickable, does not take keyboard focus, and is not a workspace-drop target.
 Use
 `dockrail config set workspaceMonitorScope current-monitor --json` for the
 existing local, unprefixed workspace-card appearance. Missing/invalid values and
@@ -997,8 +1000,8 @@ the source monitor section to the destination section. There is no drag setting,
 and app reordering and window-to-card dragging are unchanged.
 
 Grouped minimize/restore requires a validated recorded workspace: an unknown
-origin never moves a window to a guessed focused workspace. Flat mode retains
-its fallback. Sticky windows appear once on their monitor’s active normal
+origin never moves a window to a guessed focused workspace. Flat mode retains its
+fallback. Sticky windows appear once on their monitor’s active normal
 workspace with a small marker; minimized windows retain their recorded origin.
 Local urgency marks its workspace and member icons. App-wide notification badges
 have one visible owner per app per dock, without claiming a notification belongs
