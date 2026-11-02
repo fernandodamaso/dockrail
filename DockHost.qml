@@ -162,6 +162,14 @@ Item {
   property bool t3BinaryProbePending: false
   readonly property var applications: DesktopEntries.applications.values || []
   property int iconReloadRevision: 0
+  // Migration/cleanup use a separate non-writing helper. The host alone
+  // validates and commits any migration through the existing FileView writer.
+  readonly property string iconAssetScript: decodeURIComponent(
+    String(Qt.resolvedUrl("scripts/dockrail_icon_assets.py")).slice(7))
+  property string iconMigrationCheckedText: ""
+  property int iconMigrationExitCode: -1
+  property bool iconMigrationOutputDone: false
+  property bool iconCollectQueued: false
   // Menus may cache popup instances, but only one editor owns a live session.
   property var activeIconDialog: null
   // Reuse the exact app picker and Change Icon dialog used by dock menus.
@@ -381,6 +389,10 @@ Item {
   property string modeMenuWriteConnector: ""
   property bool settingsReloadPending: false
   property string settingsLoadedText: ""
+  // Maintenance is deferred by declarative timers, not invoked by writer
+  // callbacks. Source-model and native writer contracts remain unchanged.
+  onSettingsLoadedTextChanged: iconMaintenanceKick.restart()
+  onSettingsPersistedChanged: if (settingsPersisted) iconCollectKick.restart()
   property string settingsWriteBaseText: ""
   property string settingsWriteText: ""
   property var workspaceWindowCounts: ({})
@@ -433,6 +445,49 @@ Item {
     }
     settingsLoaded = true
     if (showTrash) Qt.callLater(root.refreshTrash)
+  }
+
+  // Scanning reads disk and creates immutable owned copies, but NEVER edits
+  // dock.json. Compare both raw collections to the current live snapshot
+  // before asking the one host writer to persist the migration patch.
+  function startIconMigration() {
+    if (!settingsLoaded || settingsLoadState !== "loaded" || settingsReloadPending
+        || settingsWriteState === "saving" || iconMigrationProcess.running
+        || settingsLoadedText === iconMigrationCheckedText) return
+    iconMigrationCheckedText = settingsLoadedText
+    iconMigrationExitCode = -1
+    iconMigrationOutputDone = false
+    iconMigrationProcess.running = true
+  }
+
+  function settleIconMigration() {
+    if (iconMigrationExitCode < 0 || (iconMigrationExitCode === 0 && !iconMigrationOutputDone))
+      return
+    var code = iconMigrationExitCode
+    iconMigrationExitCode = -1
+    if (code !== 0) return
+    var plan = null
+    try { plan = JSON.parse(iconMigrationOutput.text) } catch (error) { return }
+    if (!plan || !plan.expected || !plan.patch || !Object.keys(plan.patch).length)
+      return
+    if (mutationBlocked()) return
+    if (JSON.stringify(plan.expected.iconOverrides) !== JSON.stringify(settings.iconOverrides)
+        || JSON.stringify(plan.expected.windowIconOverrides)
+          !== JSON.stringify(settings.windowIconOverrides)) return
+    // An invalid legacy collection is not silently sanitized or erased.
+    // The existing settings metadata validation can reject that patch.
+    saveSettings(plan.patch, false)
+  }
+
+  function startIconCollect() {
+    if (iconCollectProcess.running) {
+      iconCollectQueued = true
+      return
+    }
+    if (!settingsLoaded || settingsLoadState !== "loaded"
+        || settingsWriteState === "saving" || !settingsPersisted) return
+    iconCollectQueued = false
+    iconCollectProcess.running = true
   }
 
   function reorderPinned(sourceDesktopId, targetDesktopId) {
@@ -502,7 +557,7 @@ Item {
       ? settings.windowIconOverrides : []
     reply.data.effectiveWindowOverrides = DockIconModel.normalizeWindowRules(
       settings.windowIconOverrides)
-    reply.warnings.push("Artwork is referenced in place. Saving or requesting a reload does not verify decoding or rendering.")
+    reply.warnings.push("Managed artwork is copied before supported icon edits; a save or reload does not verify decoding or rendering.")
     return reply
   }
 
@@ -1100,6 +1155,61 @@ Item {
       if (exitCode !== 0) console.warn("Dock: could not empty Trash (gio exited " + exitCode + ")")
       root.refreshTrash()
     }
+  }
+
+
+  // Independent file worker. Its stdout contains only proposed replacements,
+  // never authoritative settings; host validation and FileView remain sole writer.
+  Process {
+    id: iconMigrationProcess
+    command: ["python3", root.iconAssetScript, "migrate", root.configPath]
+    stdout: StdioCollector {
+      id: iconMigrationOutput
+      waitForEnd: true
+      onStreamFinished: {
+        root.iconMigrationOutputDone = true
+        root.settleIconMigration()
+      }
+    }
+    onExited: function(code) {
+      root.iconMigrationExitCode = code
+      root.settleIconMigration()
+    }
+  }
+
+  Process {
+    id: iconCollectProcess
+    command: ["python3", root.iconAssetScript, "collect", root.configPath]
+    onExited: function(code) {
+      if (code !== 0) console.warn("Dock: managed icon cleanup was skipped.")
+      if (root.iconCollectQueued) Qt.callLater(root.startIconCollect)
+    }
+  }
+
+  Timer {
+    id: iconMaintenanceKick
+    interval: 0
+    repeat: false
+    onTriggered: {
+      root.startIconMigration()
+      root.startIconCollect()
+    }
+  }
+
+  Timer {
+    id: iconCollectKick
+    interval: 0
+    repeat: false
+    onTriggered: root.startIconCollect()
+  }
+
+  // Grace-delayed files that were copied while another intent was pending
+  // are eventually reclaimed even if the user makes no further settings edit.
+  Timer {
+    interval: 300000
+    repeat: true
+    running: root.settingsLoaded && root.settingsLoadState === "loaded"
+    onTriggered: root.startIconCollect()
   }
 
   FileView {
