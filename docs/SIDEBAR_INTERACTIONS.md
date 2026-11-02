@@ -33,6 +33,16 @@ pins, minimized origins, named workspaces, exact-handle liveness and same-monito
 behavior remain owned by that service. No focus-derived monitor or frozen card
 workspace override is substituted. Enter remains plain even while Ctrl is held.
 
+Nested T3 Code thread and Herdr agent rows use the same captured sidebar
+connector for Ctrl+left-click. A trusted Ctrl tap first uses the shared window
+action to move or restore the exact host window onto that monitor's active
+workspace, then sends the captured agent's exact focus request. When the host
+window is already on the clicked monitor, the agent is focused in place without
+a redundant window move. Missing provider/capability, stale agent or host,
+unmapped connector and rejected moves cause no agent-focus request. Plain clicks
+and Enter continue to focus the exact agent without moving its window. The
+standalone agents Widget is unchanged.
+
 Unknown window locations remain reachable by their live native handles; actions
 requiring a trustworthy location are disabled. Address reuse, hidden-app changes,
 closure and a changed captured connector cannot retarget a delayed click.
