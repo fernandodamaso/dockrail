@@ -52,9 +52,12 @@ class ManagedIconTests(unittest.TestCase):
                 with self.assertRaises(assets.IconAssetError):
                     assets.ingest(source, self.env)
         invalid = self.root / "bad.png"
-        invalid.write_bytes(b"not a PNG")
-        with self.assertRaises(assets.IconAssetError):
-            assets.ingest(str(invalid), self.env)
+        for garbage in (b"not a PNG", assets.PNG_MAGIC, PNG[:-12], PNG[:-1],
+                        PNG[:32] + b"!" + PNG[33:]):
+            invalid.write_bytes(garbage)
+            with self.subTest(length=len(garbage)):
+                with self.assertRaises(assets.IconAssetError):
+                    assets.ingest(str(invalid), self.env)
         too_big = self.root / "big.svg"
         too_big.write_bytes(SVG + b" " * (assets.MAX_BYTES + 1))
         with self.assertRaises(assets.IconAssetError):
