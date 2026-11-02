@@ -1,5 +1,6 @@
 """FDM-1068: file-backed, restart-safe icon assets and migration/cleanup."""
 import importlib.util
+import base64
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ spec = importlib.util.spec_from_file_location("dockrail_icon_assets", MODULE)
 assets = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(assets)
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'
-PNG = b"\x89PNG\r\n\x1a\n" + b"sample-image"
+PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")
 
 
 class ManagedIconTests(unittest.TestCase):
@@ -88,8 +89,8 @@ class ManagedIconTests(unittest.TestCase):
     def test_collect_only_unreferenced_owned_aged_assets(self):
         original = assets.ingest(str(self.original), self.env)
         owned = assets.source_path(original)
-        second = self.root / "another.png"
-        second.write_bytes(PNG + b"other")
+        second = self.root / "another.svg"
+        second.write_bytes(SVG)
         unrelated = assets.source_path(assets.ingest(str(second), self.env))
         self.settings(iconOverrides={"one": original},
                       windowIconOverrides=[{"appId": "w", "titlePattern": "*",
