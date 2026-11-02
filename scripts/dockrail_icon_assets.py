@@ -14,6 +14,7 @@ import re
 import stat
 import sys
 import tempfile
+import zlib
 from urllib.parse import unquote, urlsplit
 import xml.etree.ElementTree as ET
 
@@ -55,8 +56,45 @@ def _validate_bytes(data, extension):
     if not data or len(data) > MAX_BYTES:
         raise IconAssetError("Artwork must be between 1 byte and 8 MiB")
     if extension == ".png":
+        # A signature-only file is not an image. Check complete chunk framing,
+        # CRCs, a nonzero IHDR and the IDAT/IEND sequence before publishing.
+        # Actual Qt decoding remains a separate, non-guaranteed observation.
         if not data.startswith(PNG_MAGIC):
             raise IconAssetError("Invalid PNG signature")
+        offset = len(PNG_MAGIC)
+        seen_image = False
+        seen_end = False
+        first = True
+        while offset + 12 <= len(data):
+            length = int.from_bytes(data[offset:offset + 4], "big")
+            end = offset + length + 12
+            if end > len(data):
+                raise IconAssetError("Truncated PNG chunk")
+            kind = data[offset + 4:offset + 8]
+            payload = data[offset + 8:offset + 8 + length]
+            checksum = int.from_bytes(data[end - 4:end], "big")
+            if zlib.crc32(kind + payload) & 0xffffffff != checksum:
+                raise IconAssetError("Invalid PNG checksum")
+            if first:
+                if kind != b"IHDR" or length != 13:
+                    raise IconAssetError("PNG missing IHDR")
+                width = int.from_bytes(payload[0:4], "big")
+                height = int.from_bytes(payload[4:8], "big")
+                if not width or not height or width > 16384 or height > 16384:
+                    raise IconAssetError("Unsupported PNG dimensions")
+                first = False
+            elif kind == b"IHDR":
+                raise IconAssetError("Duplicate PNG header")
+            if kind == b"IDAT":
+                seen_image = True
+            if kind == b"IEND":
+                if length or not seen_image or end != len(data):
+                    raise IconAssetError("Invalid PNG end marker")
+                seen_end = True
+                break
+            offset = end
+        if not seen_end:
+            raise IconAssetError("Incomplete PNG image")
     elif extension == ".svg":
         # Block DTD/entity declarations; ElementTree itself does not resolve
         # remote resources. Do not attempt to sanitize or rewrite user SVGs.
@@ -114,14 +152,14 @@ def ingest(source, env=None):
             stream.flush()
             os.fsync(stream.fileno())
         os.chmod(staged, 0o600)
-        # Immutable content-addressed files make duplicate use safe. Atomic
-        # publication prevents partially copied images from being referenced.
-        if target.exists() or target.is_symlink():
+        # Hard-link publication is atomic and never clobbers an existing
+        # content-addressed entry, even when two icon saves race each other.
+        try:
+            os.link(staged, target, follow_symlinks=False)
+        except FileExistsError:
             if target.is_symlink() or _open_source(target) != data:
                 raise IconAssetError("Managed artwork destination changed")
         else:
-            os.replace(staged, target)
-            staged = ""
             dirfd = os.open(managed_dir, os.O_RDONLY)
             try:
                 os.fsync(dirfd)
