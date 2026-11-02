@@ -1217,7 +1217,7 @@ def validate_mutation(reply, instance):
         data = reply['data']
         if (type(data.get('applied')) is not bool or type(data.get('noop')) is not bool
                 or not isinstance(data.get('changedKeys'), list)
-                or any(not isinstance(key, key) for key in data['changedKeys'])
+                or any(not isinstance(key, str) for key in data['changedKeys'])
                 or not isinstance(data.get('requested'), dict)
                 or not isinstance(data.get('effective'), dict)
                 or data['writeState'] in ('saving', 'error') and not data.get('dryRun')
