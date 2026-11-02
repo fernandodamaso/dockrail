@@ -38,6 +38,11 @@ PopupWindow {
   property string titleMode: "contains"
   property string titleText: ""
   property string inlineError: ""
+  // FDM-1068: copying the selected artwork into managed storage is async
+  // (Process), so it runs after Save is pressed and before the synchronous
+  // host commit. Bumped on every session change so a late reply is ignored.
+  property bool ingesting: false
+  property int ingestSerial: 0
   // The file picker is a separate window; the popup steps aside while it is
   // open so the picker gets focus and is not covered, then comes back.
   property bool picking: false
@@ -167,7 +172,9 @@ PopupWindow {
 
   function closeDialog() {
     root.chooserSerial++
+    root.ingestSerial++
     root.picking = false
+    root.ingesting = false
     root.inlineError = ""
     root.openAnchor = null
     root.windows = []
@@ -223,6 +230,7 @@ PopupWindow {
   }
 
   function save() {
+    if (root.ingesting) return false
     var built = root.changeArguments()
     if (!built.ok) {
       root.inlineError = built.error
@@ -232,7 +240,41 @@ PopupWindow {
       root.closeDialog()
       return true
     }
+    // Ingest before commit: the host persists only Dockrail-managed copies, so
+    // a failed copy can never leave a falsely successful broken mapping.
+    var set = built.args && built.args.set
+    var controller = root.mutationController
+    var dataRoot = controller && typeof controller.dataRoot === "string" ? controller.dataRoot : ""
+    if (set && dataRoot && typeof controller.ingestIconSource === "function"
+        && !DockIconModel.isManagedIconSource(set.source, dataRoot))
+      return root.beginIngest(built.args)
     return root.commit(built.args)
+  }
+
+  function beginIngest(args) {
+    var serial = ++root.ingestSerial
+    root.ingesting = true
+    root.inlineError = ""
+    var key = args.set.kind === "window"
+      ? DockIconModel.windowRuleKey(args.set.appId, args.set.titlePattern)
+      : args.set.key
+    var started = root.mutationController.ingestIconSource(args.set.source, key,
+      function(reply) {
+        if (serial !== root.ingestSerial) return
+        root.ingesting = false
+        var managed = reply && reply.ok === true && reply.data
+          ? DockIconModel.normalizeSource(reply.data.source) : ""
+        if (managed) {
+          var next = { remove: args.remove, set: Object.assign({}, args.set, { source: managed }) }
+          root.commit(next)
+          return
+        }
+        var message = reply && reply.error && typeof reply.error.message === "string"
+          ? reply.error.message : "The image could not be copied into managed storage."
+        root.inlineError = String(message)
+      })
+    if (!started) root.ingesting = false
+    return true
   }
 
   function resetToDefault() {
@@ -538,8 +580,8 @@ PopupWindow {
                     }
                     Image {
                       id: tileImage
-                      // Custom files are edited and deleted in place: never
-                      // reuse cached bytes, and reload when a watched file changes.
+                      // Custom files are watched for edits and replacements:
+                      // never reuse cached bytes, and reload on revision bumps.
                       readonly property int revision: root.reloadRevision
                       onRevisionChanged: {
                         tileImage.source = ""
@@ -892,10 +934,12 @@ PopupWindow {
               }
               Button {
                 id: saveButton
-                text: "Save"
+                text: root.ingesting ? "Copying…" : "Save"
                 bordered: true
                 focusable: true
                 active: true
+                enabled: !root.ingesting
+                opacity: enabled ? 1 : 0.45
                 foreground: Color.menu.text
                 onClicked: root.save()
               }
