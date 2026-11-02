@@ -67,9 +67,32 @@ class CliDocumentationTests(unittest.TestCase):
     def setUp(self):
         self.guide = (ROOT / 'docs/AGENT_CONFIGURATION.md').read_text(encoding='utf-8')
         self.transport = ModelTransport()
+        # Guide recipes use relative './Pictures/...' artwork that the CLI now
+        # copies into Dockrail-managed storage; run them against an isolated
+        # working directory and data home instead of the developer's machine.
+        workspace = tempfile.TemporaryDirectory()
+        self.addCleanup(workspace.cleanup)
+        self.workspace = Path(workspace.name)
+        pictures = self.workspace / 'Pictures'
+        pictures.mkdir()
+        (pictures / 'My Ícone.svg').write_bytes(b'<svg/>')
+        (pictures / 'solar.svg').write_bytes(b'<svg viewBox="0 0 1 1"/>')
+        self.previous_cwd = Path.cwd()
+        os.chdir(self.workspace)
+        self.addCleanup(os.chdir, self.previous_cwd)
+        self.data_home = self.workspace / 'xdg-data'
+        environ = patch.dict(os.environ, {'XDG_DATA_HOME': str(self.data_home)})
+        environ.start()
+        self.addCleanup(environ.stop)
         self.mock = patch.object(cli, 'Transport', return_value=self.transport)
         self.mock.start()
         self.addCleanup(self.mock.stop)
+
+    def managed_uri(self, suffix, expected_content=b'<svg/>'):
+        copies = sorted((self.data_home / 'dockrail' / 'icons').glob('*-????????????.' + suffix))
+        self.assertEqual(len(copies), 1, copies)
+        self.assertEqual(copies[0].read_bytes(), expected_content)
+        return copies[0].as_uri()
 
     def run_command(self, command):
         args = shlex.split(command)
@@ -162,7 +185,7 @@ class CliDocumentationTests(unittest.TestCase):
         args = shlex.split(command)
         if args[0] == 'dockrail':
             return self.run_command(command)
-        self.assertEqual(args[:2], ['printf', '%s\\n'])
+        self.assertEqual(args[:2], ['printf', '%s\n'])
         self.assertEqual(args[3:5], ['|', 'dockrail'])
         self.assertIn('--stdin', args[5:])
         with io.TextIOWrapper(io.BytesIO((args[2] + '\n').encode())) as stdin:
@@ -214,7 +237,7 @@ class CliDocumentationTests(unittest.TestCase):
                 self.assertTrue(data['persisted'])
                 reload_revision = data['iconReloadRevision']
                 expected = dict(self.transport.initial['iconOverrides'],
-                                code=Path('Pictures/My Ícone.svg').absolute().as_uri())
+                                code=self.managed_uri('svg'))
                 self.assertEqual(data['requested']['iconOverrides'], expected)
             if 'icons reload ' in line:
                 self.assertFalse(data['applied'])
@@ -238,7 +261,7 @@ class CliDocumentationTests(unittest.TestCase):
                 self.assertEqual(data['effectiveWindowOverrides'], [{
                     'appId': 'com.mitchellh.ghostty',
                     'titlePattern': '*solar*',
-                    'source': Path('Pictures/solar.svg').absolute().as_uri(),
+                    'source': self.managed_uri('svg', b'<svg viewBox="0 0 1 1"/>'),
                 }])
             if 'icons reset ' in line:
                 self.assertEqual(data['requested']['windowIconOverrides'], [])

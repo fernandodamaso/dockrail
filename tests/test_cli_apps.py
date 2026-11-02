@@ -56,19 +56,66 @@ class AppCliTests(unittest.TestCase):
             self.assertEqual(self.last_request()['command'], 'apps.list')
         self.assert_no_state()
 
-    def test_icon_paths_are_resolved_only_not_revalidated_by_client(self):
-        for source, expected in [('Pictures/My Ícone.svg', os.path.abspath('Pictures/My Ícone.svg')),
-                                 ('/tmp/My Ícone.png', '/tmp/My Ícone.png'),
-                                 ('file:///tmp/My%20%C3%8Dcone.svg', 'file:///tmp/My%20%C3%8Dcone.svg'),
-                                 ('https://example.invalid/a.png', 'https://example.invalid/a.png'),
-                                 ('data:image/png,bad', 'data:image/png,bad')]:
+    def test_local_icon_sources_are_ingested_into_managed_storage(self):
+        pictures = self.tmp / 'Pictures'
+        pictures.mkdir()
+        svg = pictures / 'My Ícone.svg'
+        svg.write_bytes(b'<svg/>')
+        png = self.tmp / 'icon.png'
+        png.write_bytes(b'\x89PNG\r\n\x1a\n')
+        managed_dir = (Path(self.env['XDG_DATA_HOME']) / 'dockrail' / 'icons').resolve()
+        self.assertFalse(managed_dir.exists())
+        # Local plain paths and file URLs are copied into Dockrail-managed
+        # persistent storage; the host receives the managed reference, never
+        # the original path, and the original file is never modified.
+        requested = []
+        for source in (str(svg), str(png), svg.as_uri()):
             self.reply_data()
             self.response(('icons', 'set', 'Code.desktop', source, '--json'))
             self.assertEqual(self.last_request()['command'], 'icons.set')
-            self.assertEqual(self.last_request()['arguments'], {'id': 'Code.desktop', 'source': expected})
-        # The fixture intentionally accepts invalid URLs: the real host/model,
-        # not a duplicate Python icon validator, is responsible for rejecting them.
+            self.assertEqual(self.last_request()['arguments']['id'], 'Code.desktop')
+            requested.append(self.last_request()['arguments']['source'])
+        copies = sorted(managed_dir.iterdir())
+        self.assertEqual(len(copies), 2, copies)
+        for name in (copy.name for copy in copies):
+            self.assertRegex(name, r'^[A-Za-z0-9._-]+-[0-9a-f]{12}\.(png|svg)$')
+        self.assertEqual({copy.suffix for copy in copies}, {'.png', '.svg'})
+        self.assertEqual({copy.read_bytes() for copy in copies}, {b'<svg/>', b'\x89PNG\r\n\x1a\n'})
+        for url in requested:
+            self.assertTrue(url.startswith(managed_dir.as_uri() + '/'), url)
+        self.assertTrue(svg.exists())
+        self.assertEqual(svg.read_bytes(), b'<svg/>')
+        self.assertEqual(png.read_bytes(), b'\x89PNG\r\n\x1a\n')
+        # A second ingestion of the same content under the same key reuses the
+        # same managed asset instead of minting a new file.
+        self.assertEqual(requested[0], requested[2])
+        self.assertEqual(len(list(managed_dir.iterdir())), 2)
+
+    def test_remote_and_data_icon_sources_pass_through_without_ingestion(self):
+        managed_dir = Path(self.env['XDG_DATA_HOME']) / 'dockrail' / 'icons'
+        for source in ('https://example.invalid/a.png', 'data:image/png,bad'):
+            self.reply_data()
+            self.response(('icons', 'set', 'Code.desktop', source, '--json'))
+            self.assertEqual(self.last_request()['command'], 'icons.set')
+            self.assertEqual(self.last_request()['arguments'],
+                             {'id': 'Code.desktop', 'source': source})
+        # Non-local schemes keep the historic pass-through for host validation;
+        # no managed copy is created for them.
+        self.assertFalse(managed_dir.exists())
         self.assert_no_state()
+
+    def test_missing_local_icon_source_fails_before_any_host_intent(self):
+        self.reply_data()
+        missing = str(self.tmp / 'missing.png')
+        icon_intents = lambda: [line for line in self.calls.read_text().splitlines()
+                                if '\"command\":\"icons.set\"' in line]
+        value = self.response(('icons', 'set', 'Code.desktop', missing, '--json'), 2)
+        self.assertEqual(value['error']['code'], 'E_VALIDATION')
+        self.assertIn('does not exist', value['error']['message'])
+        # The host-selection status probe may run, but no icon mutation intent
+        # is ever sent for a source that could not be ingested.
+        self.assertEqual(icon_intents(), [])
+        self.assertFalse((Path(self.env['XDG_DATA_HOME']) / 'dockrail').exists())
 
     def test_icon_list_reset_and_reload_are_primitive_requests(self):
         self.reply_data(overrides={'code': 'file:///missing/icon.svg'})
@@ -114,7 +161,7 @@ class AppCliTests(unittest.TestCase):
         self.reply_data(overrides=[], renderVerified=False)
         self.assertEqual(self.response(('icons', 'list', '--json'), 5)['error']['code'], 'E_PROTOCOL')
         self.reply_data(renderVerified=True)
-        self.assertEqual(self.response(('icons', 'set', 'code', '/tmp/a.png', '--json'), 5)['error']['code'], 'E_PROTOCOL')
+        self.assertEqual(self.response(('icons', 'set', 'code', 'https://example.invalid/a.png', '--json'), 5)['error']['code'], 'E_PROTOCOL')
 
 
 if __name__ == '__main__':

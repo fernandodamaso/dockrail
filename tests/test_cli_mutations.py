@@ -145,11 +145,17 @@ class MutationCliTests(unittest.TestCase):
         source.write_text('<svg/>', encoding='utf-8')
         self.response(('icons', 'set', 'org.ghostty', str(source),
                        '--title-pattern', ' *solar* ', '--json'))
-        self.assertEqual(self.requests('icons.set')[-1], {
-            'id': 'org.ghostty',
-            'source': str(source.resolve()),
-            'titlePattern': ' *solar* ',
-        })
+        request = self.requests('icons.set')[-1]
+        self.assertEqual(request['id'], 'org.ghostty')
+        self.assertEqual(request['titlePattern'], ' *solar* ')
+        # The host receives a Dockrail-managed copy, never the original path.
+        managed_dir = (Path(self.env['XDG_DATA_HOME']) / 'dockrail' / 'icons').resolve()
+        self.assertTrue(request['source'].startswith(managed_dir.as_uri() + '/'), request['source'])
+        copies = list(managed_dir.iterdir())
+        self.assertEqual(len(copies), 1, copies)
+        self.assertRegex(copies[0].name, r'^[A-Za-z0-9._-]+-[0-9a-f]{12}\.svg$')
+        self.assertEqual(copies[0].read_bytes(), b'<svg/>')
+        self.assertEqual(source.read_text(encoding='utf-8'), '<svg/>')
         self.response(('icons', 'reset', 'org.ghostty',
                        '--title-pattern', '*solar*', '--json'))
         self.assertEqual(self.requests('icons.reset')[-1], {
