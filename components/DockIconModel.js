@@ -234,7 +234,7 @@ function containsToPattern(text) {
   if (value.indexOf("*") >= 0)
     return { ok: false, pattern: "", error: "The title text cannot contain *." }
   if (/[\x00-\x1f\x7f]/.test(value))
-    return { ok: false, pattern: "", error: "The title text cannot contain control characters." }
+    return { ok: false, pattern: "", error: "The title text must not contain control characters." }
   if (value.length > 198)
     return { ok: false, pattern: "", error: "The title text must be at most 198 characters." }
   return { ok: true, pattern: "*" + value + "*", error: "" }
@@ -509,6 +509,76 @@ function candidates(windowUrl, profileUrl, overrideUrl, desktopUrl, genericUrl) 
       result.push(source)
   })
   return result
+}
+
+// --- Dockrail-managed icon storage (FDM-1068) -------------------------
+// Python twin: scripts/dockrail_icons.py. Successful custom-icon selections
+// persist a Dockrail-owned copy under <dataRoot>/icons, never the user's
+// source path. Helpers below only classify references; copying, migration
+// and pruning run through the bundled helper.
+
+// file:// prefix of the managed icons directory. dataRoot must already be
+// resolved (the startup migration helper provides it that way).
+function managedIconPrefix(dataRoot) {
+  var root = String(dataRoot || "").trim()
+  if (!root || root.charAt(0) !== "/") return ""
+  var parts = []
+  root.split("/").forEach(function(segment) {
+    if (segment === "..") parts.pop()
+    else if (segment && segment !== ".") parts.push(segment)
+  })
+  return "file:///" + parts.map(function(part) { return encodeURIComponent(part) }).join("/")
+    + "/icons/"
+}
+
+function isManagedIconSource(source, dataRoot) {
+  var prefix = managedIconPrefix(dataRoot)
+  var url = normalizeSource(source)
+  return !!prefix && !!url && url.indexOf(prefix) === 0
+}
+
+// Ownership predicate: only names minted by dockrail_icons.py
+// ("<sanitized-key>-<sha1[:12]>.<ext>") are ever deletion candidates.
+function isManagedIconFileName(name) {
+  return /^[A-Za-z0-9._-]+-[0-9a-f]{12}\.png$/.test(String(name || ""))
+    || /^[A-Za-z0-9._-]+-[0-9a-f]{12}\.svg$/.test(String(name || ""))
+}
+
+// Managed asset file names still referenced by any override mapping. The
+// prune step deletes managed files outside this set, so shared assets used
+// by two overrides naturally survive until the last reference disappears.
+function referencedManagedIconFiles(settings, dataRoot) {
+  var value = settings || {}
+  var referenced = []
+  function consider(source) {
+    if (!isManagedIconSource(source, dataRoot)) return
+    var name = String(source).replace(/\/+$/, "").split("/").pop()
+    if (isManagedIconFileName(name) && referenced.indexOf(name) < 0)
+      referenced.push(name)
+  }
+  var overrides = value.iconOverrides
+  if (overrides && typeof overrides === "object" && !Array.isArray(overrides))
+    Object.keys(overrides).forEach(function(key) { consider(overrides[key]) })
+  var rules = Array.isArray(value.windowIconOverrides) ? value.windowIconOverrides : []
+  rules.forEach(function(rule) { consider(rule && rule.source) })
+  return referenced
+}
+
+// True when any valid custom icon reference points outside managed storage;
+// the host runs the migration helper only while this holds.
+function hasUnmanagedIconSources(settings, dataRoot) {
+  var value = settings || {}
+  var unmanaged = false
+  function check(source) {
+    var url = normalizeSource(source)
+    if (url && !isManagedIconSource(url, dataRoot)) unmanaged = true
+  }
+  var overrides = value.iconOverrides
+  if (overrides && typeof overrides === "object" && !Array.isArray(overrides))
+    Object.keys(overrides).forEach(function(key) { check(overrides[key]) })
+  var rules = Array.isArray(value.windowIconOverrides) ? value.windowIconOverrides : []
+  rules.forEach(function(rule) { check(rule && rule.source) })
+  return unmanaged
 }
 
 // Deterministic badge color for profiles without a photo.
