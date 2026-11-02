@@ -389,6 +389,10 @@ Item {
   property string modeMenuWriteConnector: ""
   property bool settingsReloadPending: false
   property string settingsLoadedText: ""
+  // Maintenance is deferred by declarative timers, not invoked by writer
+  // callbacks. Source-model and native writer contracts remain unchanged.
+  onSettingsLoadedTextChanged: iconMaintenanceKick.restart()
+  onSettingsPersistedChanged: if (settingsPersisted) iconCollectKick.restart()
   property string settingsWriteBaseText: ""
   property string settingsWriteText: ""
   property var workspaceWindowCounts: ({})
@@ -440,10 +444,6 @@ Item {
       console.warn("Dock: could not load " + configPath + ":", error)
     }
     settingsLoaded = true
-    if (settingsLoadState === "loaded") {
-      Qt.callLater(root.startIconMigration)
-      Qt.callLater(root.startIconCollect)
-    }
     if (showTrash) Qt.callLater(root.refreshTrash)
   }
 
@@ -919,7 +919,6 @@ Item {
     settingsDefaultsInUse = false
     settingsPersisted = true
     reloadSettingsIfPending()
-    Qt.callLater(root.startIconCollect)
   }
 
   function settingsSaveFailed(error) {
@@ -1185,6 +1184,23 @@ Item {
       if (code !== 0) console.warn("Dock: managed icon cleanup was skipped.")
       if (root.iconCollectQueued) Qt.callLater(root.startIconCollect)
     }
+  }
+
+  Timer {
+    id: iconMaintenanceKick
+    interval: 0
+    repeat: false
+    onTriggered: {
+      root.startIconMigration()
+      root.startIconCollect()
+    }
+  }
+
+  Timer {
+    id: iconCollectKick
+    interval: 0
+    repeat: false
+    onTriggered: root.startIconCollect()
   }
 
   // Grace-delayed files that were copied while another intent was pending
