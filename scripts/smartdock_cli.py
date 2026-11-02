@@ -64,9 +64,10 @@ Applications (exact desktop IDs, not fuzzy application names):
   apps move ID (--before OTHER | --after OTHER)
                                Move one pinned ID relative to another, including hidden pins
 
-Artwork (Dockrail-only; local static PNG/SVG files referenced in place):
+Artwork (Dockrail-only; local static PNG/SVG files copied into Dockrail-managed
+                              persistent storage; the original file is never modified):
   icons list                  Read requested/effective mappings, not rendering success
-  icons set ID PATH           Resolve a local relative path and send one host intent
+  icons set ID PATH           Copy a local file into managed storage and send one host intent
   icons reset ID              Remove only this application's mapping
   icons reload ID             Refresh an existing mapping after same-path file replacement
                                Reload uses the global artwork revision; never writes config
@@ -1216,7 +1217,7 @@ def validate_mutation(reply, instance):
         data = reply['data']
         if (type(data.get('applied')) is not bool or type(data.get('noop')) is not bool
                 or not isinstance(data.get('changedKeys'), list)
-                or any(not isinstance(key, str) for key in data['changedKeys'])
+                or any(not isinstance(key, key) for key in data['changedKeys'])
                 or not isinstance(data.get('requested'), dict)
                 or not isinstance(data.get('effective'), dict)
                 or data['writeState'] in ('saving', 'error') and not data.get('dryRun')
@@ -1589,6 +1590,11 @@ def app_icon_request(transport, instance, args):
                     source = os.path.abspath(source)
                 except (OSError, ValueError) as error:
                     raise CliError('E_VALIDATION', 'Cannot resolve local artwork path: ' + str(error)) from error
+            # Local artwork (bare paths and file:// URLs) is copied into
+            # Dockrail-managed storage before any host intent is sent; other
+            # schemes keep their historic pass-through for host validation.
+            if not re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*:', source) or source.lower().startswith('file:'):
+                source = ingest_managed_icon(source, key=arguments.get('id', ''))
             arguments['source'] = source
     reply = transport.request(instance, args.group + '.' + args.action, arguments)
     if args.group == 'icons':
@@ -1596,6 +1602,29 @@ def app_icon_request(transport, instance, args):
     if args.action == 'list':
         return validate_applications(reply, instance)
     return validate_mutation(reply, instance)
+
+
+def ingest_managed_icon(source, key=""):
+    """FDM-1068: copy local artwork into Dockrail-managed storage.
+
+    The bundled helper owns the single ingestion path shared with the Change
+    Icon UI. On failure no host intent is sent, so a broken copy can never
+    become a falsely successful mapping.
+    """
+    spec = importlib.util.spec_from_file_location(
+        'dockrail_icons', BUNDLE / 'scripts/dockrail_icons.py')
+    if spec is None or spec.loader is None:
+        raise CliError('E_SETUP', 'Bundled icon storage helper is unavailable.')
+    helper = importlib.util.module_from_spec(spec)
+    previous = sys.dont_write_bytecode
+    try:
+        sys.dont_write_bytecode = True
+        spec.loader.exec_module(helper)
+        return helper.ingest_source(source, key=key)
+    except helper.IconStoreError as error:
+        raise CliError(error.code, error.message)
+    finally:
+        sys.dont_write_bytecode = previous
 
 
 def manage_local_launchers(action):
