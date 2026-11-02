@@ -440,7 +440,10 @@ Item {
       console.warn("Dock: could not load " + configPath + ":", error)
     }
     settingsLoaded = true
-    if (settingsLoadState === "loaded") Qt.callLater(root.startIconMigration)
+    if (settingsLoadState === "loaded") {
+      Qt.callLater(root.startIconMigration)
+      Qt.callLater(root.startIconCollect)
+    }
     if (showTrash) Qt.callLater(root.refreshTrash)
   }
 
@@ -1182,6 +1185,15 @@ Item {
       if (code !== 0) console.warn("Dock: managed icon cleanup was skipped.")
       if (root.iconCollectQueued) Qt.callLater(root.startIconCollect)
     }
+  }
+
+  // Grace-delayed files that were copied while another intent was pending
+  // are eventually reclaimed even if the user makes no further settings edit.
+  Timer {
+    interval: 300000
+    repeat: true
+    running: root.settingsLoaded && root.settingsLoadState === "loaded"
+    onTriggered: root.startIconCollect()
   }
 
   FileView {
