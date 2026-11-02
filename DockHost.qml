@@ -150,6 +150,10 @@ Item {
     id: featureReadinessProbe
   }
   property string dataRoot: ""
+  // FDM-1068: bundled managed-icon storage helper (scripts/dockrail_icons.py).
+  readonly property url iconStoreHelperUrl: Qt.resolvedUrl("scripts/dockrail_icons.py")
+  property string iconStoreStderr: ""
+  property var iconStoreIngestCallback: null
   property var notificationService: null
   property var launcherBadgeService: null
   property var browserProfileService: null
@@ -425,6 +429,7 @@ Item {
       settingsPersisted = true
       settingsWriteState = "idle"
       settingsWriteError = ""
+      root.maybeMigrateIconSources()
     } catch (error) {
       settingsLoadState = "invalid"
       settingsLoadError = String(error)
@@ -502,8 +507,190 @@ Item {
       ? settings.windowIconOverrides : []
     reply.data.effectiveWindowOverrides = DockIconModel.normalizeWindowRules(
       settings.windowIconOverrides)
-    reply.warnings.push("Artwork is referenced in place. Saving or requesting a reload does not verify decoding or rendering.")
+    reply.warnings.push("Custom artwork is stored in Dockrail-managed persistent storage. Saving or requesting a reload does not verify decoding or rendering.")
     return reply
+  }
+
+  // --- Managed icon storage (FDM-1068) ----------------------------------
+  // Custom artwork lives in <dataRoot>/icons, owned by scripts/dockrail_icons.py.
+  // Entry points (Change Icon dialog, icons-set CLI) ingest before saving, so
+  // the synchronous writer below only persists managed references; legacy
+  // in-place references are migrated on load and unowned leftovers pruned.
+  function iconStoreLocalPath(url) {
+    var value = String(url || "")
+    return value.indexOf("file://") === 0 ? decodeURIComponent(value.slice(7)) : value
+  }
+
+  function iconStoreDataRoot() {
+    return typeof root.dataRoot === "string" ? root.dataRoot : ""
+  }
+
+  function iconStoreHelperPath() {
+    if (typeof root.iconStoreHelperUrl === "undefined") return ""
+    return iconStoreLocalPath(root.iconStoreHelperUrl)
+  }
+
+  // Compose a settings patch from helper-reported migrations. Every entry is
+  // re-verified against the live raw map: a key whose value changed meanwhile
+  // is skipped, so concurrent edits are never overwritten and missing sources
+  // keep their mapping for fallback display and removal.
+  function iconMigrationPatch(changed, liveSettings) {
+    var live = liveSettings || ({})
+    var patch = null
+    function overridesPatch() {
+      if (!patch) patch = ({})
+      if (Object.prototype.hasOwnProperty.call(patch, "iconOverrides")) return
+      var source = live.iconOverrides && typeof live.iconOverrides === "object"
+        && !Array.isArray(live.iconOverrides) ? live.iconOverrides : ({})
+      var copy = ({})
+      Object.keys(source).forEach(function(key) { copy[key] = source[key] })
+      patch.iconOverrides = copy
+    }
+    function rulesPatch() {
+      if (!patch) patch = ({})
+      if (Object.prototype.hasOwnProperty.call(patch, "windowIconOverrides")) return
+      var source = Array.isArray(live.windowIconOverrides) ? live.windowIconOverrides : []
+      patch.windowIconOverrides = source.map(function(rule) {
+        return rule && typeof rule === "object" ? {
+          appId: rule.appId, titlePattern: rule.titlePattern, source: rule.source
+        } : rule
+      })
+    }
+    ;(changed || []).forEach(function(entry) {
+      if (!entry || typeof entry !== "object") return
+      if (entry.container === "iconOverrides") {
+        var overrides = live.iconOverrides && typeof live.iconOverrides === "object"
+          && !Array.isArray(live.iconOverrides) ? live.iconOverrides : null
+        if (!overrides || !Object.prototype.hasOwnProperty.call(overrides, entry.locator)) return
+        if (DockIconModel.normalizeSource(overrides[entry.locator])
+            !== DockIconModel.normalizeSource(entry.from)) return
+        if (!DockIconModel.normalizeSource(entry.to)) return
+        overridesPatch()
+        patch.iconOverrides[entry.locator] = entry.to
+      } else if (entry.container === "windowIconOverrides") {
+        var rules = Array.isArray(live.windowIconOverrides) ? live.windowIconOverrides : []
+        var index = -1
+        for (var i = 0; i < rules.length; ++i) {
+          var rule = rules[i]
+          if (rule && DockIconModel.windowRuleKey(rule.appId, rule.titlePattern)
+              === DockIconModel.windowRuleKey(
+                entry.locator && entry.locator.appId, entry.locator && entry.locator.titlePattern)
+              && DockIconModel.normalizeSource(rule.source)
+                === DockIconModel.normalizeSource(entry.from)) {
+            index = i
+            break
+          }
+        }
+        if (index < 0) return
+        if (!DockIconModel.normalizeSource(entry.to)) return
+        rulesPatch()
+        patch.windowIconOverrides[index].source = entry.to
+      }
+    })
+    return patch
+  }
+
+  // Migration runs once per load, only while unmanaged references remain.
+  function maybeMigrateIconSources() {
+    if (typeof iconStoreMigrateProcess === "undefined") return
+    var dataRootValue = iconStoreDataRoot()
+    if (!dataRootValue || !settingsLoaded || settingsLoadState !== "loaded"
+        || settingsReloadPending) return
+    if (iconStoreMigrateProcess.running) return
+    if (!DockIconModel.hasUnmanagedIconSources(settings, dataRootValue)) return
+    var helper = iconStoreHelperPath()
+    if (!helper) return
+    root.iconStoreStderr = ""
+    iconStoreMigrateProcess.command = [
+      "python3", "-B", helper, "migrate", "--config", root.configPath,
+      "--data-root", dataRootValue
+    ]
+    iconStoreMigrateProcess.running = true
+    iconStoreMigrateTimer.restart()
+  }
+
+  function finishIconStoreMigration(reply) {
+    iconStoreMigrateTimer.stop()
+    var changed = reply && reply.ok === true && reply.data
+      && Array.isArray(reply.data.changed) ? reply.data.changed : null
+    if (!changed) {
+      console.warn("Dock: icon migration helper failed:",
+        root.iconStoreStderr || "no reply")
+      return
+    }
+    if (!changed.length) return
+    var patch = iconMigrationPatch(changed, settings)
+    if (!patch) return
+    var checked = ConfigModel.applyPatch(settings, patch,
+      dockControl.validationMetadata())
+    if (!checked.ok) {
+      console.warn("Dock: icon migration patch did not validate; legacy references stay in place.")
+      return
+    }
+    saveSettings(patch, false)
+  }
+
+  // Fire-and-forget cleanup after icon-affecting commits. The keep list comes
+  // from the same live snapshot the writer persisted, so a shared asset is
+  // removed only after its last referencing override disappeared.
+  function requestIconStorePrune(nextSettings) {
+    if (typeof iconStorePruneProcess === "undefined") return
+    var dataRootValue = iconStoreDataRoot()
+    if (!dataRootValue || iconStorePruneProcess.running) return
+    var helper = iconStoreHelperPath()
+    if (!helper) return
+    var keep = DockIconModel.referencedManagedIconFiles(nextSettings, dataRootValue)
+    var command = ["python3", "-B", helper, "prune", "--data-root", dataRootValue]
+    if (keep.length) {
+      command.push("--keep")
+      keep.forEach(function(name) { command.push(name) })
+    }
+    root.iconStoreStderr = ""
+    iconStorePruneProcess.command = command
+    iconStorePruneProcess.running = true
+    iconStorePruneTimer.restart()
+  }
+
+  // Change Icon dialog entry point: copy the selected artwork into managed
+  // storage, then hand the managed URL to the callback. Never commits on
+  // failure, so a broken copy cannot leave a falsely successful mapping.
+  function ingestIconSource(source, key, callback) {
+    if (typeof iconStoreIngestProcess === "undefined" || iconStoreIngestProcess.running) {
+      if (callback) callback({ ok: false,
+        error: { code: "E_BUSY", message: "Icon storage is busy. Try again." } })
+      return false
+    }
+    var dataRootValue = iconStoreDataRoot()
+    var helper = iconStoreHelperPath()
+    if (!dataRootValue || !helper) {
+      if (callback) callback({ ok: false,
+        error: { code: "E_RUNTIME", message: "Icon storage is unavailable." } })
+      return false
+    }
+    root.iconStoreIngestCallback = callback || null
+    root.iconStoreStderr = ""
+    iconStoreIngestProcess.command = [
+      "python3", "-B", helper, "ingest", "--source", String(source || ""),
+      "--key", String(key || ""), "--data-root", dataRootValue
+    ]
+    iconStoreIngestProcess.running = true
+    iconStoreIngestTimer.restart()
+    return true
+  }
+
+  function finishIconStoreIngest(reply) {
+    iconStoreIngestTimer.stop()
+    var callback = root.iconStoreIngestCallback
+    root.iconStoreIngestCallback = null
+    if (!callback) return
+    if (reply && reply.ok === true && reply.data
+        && DockIconModel.normalizeSource(reply.data.source)) {
+      callback({ ok: true, data: { source: reply.data.source } })
+      return
+    }
+    var message = reply && reply.error && typeof reply.error.message === "string"
+      ? reply.error.message : "The image could not be copied into managed storage."
+    callback({ ok: false, error: { code: "E_PERSISTENCE", message: message } })
   }
 
   function saveIconOverride(desktopId, sourceUrl) {
@@ -803,8 +990,10 @@ Item {
       return mutationOutcome(dockControl.mutationData(before, before, [], false, false))
     showTrashSetting = TrashModel.normalizeShowTrash(result.settings.showTrash)
     if (ConfigModel.iconsChanged(before.iconOverrides, result.settings.iconOverrides)
-        || ConfigModel.windowIconsChanged(before.windowIconOverrides, result.settings.windowIconOverrides))
+        || ConfigModel.windowIconsChanged(before.windowIconOverrides, result.settings.windowIconOverrides)) {
       iconReloadRevision++
+      root.requestIconStorePrune(result.settings)
+    }
     settings = result.settings
     settingsRevision++
     settingsDefaultsInUse = false
@@ -1094,6 +1283,121 @@ Item {
   }
 
   Process {
+    id: iconStoreMigrateProcess
+    running: false
+    stdout: SplitParser {
+      onRead: data => {
+        if (iconStoreMigrateProcess.running || iconStoreMigrateTimer.running) {
+          var line = String(data || "")
+          var reply = null
+          try { reply = JSON.parse(line) } catch (error) { reply = null }
+          iconStoreMigrateProcess.running = false
+          root.finishIconStoreMigration(reply)
+        }
+      }
+    }
+    stderr: SplitParser {
+      onRead: data => {
+        if (root.iconStoreStderr.length < 4096)
+          root.iconStoreStderr = (root.iconStoreStderr + String(data || "")).slice(0, 4096)
+      }
+    }
+    onExited: function(exitCode) {
+      iconStoreMigrateTimer.stop()
+      if (root.iconStoreStderr || exitCode !== 0)
+        console.warn("Dock: icon migration helper exited with status " + exitCode
+          + (root.iconStoreStderr ? ": " + root.iconStoreStderr : ""))
+    }
+  }
+
+  Timer {
+    id: iconStoreMigrateTimer
+    interval: 10000
+    repeat: false
+    onTriggered: {
+      if (iconStoreMigrateProcess.running) {
+        iconStoreMigrateProcess.running = false
+        console.warn("Dock: icon migration helper timed out.")
+      }
+    }
+  }
+
+  Process {
+    id: iconStorePruneProcess
+    running: false
+    stdout: SplitParser {
+      onRead: data => { iconStorePruneProcess.running = false }
+    }
+    stderr: SplitParser {
+      onRead: data => {
+        if (root.iconStoreStderr.length < 4096)
+          root.iconStoreStderr = (root.iconStoreStderr + String(data || "")).slice(0, 4096)
+      }
+    }
+    onExited: function(exitCode) {
+      iconStorePruneTimer.stop()
+      if (exitCode !== 0)
+        console.warn("Dock: icon prune helper exited with status " + exitCode
+          + (root.iconStoreStderr ? ": " + root.iconStoreStderr : ""))
+    }
+  }
+
+  Timer {
+    id: iconStorePruneTimer
+    interval: 10000
+    repeat: false
+    onTriggered: {
+      if (iconStorePruneProcess.running) {
+        iconStorePruneProcess.running = false
+        console.warn("Dock: icon prune helper timed out.")
+      }
+    }
+  }
+
+  Process {
+    id: iconStoreIngestProcess
+    running: false
+    stdout: SplitParser {
+      onRead: data => {
+        if (iconStoreIngestProcess.running || iconStoreIngestTimer.running) {
+          var line = String(data || "")
+          var reply = null
+          try { reply = JSON.parse(line) } catch (error) { reply = null }
+          iconStoreIngestProcess.running = false
+          root.finishIconStoreIngest(reply)
+        }
+      }
+    }
+    stderr: SplitParser {
+      onRead: data => {
+        if (root.iconStoreStderr.length < 4096)
+          root.iconStoreStderr = (root.iconStoreStderr + String(data || "")).slice(0, 4096)
+      }
+    }
+    onExited: function(exitCode) {
+      iconStoreIngestTimer.stop()
+      // A crash before any JSON line must still release the waiting dialog.
+      if (root.iconStoreIngestCallback) root.finishIconStoreIngest(null)
+      if (root.iconStoreStderr || exitCode !== 0)
+        console.warn("Dock: icon ingest helper exited with status " + exitCode
+          + (root.iconStoreStderr ? ": " + root.iconStoreStderr : ""))
+    }
+  }
+
+  Timer {
+    id: iconStoreIngestTimer
+    interval: 10000
+    repeat: false
+    onTriggered: {
+      if (iconStoreIngestProcess.running) {
+        iconStoreIngestProcess.running = false
+        root.finishIconStoreIngest(null)
+        console.warn("Dock: icon ingest helper timed out.")
+      }
+    }
+  }
+
+  Process {
     id: trashEmptyProcess
     command: ["gio", "trash", "--empty"]
     onExited: function(exitCode) {
@@ -1120,7 +1424,7 @@ Item {
     onSaveFailed: error => root.settingsSaveFailed(error)
   }
 
-  // Custom icons are referenced in place; editing a referenced PNG/SVG
+  // Custom icons live in Dockrail-managed storage; editing a referenced PNG/SVG
   // refreshes the renderer without a CLI reload or any settings write.
   DockIconReloadScheduler {
     id: iconReloadScheduler
