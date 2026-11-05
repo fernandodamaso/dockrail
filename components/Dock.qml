@@ -1248,11 +1248,13 @@ PanelWindow {
     id: interactionArea
 
     // Keep the grouped native surface stable while cards resize inside it.
-    // The compact input region leaves the transparent sides click-through.
+    // Exclude animation headroom, but keep the screen-edge approach reachable
+    // for auto-hide and native drag reveal.
     width: root.grouped && !root.fullLength
       ? Math.min(parent.width, root.compactPanelExtent) : parent.width
-    height: parent.height
+    height: root.vertical ? parent.height : dockBackground.height + root.edgeMargin
     x: (parent.width - width) / 2
+    y: root.position === "bottom" ? parent.height - height : 0
 
     // Whole-dock visibility hold for a content drag. It is passive: it only
     // keeps the surface reachable while the pointer is on any dock pixel, and

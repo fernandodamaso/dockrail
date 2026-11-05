@@ -155,6 +155,9 @@ ShellRoot {
       if (region.width !== dock.compactPanelExtent || region.width >= dock.implicitWidth
           || region.x * 2 + region.width !== dock.width)
         throw new Error("Compact input region must stay centered and exclude transparent sides")
+      if (region.height !== 66 || region.y !== dock.height - 66)
+        throw new Error("Input must exclude animation headroom and retain the edge approach: y="
+          + region.y + " height=" + region.height)
       dock.workspacePresentation = { groups: [], globalLaunchers: [],
         fallbackItems: [], renderedItems: [] }
       settle(dock.contentItem)
