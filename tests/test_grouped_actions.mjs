@@ -777,6 +777,39 @@ function dockGeometry(options = {}) {
     visibleRight: surfaceX + viewportX + groupedLayout.contentPadding + 300,
     desiredWidth: groupedLayout.desiredWidth }
 }
+// The animation canvas must not intercept input above the visible dock.
+// Keep the screen-edge margin reachable for auto-hide and native drag reveal.
+const inputSource = dockSource.split('id: interactionArea')[1]
+function inputGeometry({ iconSize = 24, magnification = 1.15, grouped = true,
+  position = 'bottom', edgeMargin = 10, fullLength = false } = {}) {
+  const root = { iconSize, magnification, grouped, position, edgeMargin,
+    fullLength, vertical: false, compactPanelExtent: 600 }
+  const parent = { width: fullLength ? 1920 : 600,
+    height: binding(dockSource, 'readonly property int crossExtent', root) }
+  const dockBackground = { height: binding(backgroundSource, 'height', { root, parent }) }
+  dockBackground.y = binding(backgroundSource, 'y',
+    { root, parent, height: dockBackground.height })
+  const area = { height: binding(inputSource, 'height', { root, parent, dockBackground }) }
+  area.y = inputSource.match(/^    y:/m)
+    ? binding(inputSource, 'y', { root, parent, dockBackground, ...area }) : 0
+  return { parent, dockBackground, area }
+}
+const reportedInput = inputGeometry()
+assert.equal(reportedInput.parent.height, 102, 'drawing canvas retains animation headroom')
+assert.equal(reportedInput.area.y, 36, 'input starts at the visible dock, below blank headroom')
+assert.equal(reportedInput.area.height, 66, 'input retains the 56px dock and 10px edge approach')
+for (const iconSize of [24, 64, 96]) for (const magnification of [1, 1.15, 2])
+  for (const grouped of [false, true]) for (const fullLength of [false, true])
+    for (const edgeMargin of [0, 10, 24]) {
+      const { parent, dockBackground, area } = inputGeometry({
+        iconSize, magnification, grouped, fullLength, edgeMargin })
+      const containsY = y => y >= area.y && y < area.y + area.height
+      assert.equal(containsY(dockBackground.y - 1), false,
+        'transparent headroom passes hover and clicks to the window below')
+      assert.equal(containsY(dockBackground.y), true, 'visible dock remains interactive')
+      assert.equal(containsY(parent.height - 1), true, 'screen-edge reveal approach stays interactive')
+    }
+
 for (const iconSize of [24, 31, 64, 96]) for (const magnification of [1, 1.2, 2])
   for (const groupedFullscreenModeActive of [false, true]) {
     const g = dockGeometry({ iconSize, magnification, groupedFullscreenModeActive })
