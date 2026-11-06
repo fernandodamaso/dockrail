@@ -57,13 +57,13 @@ assert.equal(records[0].text, 'Herdr · worktree-herdr-dock')
 assert.equal(records[0].muted, true)
 assert.deepEqual(Array.from(records.slice(1, -1), record => record.id), [
   'herdr:srv:blocked',
-  'herdr:srv:working',
   'herdr:srv:done',
   'herdr:srv:remote',
-], 'agent records are sorted by raw status urgency')
+  'herdr:srv:working',
+], 'agent records: blocked, done, idle, then working last')
 assert.equal(records.at(-1).kind, 'separator')
 assert.equal(records.at(-1).id, 'herdr:separator')
-assert.deepEqual(captures, ['blocked', 'working', 'done', 'remote'],
+assert.deepEqual(captures, ['blocked', 'done', 'remote', 'working'],
   'every exact target is captured in display order when the menu opens')
 
 const remote = records.find(record => record.id === 'herdr:srv:remote')

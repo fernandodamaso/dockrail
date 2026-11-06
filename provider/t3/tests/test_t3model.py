@@ -69,9 +69,62 @@ class ClassifyTests(unittest.TestCase):
         t = thread(status="running", pendingRuntimeRequest={"kind": "approval"})
         self.assertEqual(classify(t, NOW_MS), "blocked")
 
-    def test_actionable_plan_is_blocked(self) -> None:
-        t = thread(status="idle", hasActionableProposedPlan=True)
+    def test_actionable_plan_on_waiting_run_is_blocked(self) -> None:
+        t = thread(status="waiting", hasActionableProposedPlan=True)
         self.assertEqual(classify(t, NOW_MS), "blocked")
+
+    def test_actionable_plan_on_completed_unread_is_done(self) -> None:
+        t = thread(
+            status="completed",
+            hasActionableProposedPlan=True,
+            latestRunCompletedAt="2026-10-23T15:00:00.000Z",
+        )
+        self.assertEqual(classify(t, NOW_MS), "done")
+
+    def test_actionable_plan_on_completed_read_is_idle(self) -> None:
+        t = thread(
+            status="completed",
+            hasActionableProposedPlan=True,
+            latestRunCompletedAt="2026-10-23T14:00:00.000Z",
+            lastVisitedAt="2026-10-23T15:00:00.000Z",
+        )
+        self.assertEqual(classify(t, NOW_MS), "idle")
+
+    def test_nonblocking_request_on_running_thread_is_working(self) -> None:
+        t = thread(
+            status="running",
+            pendingRuntimeRequest={"kind": "user_input", "blocking": False},
+        )
+        self.assertEqual(classify(t, NOW_MS), "working")
+
+    def test_blocking_request_on_waiting_thread_is_blocked(self) -> None:
+        t = thread(
+            status="waiting",
+            pendingRuntimeRequest={"kind": "question", "blocking": True},
+        )
+        self.assertEqual(classify(t, NOW_MS), "blocked")
+
+    def test_leftover_request_on_cancelled_thread_is_idle(self) -> None:
+        # A request whose run already ended can never be answered through it;
+        # it must not pin the thread amber regardless of its blocking flag.
+        for blocking in (True, False):
+            with self.subTest(blocking=blocking):
+                t = thread(
+                    status="cancelled",
+                    pendingRuntimeRequest={
+                        "kind": "user_input",
+                        "blocking": blocking,
+                    },
+                )
+                self.assertEqual(classify(t, NOW_MS), "idle")
+
+    def test_leftover_request_on_completed_thread_does_not_mask_done(self) -> None:
+        t = thread(
+            status="completed",
+            pendingRuntimeRequest={"kind": "approval", "blocking": True},
+            latestRunCompletedAt="2026-10-23T15:00:00.000Z",
+        )
+        self.assertEqual(classify(t, NOW_MS), "done")
 
     def test_activity_run_status_is_working(self) -> None:
         for activity in ("preparing", "starting", "running", "waiting"):
@@ -241,11 +294,38 @@ class VisibilityTests(unittest.TestCase):
         visible, _ = visible_threads(self.store_with(t), NOW_MS)
         self.assertEqual(visible, [])
 
-    def test_idle_old_hidden_idle_recent_kept(self) -> None:
+    def test_idle_unpinned_visible_as_gray(self) -> None:
+        # Idle means quiet but live: not settled, not snoozed, not done,
+        # nothing running or waiting. Those are the gray sidebar rows and
+        # they stay until the user settles them.
         old = thread(id="old", status="stopped", updatedAt="2026-10-20T00:00:00.000Z")
         new = thread(id="new", status="stopped", updatedAt="2026-10-23T16:00:00.000Z")
         visible, _ = visible_threads(self.store_with(old, new), NOW_MS)
-        self.assertEqual([row["id"] for row in visible], ["new"])
+        self.assertEqual([row["id"] for row in visible], ["new", "old"])
+
+    def test_done_turns_gray_once_read(self) -> None:
+        # A completed+unread thread is the green done row; reading it clears
+        # the unread flag, so it becomes an ordinary gray idle row. It only
+        # leaves the sidebar when settled.
+        t = thread(
+            id="a",
+            status="completed",
+            latestRunCompletedAt="2026-10-23T14:00:00.000Z",
+            lastVisitedAt="2026-10-23T15:00:00.000Z",
+            updatedAt="2026-10-23T16:00:00.000Z",
+        )
+        visible, _ = visible_threads(self.store_with(t), NOW_MS)
+        self.assertEqual([row["id"] for row in visible], ["a"])
+
+    def test_settled_leftover_request_hidden(self) -> None:
+        t = thread(
+            id="a",
+            status="cancelled",
+            settledAt="2026-10-23T15:00:00.000Z",
+            pendingRuntimeRequest={"kind": "user_input", "blocking": False},
+        )
+        visible, _ = visible_threads(self.store_with(t), NOW_MS)
+        self.assertEqual(visible, [])
 
     def test_idle_pinned_kept(self) -> None:
         t = thread(
@@ -254,6 +334,26 @@ class VisibilityTests(unittest.TestCase):
         )
         visible, _ = visible_threads(self.store_with(t), NOW_MS)
         self.assertEqual([row["id"] for row in visible], ["a"])
+
+    def test_sort_needs_attention_done_idle_then_working(self) -> None:
+        # Sidebar order: needs-you (blocked) on top, then done/ready, then
+        # gray idle rows, working spinners last regardless of recency.
+        w = thread(id="w", status="running", updatedAt="2026-10-23T16:00:00.000Z")
+        i = thread(id="i", status="stopped", updatedAt="2026-10-23T15:00:00.000Z")
+        d = thread(
+            id="d", status="completed",
+            latestRunCompletedAt="2026-10-23T14:00:00.000Z",
+            lastVisitedAt="2026-10-23T13:00:00.000Z",
+            updatedAt="2026-10-23T14:00:00.000Z",
+        )
+        b = thread(
+            id="b", status="failed",
+            latestRunCompletedAt="2026-10-23T12:00:00.000Z",
+            lastVisitedAt="2026-10-23T11:00:00.000Z",
+            updatedAt="2026-10-23T12:00:00.000Z",
+        )
+        visible, _ = visible_threads(self.store_with(w, i, d, b), NOW_MS)
+        self.assertEqual([row["id"] for row in visible], ["b", "d", "i", "w"])
 
     def test_sort_blocked_first_then_updated(self) -> None:
         a = thread(id="a", status="running", updatedAt="2026-10-23T10:00:00.000Z")
@@ -552,8 +652,12 @@ class SnapshotTests(unittest.TestCase):
 
     def test_settlement_does_not_hide_active_subagent_work(self) -> None:
         for active, status in (
-            ({"pendingRuntimeRequest": {"kind": "approval"}}, "blocked"),
-            ({"hasActionableProposedPlan": True}, "blocked"),
+            # blocked requires a live run: a parked (waiting) run holding a
+            # blocking request or an actionable plan is genuinely active.
+            ({"status": "waiting",
+              "pendingRuntimeRequest": {"kind": "approval"}}, "blocked"),
+            ({"status": "waiting",
+              "hasActionableProposedPlan": True}, "blocked"),
             ({"status": "running"}, "working"),
             ({"activityRunStatus": "running"}, "working"),
             ({"pendingBackgroundTasks": [{"kind": "task"}]}, "working"),
