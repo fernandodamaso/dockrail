@@ -238,7 +238,10 @@ function expiredFocusRequestIds(pending, now, deadlineMs) {
 // Display order for nonzero status counters and agent lists:
 // blocked → working → done → idle → unknown.
 var STATUS_ORDER = ["blocked", "working", "done", "idle", "unknown"]
-var AGENT_STATUS_SORT = STATUS_ORDER
+// Sidebar row order, independent of counter order: what needs the user
+// first (blocked, then done/ready), quiet idle rows after that, and working
+// spinners last — an agent that is already working needs nothing.
+var AGENT_STATUS_SORT = ["blocked", "done", "idle", "working", "unknown"]
 
 function normalizeStatus(value) {
   if (typeof value !== "string") return "unknown"

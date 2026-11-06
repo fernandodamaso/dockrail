@@ -22,8 +22,10 @@ MAX_OUTPUT_FRAME = 1024 * 1024
 
 WORKING_ACTIVITY = ("preparing", "starting", "running", "waiting")
 WORKING_STATUS = ("queued", "preparing", "starting", "running", "waiting")
-STATUS_RANK = {"blocked": 0, "working": 1, "done": 2, "idle": 3}
-DAY_MS = 24 * 60 * 60 * 1000
+# Sidebar order: what needs the user first (blocked, then done/ready),
+# quiet idle rows after that, and working spinners last — an agent that is
+# already working needs nothing, so it sinks to the bottom.
+STATUS_RANK = {"blocked": 0, "done": 1, "idle": 2, "working": 3}
 
 
 class Failure(Exception):
@@ -88,10 +90,24 @@ def unread(thread: dict[str, Any]) -> bool:
 def classify(thread: dict[str, Any], now_ms: int) -> str:
     """Map a T3 thread to the Herdr status enum (first match wins)."""
     _ = now_ms
+    live_run = thread.get("status") in WORKING_STATUS
     pending = thread.get("pendingRuntimeRequest")
-    if isinstance(pending, dict) and pending.get("kind"):
+    if (
+        isinstance(pending, dict)
+        and pending.get("kind")
+        and pending.get("blocking") is not False
+        and live_run
+    ):
+        # Only a blocking request on a live run needs the user. A
+        # non-blocking request never pauses the agent (the run keeps
+        # working), and a request whose run already ended can never be
+        # answered through it: neither may mask the spinner or pin the
+        # thread amber.
         return "blocked"
-    if thread.get("hasActionableProposedPlan") is True:
+    if thread.get("hasActionableProposedPlan") is True and live_run:
+        # A plan awaiting approval while the run is parked needs the user.
+        # Once the run has ended the flag is just an unread result: the
+        # completed/unread rules below decide between done and idle.
         return "blocked"
     if thread.get("activityRunStatus") in WORKING_ACTIVITY:
         return "working"
@@ -240,15 +256,12 @@ def visible_threads(
             continue
         if thread.get("settledAt") and status not in ("blocked", "working"):
             continue
-        if _is_subagent(thread):
-            if status not in ("blocked", "working"):
-                continue
-        else:
-            if status == "idle":
-                if not thread.get("pinnedAt"):
-                    updated = _parse_ms(thread.get("updatedAt"))
-                    if updated is None or now_ms - updated > DAY_MS:
-                        continue
+        if _is_subagent(thread) and status not in ("blocked", "working"):
+            continue
+        # Everything else stays: idle threads are the gray "quiet but live"
+        # rows. The sidebar only drops a thread when the user dismisses it
+        # (settled, above), snoozes it, or when it is a subagent whose result
+        # belongs to the parent.
         updated = _parse_ms(thread.get("updatedAt"))
         ranked.append(
             (STATUS_RANK[status], -(updated or 0), str(thread.get("id")), thread)
