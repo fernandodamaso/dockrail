@@ -793,7 +793,27 @@ Item {
     if (root.interactionBusy || !root.targetIsCurrent(target)) return false
     var accepted = false
     if (target.kind === "herdr-agent") {
-      if (control === true) return false
+      if (control === true) {
+        // Only the native Ctrl tap may authorize a move. Use the captured
+        // panel connector, never the monitor that gains focus during dispatch.
+        if (typeof modifiers !== "number" || modifiers !== Qt.ControlModifier)
+          return false
+        var agentConnector = String(clickedConnector || "")
+        if (!root.connectorIsMapped(agentConnector)) return false
+        var agentMonitor = root.windowActions.canonicalMonitorIdentity(agentConnector)
+        if (!agentMonitor || !root.herdrAgentActions
+            || !root.herdrAgentActions.herdrService
+            || typeof root.herdrAgentActions.herdrService.focusAgent !== "function")
+          return false
+        // Same-monitor navigation focuses the agent in place. A minimized
+        // window still needs the shared pull/restore path.
+        var agentWindow = root.windowActions.windowState(target.toplevel)
+        var sameMonitor = agentWindow && !agentWindow.minimized && agentWindow.monitor
+          && root.windowActions.canonicalMonitorIdentity(agentWindow.monitor) === agentMonitor
+        if (!sameMonitor && !root.windowActions.pullToplevelToMonitorWorkspace(
+              target.toplevel, true, agentMonitor)) return false
+        return root.herdrAgentActions.activateHerdrTarget(target)
+      }
       if (Number(modifiers || 0) !== Number(Qt.NoModifier)) return false
       return root.herdrAgentActions
         ? root.herdrAgentActions.activateHerdrTarget(target) : false
