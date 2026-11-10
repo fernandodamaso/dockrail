@@ -33,7 +33,7 @@
       "type": "object",
       "format": "icon-overrides",
       "resetWithPreferences": false,
-      "description": "SmartDock-only local PNG/SVG artwork by desktop ID. Prefer icons set/reset for single-app edits; no rendering verification is implied.",
+      "description": "Dockrail-managed persistent PNG/SVG artwork by desktop ID. Prefer icons set/reset for single-app edits; no rendering verification is implied.",
       "ui": {
         "section": "apps",
         "group": "custom-icons",

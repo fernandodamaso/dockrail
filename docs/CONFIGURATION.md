@@ -117,7 +117,7 @@ Workspace drag/drop continues to scan the one global workspace-card repeater and
 
 Right click remains the context menu. Existing modifier precedence, grouped close/minimize/restore and wheel rules remain unchanged. Pinning does not show a hidden app; hiding does not unpin/close it; unpinning does not hide a running app. Restore and move use exact host-discovered IDs and preserve unrelated order, including unavailable entries. Application display-name queries are discovery, not mutation identities.
 
-Icon overrides are app-wide and Dockrail-only. Set/reset changes one latest-map entry, including for an unavailable safe identity, without changing desktop files, launch commands, grouping or screenshots. The local PNG/SVG is referenced in place. The dock watches referenced files and refreshes automatically after a same-path edit, replacement, deletion or recreation; `icons reload` remains for compatibility and to force a refresh. Humans can also edit app-wide, browser-profile and window-title artwork through the context menu's host-owned **Change Icon…** dialog, which saves through the same writer; the CLI remains the scripting interface. Missing/corrupt artwork retains the mapping and uses the bounded original/generic/bundled-glyph fallback. All CLI icon acknowledgments retain `renderVerified: false`.
+Icon overrides are app-wide and Dockrail-only. Set/reset changes one latest-map entry, including for an unavailable safe identity, without changing desktop files, launch commands, grouping or screenshots. Supported local PNG/SVG bytes are ingested into persistent Dockrail-owned XDG data storage, with only their managed file URLs saved. Moving or deleting the original image does not break the override. Re-run `icons set` to import new source bytes; `icons reload` can redraw the currently saved managed image without recopying it. Humans can also edit app-wide, browser-profile and window-title artwork through the context menu's host-owned **Change Icon…** dialog, which saves through the same writer; the CLI remains the scripting interface. Missing/corrupt artwork retains the mapping and uses the bounded original/generic/bundled-glyph fallback. All CLI icon acknowledgments retain `renderVerified: false`.
 
 Window icon overrides are a separate ordered rule collection keyed by normalized raw
 Wayland `(appId, titlePattern)`. Only `*` is wildcard syntax; matching is
@@ -133,8 +133,10 @@ desktop icon → generic icon → bundled glyph. Reset removes only the exact ru
 may expose another rule or fallback. A source-only edit keeps stable rule/presentation
 identity; changing the pattern may change identity. Source A→B propagation and
 same-source byte reload are distinct: the latter advances the shared artwork revision
-without a redundant settings write. Malformed/duplicate collections are rejected
-unchanged; no migration or partial repair is attempted.
+without a redundant settings write. Malformed/duplicate collections are rejected unchanged. On startup,
+recoverable legacy external artwork references are copied and migrated through
+the one host writer with current-state conflict checks; missing originals
+remain configured as removable fallback entries, without unrelated data loss.
 
 ## Reset, preservation and executable settings
 

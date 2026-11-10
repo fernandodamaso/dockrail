@@ -663,10 +663,12 @@ action glyphs. A browser tab grouped as Chrome remains a Chrome item; custom
 artwork does not split browser groups.
 
 Only local static PNG/SVG files are accepted. Ordinary relative paths supplied
-to the CLI are resolved from its current directory; the host accepts absolute
-local paths and local `file:///` URLs, preserving spaces and Unicode. Remote
-URLs and other formats are rejected. Files are referenced in place, not copied,
-so keep them outside the plugin checkout. Per-app set/reset preserves unrelated
+to the CLI are resolved from its current directory, and supported local
+`file:///` URLs preserve spaces and Unicode. `icons set` and Change Icon
+copy valid artwork into persistent `$XDG_DATA_HOME/dockrail/icons/` storage
+before saving its managed file URL. The original is never moved or deleted, and
+a later move/deletion of the original does not break the custom icon. Remote
+URLs and other formats are rejected. Per-app set/reset preserves unrelated
 map entries. Preference reset also preserves `iconOverrides`.
 
 The bounded fallback is **custom file → original desktop icon →
@@ -674,12 +676,12 @@ The bounded fallback is **custom file → original desktop icon →
 artwork is not tinted. Missing or corrupt images retain the requested mapping
 and fall back instead of being silently removed.
 
-The dock watches referenced artwork files and refreshes automatically about
-250 ms after one is edited, replaced, deleted or recreated at the same path.
-`icons reload ID` remains for compatibility and to force a refresh; it bumps the
-global artwork revision without writing settings, and other mapped icons may
-refresh too. Setting an equivalent source also requests a reload without a
-redundant save. Every successful icon response
+The dock watches its managed artwork files for edits and refreshes the image
+about 250 ms after a change. Editing the original file does not modify its
+managed copy: use `icons set ID PATH` again to ingest changed bytes.
+`icons reload ID` remains for compatibility and can force a redraw of an
+existing managed image without a settings write. Setting an equivalent source
+also requests a reload without a redundant save. Every successful icon response
 reports `renderVerified: false`: persistence and reload requests do not prove
 image decoding or a visible redraw. Check the visible result on your Omarchy
 desktop; headless tests cannot confirm image decoding or cache behavior there.
