@@ -262,9 +262,9 @@ PanelWindow {
   // Border/Util; first-party BorderSurface usage in plugins/panels/tailscale.
   // Theme-reactive card fills for expanded section chrome (phase 4).
   readonly property QtObject sidebarAppearance: QtObject {
-    readonly property color monitorFill: Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035))
+    readonly property color monitorFill: Util.alpha(Commons.Color.foreground, 0.035)
     readonly property color workspaceFill: Qt.darker(Commons.Color.background, 1.04)
-    readonly property color workspaceHoverFill: Qt.tint(workspaceFill, Util.alpha(Commons.Color.foreground, 0.09))
+    readonly property color workspaceHoverFill: Util.alpha(Commons.Color.foreground, 0.09)
     readonly property color activeWorkspaceBorder: Util.alpha(Commons.Color.accent, 0.50)
     readonly property real cardRadius: Math.min(3, Style.cornerRadius)
   }

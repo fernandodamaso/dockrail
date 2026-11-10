@@ -57,11 +57,11 @@ FocusScope {
   readonly property real cardRadius: appearance && appearance.cardRadius !== undefined
     ? appearance.cardRadius : Math.min(3, Style.cornerRadius)
   readonly property color monitorFill: appearance ? appearance.monitorFill
-    : Qt.tint(Color.background, Util.alpha(Color.foreground, 0.035))
+    : Util.alpha(Color.foreground, 0.035)
   readonly property color workspaceFill: appearance ? appearance.workspaceFill
     : Qt.darker(Color.background, 1.04)
   readonly property color workspaceHoverFill: appearance ? appearance.workspaceHoverFill
-    : Qt.tint(workspaceFill, Util.alpha(Color.foreground, 0.09))
+    : Util.alpha(Color.foreground, 0.09)
   readonly property color monitorDropFill: Style.pressedFillFor(Color.accent, Color.accent)
   readonly property var workspaceRects: root.workspaceGroupRects()
   readonly property var workspacePlaceholder: {

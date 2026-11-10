@@ -14,10 +14,10 @@ Item {
   property var appearance: null
   property real contentInset: Style.space(5) + Style.space(4)
   readonly property color idleCardFill: appearance
-    ? appearance.monitorFill : Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035))
+    ? appearance.monitorFill : Util.alpha(Commons.Color.foreground, 0.035)
   readonly property color headerHoverFill: appearance
     ? appearance.workspaceHoverFill
-    : Qt.tint(Qt.darker(Commons.Color.background, 1.04), Util.alpha(Commons.Color.foreground, 0.09))
+    : Util.alpha(Commons.Color.foreground, 0.09)
   readonly property real widgetCardRadius: appearance && appearance.cardRadius !== undefined
     ? appearance.cardRadius : Math.min(3, Style.cornerRadius)
   property bool bodyNavigationEnabled: true
