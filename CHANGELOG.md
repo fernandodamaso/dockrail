@@ -29,7 +29,6 @@ Dockrail 3.1 adds native Settings and developer-session integrations on top of t
 - Sidebar monitor cards render as translucent overlays instead of opaque surfaces.
 - Settings invocation targets the focused monitor reliably.
 
-
 - Failed T3 subagent threads no longer pin an orange "needs you" row in the
   dock. Their failure belongs to the parent run, and a subagent thread is
   never visited, so the row came back after every snooze expired.
