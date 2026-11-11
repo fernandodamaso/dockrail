@@ -72,7 +72,8 @@ with the same feature-readiness checks and guides optional setup through the run
 shell's `PATH` to use `dockrail` by name.
 
 Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
-Dockrail 3.0.0 introduced the new plugin ID (retained in 3.1.0), so reinstall once when upgrading from SmartDock. Your settings in
+Dockrail 3.0.0 introduced the new plugin ID (retained in 3.1.0), so
+reinstall once when upgrading from SmartDock. Your settings in
 `~/.config/dockrail` (or legacy `~/.config/smartdock`) are kept:
 
 ```bash
