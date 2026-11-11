@@ -2,8 +2,18 @@
 
 ## [Unreleased]
 
+_No entries yet._
+
+## 3.1.0 - Release candidate (publication date pending)
+
+Dockrail 3.1 adds native Settings and developer-session integrations on top of the 3.0 compatibility-preserving SmartDock-to-Dockrail migration. This candidate retains the existing plugin ID, user configuration and legacy compatibility; the intentional 4.0 cutover is not part of this release.
+
 ### Added
 
+- A single host-owned Omarchy Settings panel with Layout, Appearance, Behavior, Sidebar & Widgets, Features, Apps and search. The panel uses the same settings writer as the CLI and reports persistence and conflict states.
+- Guided `dockrail setup` onboarding, feature-readiness checks with `dockrail doctor`, and a documented plugin-side CLI-only installation path.
+- Drag-hover navigation across sidebar windows, workspaces, tabs and classic-dock targets, with configurable dwell time and enablement.
+- Focused-monitor dock/sidebar presentation toggling through the host CLI/IPC.
 - T3 Code threads (sidebar widget `t3.threads`, dock indicators `dockT3Indicators`, `dockrail t3 pair|status|unpair`).
 - Claude Desktop session state on its dock icon and sidebar window row
   (working spinner, input needed, done). A session needs input when Claude
@@ -13,6 +23,12 @@
   `dockrail claude hooks install|status|uninstall`).
 
 ### Fixed
+
+- T3 attention and idle-row classification and agent row ordering.
+- Classic-dock pointer input no longer includes transparent animation headroom.
+- Sidebar monitor cards render as translucent overlays instead of opaque surfaces.
+- Settings invocation targets the focused monitor reliably.
+
 
 - Failed T3 subagent threads no longer pin an orange "needs you" row in the
   dock. Their failure belongs to the parent run, and a subagent thread is
