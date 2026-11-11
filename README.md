@@ -72,7 +72,7 @@ with the same feature-readiness checks and guides optional setup through the run
 shell's `PATH` to use `dockrail` by name.
 
 Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
-Dockrail 3.0.0 uses a new plugin ID, so reinstall once. Your settings in
+Dockrail 3.0.0 introduced the new plugin ID (retained in 3.1.0), so reinstall once when upgrading from SmartDock. Your settings in
 `~/.config/dockrail` (or legacy `~/.config/smartdock`) are kept:
 
 ```bash
@@ -469,9 +469,13 @@ for atomic patches, dry runs, persistence errors, reset scope and safe exports.
 [`config/dock.json`](config/dock.json) contains bundled defaults, not necessarily
 the running configuration.
 
-The CLI is the configuration interface for AI coding agents and automation.
-The accepted [Settings 3.1 design](docs/SETTINGS.md) is not shipped yet; there is
-no live preference preview. **Change Icon** remains the sole icon editor:
+The CLI remains the complete configuration interface for AI coding agents
+and automation. Dockrail 3.1 also includes a host-owned graphical Settings
+panel on Omarchy, available from the sidebar Settings gear and through
+`dockrail settings` against a running host. Settings applies changes through
+the same writer as the CLI; it does not create a separate unsaved-preview
+configuration. See the [Settings design and behavior](docs/SETTINGS.md).
+**Change Icon** remains the sole icon editor:
 right-click an app, window or pinned app and choose **Change Icon…** to edit its app-wide, browser-profile or window-title icon
 through the same host writer. The dock, ordinary window previews, application picker,
 context menus, drag reordering, workspace controls and Trash remain available.
