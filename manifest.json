@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.fernandodamaso.dockrail",
   "name": "Dockrail",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": "Dockrail contributors",
   "license": "MIT",
   "description": "A developer-focused workspace rail for Hyprland — apps, windows, workspaces, widgets, and coding-agent sessions in one surface.",

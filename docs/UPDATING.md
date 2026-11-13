@@ -1,29 +1,35 @@
-# Updating SmartDock
+# Updating Dockrail
 
-SmartDock is installed as a Git-managed Omarchy plugin from the SmartDock
-fork. Run the normal update command with the public plugin ID:
+Dockrail is installed as a Git-managed Omarchy plugin from the public
+`fernandodamaso/dockrail` repository. Update it with:
 
 ```bash
 omarchy plugin update io.github.fernandodamaso.dockrail --yes
 ```
 
-Updates pull the fork's default `main` branch. They preserve the user's
-settings in `~/.config/smartdock/dock.json`; plugin updates do not replace or
-reset that file.
+Updates pull the repository's default `main` branch. They preserve the
+canonical user configuration at `~/.config/dockrail/dock.json` (or its
+`XDG_CONFIG_HOME` equivalent). The existing 3.x legacy SmartDock migration
+compatibility is retained; updating the plugin does not reset user settings.
+
+If you have temporarily linked a development checkout with `dockrail dev use`,
+run `dockrail dev reset` **before** updating the installed plugin. Otherwise
+the update could affect the linked source checkout.
 
 Installed plugin files are deployment state and must not be edited directly.
-Contributors should work in `/home/admin/Projects/smart-omarchy-dock` or in
-their own development clone, then push changes and update the installed copy
-through Omarchy.
+Contributors should use a separate source clone and deliver changes through
+a reviewed pull request to `main`.
 
 ## Fast-forward failures
 
 Omarchy updates the installed checkout with a fast-forward-only pull. A
-fast-forward failure means that the installed checkout has local changes or
-otherwise no longer follows the fork's history. Preserve any intentional
-edits elsewhere before reinstalling the plugin from the fork; do not repair
-the deployment checkout by editing it in place.
+fast-forward failure means the installed checkout has local changes or no
+longer follows the repository history. Preserve intentional edits in a
+separate checkout before reinstalling from the public repository; do not
+repair the deployed plugin by editing its files in place.
 
-The `origin` remote in an installed checkout points to SmartDock. The
-`upstream` remote is relevant only in development clones, where upstream
-changes are imported deliberately on a reviewed branch.
+## Standalone installations
+
+The `dockrail update` command applies to an installed **standalone** copy
+from its local source; it does not update the Omarchy plugin. Use the
+`omarchy plugin update` command above for plugin installations.
