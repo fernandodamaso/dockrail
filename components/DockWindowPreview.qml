@@ -1289,6 +1289,7 @@ PopupWindow {
 
   Connections {
     target: root.anchorScreen
+    ignoreUnknownSignals: true
     function onDestroyed() { root.dismissImmediately() }
   }
 
