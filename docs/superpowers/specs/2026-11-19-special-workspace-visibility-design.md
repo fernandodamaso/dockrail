@@ -92,7 +92,8 @@ Wispr status overlay.
 - `keymap/alttab.lua`: `switchable()` also requires
   `not (w.workspace and w.workspace.special)`. A focused scratchpad window is
   therefore never a candidate; from inside a shown scratchpad Alt+Tab lands on
-  the newest normal window, which retracts the overlay.
+  the most recently focused normal window (the MRU head, index 1, matching the
+  existing empty-workspace behaviour), which retracts the overlay.
 
 ## Tests
 

@@ -73,7 +73,9 @@ function fixture(options = {}) {
   window('aa', 'app.hidden', { id: 3 }, 1)
   window('ab', 'app.editor', { id: 6 }, 9) // unresolved owner
   window('ac', 'app.editor', { id: 7 }, 0) // conflicting native owner evidence
-  window('ad', 'app.editor', { name: 'special:scratch' }, 1)
+  // Special workspaces are deliberately absent from classic presentation and are
+  // characterized separately by tests/test_desktop_special_workspaces.mjs, so the
+  // frozen reference and the production model compare on identical inventories.
   window('ae', 'app.editor', { id: 3 }, 1, { pending: true })
   window('af', 'app.editor', { id: 3 }, 1, { pending: true })
   window('ba', 'app.unknown', null, null, { noHandle: true })

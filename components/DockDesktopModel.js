@@ -20,8 +20,16 @@ function build(input) {
   var sidebar = input.mode === "sidebar"
   if (!sidebar && input.mode !== "classic-flat" && input.mode !== "classic-grouped")
     throw new Error("Unsupported desktop presentation mode: " + input.mode)
+
+  // Special workspaces are overlays: only windows Dockrail can present reach the
+  // desktop model. The flat path arrives pre-filtered through the shared scope
+  // filter; this clamps the grouped and sidebar inventories. `input.toplevels`
+  // stays raw so windowRuleMatches keeps resolving against the caller's order.
+  var presentationToplevels = DockWindowModel.filterPresentationToplevels(
+    input.toplevels, input.hyprToplevels, input.minimizedOrigins)
+
   if (sidebar) input = Object.assign({}, input, {
-    filteredToplevels: input.toplevels,
+    filteredToplevels: presentationToplevels,
     settings: Object.assign({}, input.settings, {
       workspaceMonitorScope: "all", workspaceGroups: [], sortByWorkspace: false
     })
@@ -30,11 +38,6 @@ function build(input) {
   var settings = input.settings
   var records = []
   var workspacePresentation = null
-  // Special workspaces are overlays: only windows Dockrail can present reach the
-  // desktop model. The flat path arrives pre-filtered through the shared scope
-  // filter; this clamps the grouped and sidebar inventories.
-  var presentationToplevels = DockWindowModel.filterPresentationToplevels(
-    input.toplevels, input.hyprToplevels, input.minimizedOrigins)
   if (sidebar || input.mode === "classic-grouped") {
     var monitor = input.dockMonitor
     records = presentationToplevels.map(function(toplevel) {
