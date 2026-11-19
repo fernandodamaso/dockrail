@@ -27,6 +27,13 @@ Item {
   property var minimizedOrigins: ({})
   property string focusedWorkspace: ""
   property int scopeRevision: 0
+  // Special workspaces are overlays; their windows never reach sidebar rows,
+  // folds, browser tabs or registry keys.
+  readonly property var presentationToplevels: {
+    var revision = root.scopeRevision
+    return WindowModel.filterPresentationToplevels(
+      root.toplevels, root.hyprToplevels, root.minimizedOrigins)
+  }
   readonly property var windowActions: host ? host.windowActions || null : null
   // Host-owned shared dwell coordinator; views attach their row adapters to it.
   readonly property var externalDragNavigation: host
@@ -457,7 +464,7 @@ Item {
 
   function refreshBody() {
     if (root.dragSession && !root.rowDragIsCurrent()) root.cancelRowDrag("source-or-topology-changed")
-    root.registry = SidebarModel.reconcileHandles(root.registry, root.toplevels)
+    root.registry = SidebarModel.reconcileHandles(root.registry, root.presentationToplevels)
     // Sidebar membership comes from the shared per-screen resolver, the same
     // pure function the host owners and CLI diagnostics use, so every surface
     // and gate agrees on which outputs actually show a sidebar.
@@ -513,12 +520,12 @@ Item {
           "hiddenApplications", root.settings.hiddenApplications), workspaceGroups: [],
         workspaceMonitorScope: "all", workspaceMonitorOrder: DockModel.normalizeSetting(
           "workspaceMonitorOrder", root.settings.workspaceMonitorOrder), sortByWorkspace: false
-      }, applications: root.applications, toplevels: root.toplevels,
-      windowRuleMatches: root.toplevels.map(function(toplevel) {
+      }, applications: root.applications, toplevels: root.presentationToplevels,
+      windowRuleMatches: root.presentationToplevels.map(function(toplevel) {
         return DockIconModel.matchWindowRule(root.windowIconOverrides,
           toplevel ? toplevel.appId : "", toplevel ? toplevel.title : "")
       }),
-      filteredToplevels: root.toplevels, hyprToplevels: root.hyprToplevels,
+      filteredToplevels: root.presentationToplevels, hyprToplevels: root.hyprToplevels,
       hyprWorkspaces: root.workspaces, hyprMonitors: root.monitors,
       dockMonitor: WindowModel.monitorForScreen(nextPrimary, root.monitors),
       minimizedOrigins: root.minimizedOrigins, focusedWorkspace: root.focusedWorkspace
