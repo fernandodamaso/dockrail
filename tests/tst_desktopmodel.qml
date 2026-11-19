@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../components/DockDesktopModel.js" as DesktopModel
+import "../components/DockWindowModel.js" as DockWindowModel
 
 TestCase {
   name: "DesktopModel"
@@ -58,5 +59,28 @@ TestCase {
     var rejected = false
     try { DesktopModel.build(snapshot("unsupported")) } catch (error) { rejected = true }
     verify(rejected)
+  }
+
+  function test_groupedPresentationDropsSpecialWorkspaceWindows() {
+    var normal = { appId: "example.browser", title: "Normal" }
+    var scratch = { appId: "example.browser", title: "Scratch" }
+    var input = snapshot("classic-grouped")
+    input.toplevels = [normal, scratch]
+    input.filteredToplevels = [normal]
+    input.hyprToplevels = [
+      { wayland: normal, address: "0xa",
+        lastIpcObject: { workspace: { id: 1 }, monitor: 0 } },
+      { wayland: scratch, address: "0xb",
+        lastIpcObject: { workspace: { id: -98, name: "special:scratchpad" }, monitor: 0 } }
+    ]
+    var result = DesktopModel.build(input)
+    compare(result.records.length, 1)
+    compare(result.records[0].toplevel, normal)
+    var group = result.workspacePresentation.groups.filter(function(value) {
+      return value.identity === "id:1"
+    })[0]
+    compare(group.items.length, 1)
+    compare(group.items[0].toplevels.length, 1)
+    compare(result.workspacePresentation.fallbackItems.length, 0)
   }
 }

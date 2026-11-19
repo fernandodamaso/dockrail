@@ -171,19 +171,19 @@ git commit -m "fix: hide special-workspace windows from dock presentation"
 
 ---
 
-### Task 2: Grouped dock consumes the filtered inventory
+### Task 2: Desktop model clamps the grouped inventory
 
 **Files:**
-- Modify: `components/Dock.qml` (property block near `filteredToplevels`, and `refreshVisibleItems` around line 673)
+- Modify: `components/DockDesktopModel.js` (`build`, `sidebarBaseItems`)
 - Test: `tests/tst_desktopmodel.qml`
 
 **Interfaces:**
 - Consumes: `DockWindowModel.filterPresentationToplevels` from Task 1.
-- Produces: `Dock.presentationToplevels` — a `var` property bound to `scopeRevision`, holding every live toplevel except those on a known special workspace.
+- Produces: `DesktopModel.build` never emits a record or item for a window whose resolved location is a known special workspace, in `classic-grouped` and `sidebar` modes. `sidebarBaseItems(input, toplevels)` takes the already-filtered list as its second argument.
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tests/tst_desktopmodel.qml`:
+Append to `tests/tst_desktopmodel.qml` (and import `../components/DockWindowModel.js` as `DockWindowModel`):
 
 ```qml
   function test_groupedPresentationDropsSpecialWorkspaceWindows() {
@@ -198,11 +198,9 @@ Append to `tests/tst_desktopmodel.qml`:
       { wayland: scratch, address: "0xb",
         lastIpcObject: { workspace: { id: -98, name: "special:scratchpad" }, monitor: 0 } }
     ]
-    var filtered = DockWindowModel.filterPresentationToplevels(
-      input.toplevels, input.hyprToplevels, input.minimizedOrigins)
-    compare(filtered.length, 1)
-    input.toplevels = filtered
     var result = DesktopModel.build(input)
+    compare(result.records.length, 1)
+    compare(result.records[0].toplevel, normal)
     var group = result.workspacePresentation.groups.filter(function(value) {
       return value.identity === "id:1"
     })[0]
@@ -212,66 +210,35 @@ Append to `tests/tst_desktopmodel.qml`:
   }
 ```
 
-Add `import "../components/DockWindowModel.js" as DockWindowModel` to the test's imports.
-
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd /home/admin/.t3/worktrees/dockrail/fix-scratchpad-visibility
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input tests/tst_desktopmodel.qml -import components -import tests/qml-imports
 ```
 
-Expected: FAIL on the `group.items.length` or `fallbackItems.length` assertion (the scratchpad window lands in `fallbackItems`).
+Expected: FAIL — `records.length` is 2 and the scratchpad window appears in `fallbackItems`.
 
-- [ ] **Step 3: Bind the filtered inventory in `Dock.qml`**
+- [ ] **Step 3: Filter the grouped inventory inside `build`**
 
-Add immediately after the existing `filteredToplevels` property:
+In `components/DockDesktopModel.js`:
 
-```qml
-  // Special workspaces are overlays; their windows never reach the dock build.
-  readonly property var presentationToplevels: {
-    var revision = scopeRevision
-    return DockWindowModel.filterPresentationToplevels(
-      toplevels, hyprToplevels,
-      windowActions ? windowActions.minimizedOriginsSnapshot : ({}))
-  }
+```js
+  var presentationToplevels = DockWindowModel.filterPresentationToplevels(
+    input.toplevels, input.hyprToplevels, input.minimizedOrigins)
 ```
 
-In `refreshVisibleItems`, replace the grouped build inputs:
+Use `presentationToplevels` for `records`, for `DockModel.buildVisibleItems`, for `windowMatchesFor`, and (as the second parameter) for `sidebarBaseItems(input, toplevels)`. Leave `input` untouched so `windowMatchesFor` keeps resolving indices against the caller's original list.
 
-```qml
-      toplevels: toplevels,
-      windowRuleMatches: toplevels.map(function(toplevel) {
-```
-
-with:
-
-```qml
-      toplevels: presentationToplevels,
-      windowRuleMatches: presentationToplevels.map(function(toplevel) {
-```
-
-Leave `filteredToplevels: filteredToplevels` unchanged: Task 1 already excludes specials there.
-
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Run the test to verify it passes**
 
 Run the Step 2 command. Expected: PASS for all `DesktopModel` cases.
 
-- [ ] **Step 5: Lint the changed surface**
+- [ ] **Step 5: Commit**
 
 ```bash
-cd /home/admin/.t3/worktrees/dockrail/fix-scratchpad-visibility
-/usr/lib/qt6/bin/qmllint -I "$OMARCHY_PATH/shell" components/Dock.qml
-```
-
-Expected: no errors (warnings unchanged from `main`).
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add components/Dock.qml tests/tst_desktopmodel.qml
-git commit -m "fix: build grouped dock from presentation-visible windows"
+git add components/DockDesktopModel.js tests/tst_desktopmodel.qml
+git commit -m "fix: clamp grouped desktop inventory to presentable windows"
 ```
 
 ---

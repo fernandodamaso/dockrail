@@ -30,16 +30,21 @@ function build(input) {
   var settings = input.settings
   var records = []
   var workspacePresentation = null
+  // Special workspaces are overlays: only windows Dockrail can present reach the
+  // desktop model. The flat path arrives pre-filtered through the shared scope
+  // filter; this clamps the grouped and sidebar inventories.
+  var presentationToplevels = DockWindowModel.filterPresentationToplevels(
+    input.toplevels, input.hyprToplevels, input.minimizedOrigins)
   if (sidebar || input.mode === "classic-grouped") {
     var monitor = input.dockMonitor
-    records = input.toplevels.map(function(toplevel) {
+    records = presentationToplevels.map(function(toplevel) {
       return Object.assign({ toplevel: toplevel }, DockWindowModel.locationForToplevel(
         toplevel, input.hyprToplevels, input.minimizedOrigins))
     })
-    var baseItems = sidebar ? sidebarBaseItems(input) : DockModel.buildVisibleItems(
-      settings.pinned, input.toplevels, input.applications, input.hyprToplevels,
+    var baseItems = sidebar ? sidebarBaseItems(input, presentationToplevels) : DockModel.buildVisibleItems(
+      settings.pinned, presentationToplevels, input.applications, input.hyprToplevels,
       false, false, settings.hiddenApplications,
-      windowMatchesFor(input.toplevels, input))
+      windowMatchesFor(presentationToplevels, input))
     var localizedItems = WorkspaceGroupModel.prepareWorkspaceItems(
       baseItems, records, settings.workspaceGroups)
     workspacePresentation = WorkspaceModel.buildWorkspacePresentation(
@@ -78,9 +83,9 @@ function build(input) {
 
 // An empty Wayland appId is not evidence for matching a pin's empty StartupWMClass.
 // Keep such handles reachable with neutral artwork; classic matching is unchanged.
-function sidebarBaseItems(input) {
-  var known = input.toplevels.filter(function(t) { return !!String(t.appId || "").trim() })
-  var unknown = input.toplevels.filter(function(t) { return !String(t.appId || "").trim() })
+function sidebarBaseItems(input, toplevels) {
+  var known = toplevels.filter(function(t) { return !!String(t.appId || "").trim() })
+  var unknown = toplevels.filter(function(t) { return !String(t.appId || "").trim() })
   return DockModel.buildVisibleItems(input.settings.pinned, known, input.applications,
     input.hyprToplevels, false, false, input.settings.hiddenApplications,
     windowMatchesFor(known, input)).concat(
