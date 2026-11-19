@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-_No entries yet._
+- Hide windows on Hyprland special workspaces (the scratchpad) from the dock and sidebar in every window scope. Dockrail-minimized windows keep their recorded origin; unknown locations fail open.
 
 ## 3.1.0 - Release candidate (publication date pending)
 
