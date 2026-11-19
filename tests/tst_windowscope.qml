@@ -340,4 +340,67 @@ TestCase {
     compare(DockWindowModel.shouldRefreshWindowScope("windowtitle"), false)
     compare(DockWindowModel.shouldRefreshWindowScope(""), false)
   }
+
+  function test_presentationHidesEverySpecialWorkspace() {
+    if (!hasFunction("filterPresentationToplevels")) return
+
+    var normal = window("normal")
+    var scratch = window("scratch")
+    var magic = window("magic")
+    var handles = [
+      handle(normal, "0x1", 2, "2", 1, false),
+      handle(scratch, "0x2", -98, "special:scratchpad", 1, false),
+      handle(magic, "0x3", -99, "special:magic", 1, false)
+    ]
+    var filtered = DockWindowModel.filterPresentationToplevels(
+      [normal, scratch, magic], handles, {})
+    compare(filtered.length, 1)
+    compare(filtered[0], normal)
+    compare(DockWindowModel.locationHiddenFromPresentation(
+      { workspace: "special:scratchpad", workspaceKnown: true }), true)
+    compare(DockWindowModel.locationHiddenFromPresentation(
+      { workspace: "", workspaceKnown: false }), false)
+  }
+
+  function test_presentationFailsOpenForUnknownAndMinimizedWindows() {
+    if (!hasFunction("filterPresentationToplevels")) return
+
+    var fresh = window("fresh")
+    var minimized = window("min")
+    var handles = [
+      handle(minimized, "0xbbb", -99, "special:smartdock-minimized", 0, false)
+    ]
+    compare(DockWindowModel.filterPresentationToplevels(
+      [fresh, minimized], handles, {}).length, 2)
+  }
+
+  function test_presentationKeepsMinimizedOriginAndHidesSpecialOrigin() {
+    if (!hasFunction("filterPresentationToplevels")) return
+
+    var minimized = window("min")
+    var handles = [
+      handle(minimized, "0xccc", -99, "special:smartdock-minimized", 1, false)
+    ]
+    compare(DockWindowModel.filterPresentationToplevels(
+      [minimized], handles,
+      { "0xccc": { workspace: "id:3", monitor: "id:1" } }).length, 1)
+    compare(DockWindowModel.filterPresentationToplevels(
+      [minimized], handles,
+      { "0xccc": { workspace: "special:scratchpad", monitor: "id:1" } }).length, 0)
+  }
+
+  function test_scopeFilterHidesSpecialWorkspacesInAllScope() {
+    if (!hasFunction("filterToplevelsByScope")) return
+
+    var normal = window("normal")
+    var scratch = window("scratch")
+    var handles = [
+      handle(normal, "0x1", 2, "2", 1, false),
+      handle(scratch, "0x2", -98, "special:scratchpad", 1, false)
+    ]
+    var filtered = DockWindowModel.filterToplevelsByScope(
+      [normal, scratch], handles, {}, context("all", 2, "2", 1, true))
+    compare(filtered.length, 1)
+    compare(filtered[0], normal)
+  }
 }

@@ -776,4 +776,24 @@ TestCase {
     wait(0)
     compare(spy.count, settled)
   }
+
+  function test_scratchpadWindowProducesNoRowOrRegistryEntry() {
+    var a = createTemporaryObject(toplevelFactory, this, {title:"Normal"})
+    var b = createTemporaryObject(toplevelFactory, this, {title:"Scratch"})
+    var screen = {name:"DP-1",width:1920,height:1080}
+    var c = createTemporaryObject(factory, this, {
+      settings: {presentationMode:"sidebar",pinned:[],workspaceGroups:[],sidebarCollapsed:false},
+      screens:[screen], monitors:[{id:0,name:"DP-1",activeWorkspace:{id:1}}],
+      workspaces:[{id:1,monitorID:0}], toplevels:[a,b],
+      hyprToplevels:[{wayland:a,address:"0xa",lastIpcObject:{workspace:{id:1},monitor:0}},
+        {wayland:b,address:"0xb",lastIpcObject:{workspace:{id:-98,name:"special:scratchpad"},monitor:0}}]
+    })
+    verify(c !== null)
+    c.refresh()
+    compare(c.presentationToplevels.length, 1)
+    compare(c.presentationToplevels[0], a)
+    compare(c.registry.entries.length, 1)
+    var windows = c.projection.rows.filter(function(r) {return r.kind === "window"})
+    compare(windows.length, 1)
+  }
 }
