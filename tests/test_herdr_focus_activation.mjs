@@ -286,4 +286,102 @@ assert.equal(rejected.controller.activateTarget(rejectedTarget, false, 'DP-1', 0
 assert.deepEqual(Object.keys(rejected.agentActions.pendingFocusByRequest), [])
 assert.deepEqual(Object.keys(rejected.agentActions.pendingFocusByAgent), [])
 
+// FDM-1221: Ctrl on a nested Herdr agent or T3 thread uses the captured
+// sidebar connector and moves the host window before requesting exact focus.
+const ctrlModifier = 0x04000000
+function ctrlFixture(source = 'herdr') {
+  const fixture = herdrFixture()
+  fixture.controller.Qt.ControlModifier = ctrlModifier
+  fixture.bridge.snapshot.servers[0].source = source
+  return fixture
+}
+for (const source of ['herdr', 't3']) {
+  const fixture = ctrlFixture(source)
+  const agent = fixture.controller.captureTarget(fixture.agentRow.key)
+  assert.ok(agent)
+  const originalFocus = fixture.controller.host.herdrService.focusAgent
+  let movedBeforeFocus = false
+  fixture.controller.host.herdrService.focusAgent = request => {
+    assert.deepEqual(fixture.requests,
+      ['movetoworkspacesilent 1,address:0x1', 'focuswindow address:0x1'],
+      source + ': host move must precede the agent focus request')
+    movedBeforeFocus = true
+    return originalFocus(request)
+  }
+  assert.equal(fixture.controller.activateTarget(agent, true, 'DP-1', ctrlModifier), true)
+  assert.equal(movedBeforeFocus, true)
+  assert.equal(fixture.focusCalls.length, 1)
+  assert.equal(fixture.focusCalls[0].paneId, 'pane-a')
+  assert.equal(fixture.batches.length, 0, 'a window move does not pull its workspace')
+}
+
+// Already on the clicked monitor but in an inactive workspace: focus in
+// place, without moving the window to that monitor's active workspace.
+const sameMonitorAgent = ctrlFixture()
+sameMonitorAgent.handles[0].lastIpcObject = {
+  workspace: { id: 3 }, monitor: 0
+}
+const sameTarget = sameMonitorAgent.controller.captureTarget(sameMonitorAgent.agentRow.key)
+assert.equal(sameMonitorAgent.controller.activateTarget(
+  sameTarget, true, 'DP-1', ctrlModifier), true)
+assert.equal(sameMonitorAgent.requests.length + sameMonitorAgent.batches.length, 0)
+assert.equal(sameMonitorAgent.focusCalls[0].paneId, 'pane-a')
+
+// Minimized agent windows use the shared restore and monitor-target path.
+const minimizedAgent = ctrlFixture()
+minimizedAgent.handles[0].lastIpcObject.workspace = {
+  name: 'special:smartdock-minimized'
+}
+minimizedAgent.actions.minimizedOrigins = {
+  '0x1': { workspace: 'name:Design work', monitor: '1' }
+}
+const minimizedAgentTarget = minimizedAgent.controller.captureTarget(minimizedAgent.agentRow.key)
+assert.equal(minimizedAgent.controller.activateTarget(
+  minimizedAgentTarget, true, 'DP-1', ctrlModifier), true)
+assert.match(JSON.stringify(minimizedAgent.requests.concat(minimizedAgent.batches)),
+  /movetoworkspace 1,address:0x1/, 'minimized host must restore to clicked workspace')
+assert.equal(minimizedAgent.focusCalls[0].paneId, 'pane-a')
+
+// Unknown, contradictory or extended modifiers must never authorize a move.
+for (const [control, modifiers] of [
+  [true, undefined], [true, 0], [true, ctrlModifier | 0x02000000],
+  [false, ctrlModifier],
+]) {
+  const fixture = ctrlFixture()
+  const agent = fixture.controller.captureTarget(fixture.agentRow.key)
+  assert.equal(fixture.controller.activateTarget(agent, control, 'DP-1', modifiers), false)
+  assert.equal(fixture.requests.length + fixture.batches.length, 0)
+  assert.equal(fixture.focusCalls.length, 0)
+}
+function expectRejectedAgentMove(fixture, target, connector = 'DP-1') {
+  assert.equal(fixture.controller.activateTarget(target, true, connector, ctrlModifier), false)
+  assert.equal(fixture.requests.length + fixture.batches.length, 0,
+    'rejection must not dispatch a window/workspace move')
+  assert.equal(fixture.focusCalls.length, 0,
+    'rejection must not enqueue agent focus')
+}
+const wrongPanel = ctrlFixture()
+expectRejectedAgentMove(wrongPanel,
+  wrongPanel.controller.captureTarget(wrongPanel.agentRow.key), 'not-mapped')
+const staleAgent = ctrlFixture()
+const staleAgentTarget = staleAgent.controller.captureTarget(staleAgent.agentRow.key)
+staleAgent.canonicalAgent.connectionGeneration = 2
+expectRejectedAgentMove(staleAgent, staleAgentTarget)
+const closedHost = ctrlFixture()
+const closedHostTarget = closedHost.controller.captureTarget(closedHost.agentRow.key)
+closedHost.ToplevelManager.toplevels.values = []
+expectRejectedAgentMove(closedHost, closedHostTarget)
+const noProvider = ctrlFixture()
+const noProviderTarget = noProvider.controller.captureTarget(noProvider.agentRow.key)
+noProvider.agentActions.herdrService = null
+expectRejectedAgentMove(noProvider, noProviderTarget)
+const noCapability = ctrlFixture('t3')
+const noCapabilityTarget = noCapability.controller.captureTarget(noCapability.agentRow.key)
+noCapability.bridge.snapshot.servers[0].capabilities.focusAgent = false
+expectRejectedAgentMove(noCapability, noCapabilityTarget)
+const pinnedAgent = ctrlFixture()
+const pinnedAgentTarget = pinnedAgent.controller.captureTarget(pinnedAgent.agentRow.key)
+assert.equal(pinnedAgent.actions.pinWindowToWorkspace(pinnedAgent.windows[0]), true)
+expectRejectedAgentMove(pinnedAgent, pinnedAgentTarget)
+
 console.log('herdr focus activation: PASS')
