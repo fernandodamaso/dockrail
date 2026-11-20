@@ -10,7 +10,9 @@ Use this sequence for every Dockrail release:
 3. Run the complete source gate: `omarchy plugin validate .`, every
    `tests/check_*.sh`, Qt Test with `qmltestrunner`, shell syntax checks,
    `qmllint`, `git diff --check`, and the standalone smoke test.
-4. Merge the reviewed work to `main` and push `origin main`.
+4. Open a pull request into `main` and follow `docs/DELIVERY.md`. Do not
+   merge a local feature branch into `main` and push that merge. After the
+   pull request lands, `origin/main` is the release commit.
 5. Update one installed copy with `omarchy plugin update` and verify that its
    clean `HEAD` equals `origin/main`. Manually verify the dock after the
    update.

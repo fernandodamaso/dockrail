@@ -6,13 +6,13 @@
 
 Read the live FDM-919 handoff, FDM-920/FDM-885, AGENTS.md and docs/DELIVERY.md. Set `CANDIDATE_SHA` and `BASE_SHA` to the **full hashes from that handoff**, not a branch's latest commit or this document's historical provenance. Confirm remote branch writes have paused and take single-writer ownership before publishing fixes. FDM-889's separate drag branch/PR must not be imported or modified.
 
-Use Bash with failure checking for setup; stop at a failed identity/precondition check. Preserve the run directory and variables when changing test terminals.
+Use Bash with failure checking for setup; stop at a failed identity/precondition check. Preserve the run directory and variables when changing test terminals. Run the block from this repository's root so `source_repo=.` is that checkout.
 
 ```bash
 set -euo pipefail
 : "${CANDIDATE_SHA:?Set the full head SHA from the FDM-919 handoff}"
 : "${BASE_SHA:?Set the full base SHA from the FDM-919 handoff}"
-source_repo=/home/admin/Projects/smart-omarchy-dock
+source_repo=.
 git -C "$source_repo" status --short
 git -C "$source_repo" worktree list
 git -C "$source_repo" fetch origin main feat/fdm-914-cli-first
