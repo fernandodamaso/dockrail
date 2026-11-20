@@ -85,13 +85,15 @@ The normal update command is:
 
 ```bash
 omarchy plugin update io.github.fernandodamaso.dockrail --yes
+omarchy restart shell
 ```
 
-Updates pull the fork's default `main` branch and preserve
-`~/.config/dockrail/dock.json`. Installed plugin files are deployment state;
-do not edit them directly. Development belongs in a separate clone, such as
-`/home/admin/Projects/smart-omarchy-dock`, and changes reach an installed copy
-through Git push followed by `omarchy plugin update`.
+Updates pull the repository's default `main` branch and preserve
+`~/.config/dockrail/dock.json`. The update does not restart the shell, so run
+`omarchy restart shell` before judging the new dock. Installed plugin files
+are deployment state; do not edit them. Develop in your own clone of
+https://github.com/fernandodamaso/dockrail. If a development checkout is
+linked, run `dockrail dev reset` before updating.
 
 ### Standalone installation
 
@@ -102,8 +104,8 @@ clone the source and run the installer:
 git clone https://github.com/fernandodamaso/dockrail.git && cd dockrail && ./install.sh
 ```
 
-The installer uses only user directories, requires no `sudo`, and creates an
-XDG autostart entry. To install without autostart, use
+The installer uses only user directories and does not require sudo. It creates
+an XDG autostart entry. To install without autostart, use
 `./install.sh --no-autostart`.
 
 Run the standalone dock immediately with:
@@ -421,11 +423,11 @@ Want to try an unmerged version on your desktop? Use
 to return to the installed copy. See [local version switching](docs/DEV_SWITCH.md)
 for setup, reload, and recovery commands.
 
-Development happens in the canonical source checkout or in your own clone,
-never in the installed Omarchy checkout:
+Development happens in your own clone, never in the installed Omarchy checkout:
 
 ```bash
-cd /home/admin/Projects/smart-omarchy-dock
+git clone https://github.com/fernandodamaso/dockrail.git
+cd dockrail
 ./scripts/run
 ```
 
@@ -435,8 +437,10 @@ Quickshell watches the QML files, so UI changes reload while developing.
 
 Dockrail, formerly SmartDock for Omarchy, is an extensively developed MIT-licensed fork of
 [nick-friedrich/hyprland-dock](https://github.com/nick-friedrich/hyprland-dock).
-The upstream Git history, MIT license, and original copyright notice are
-preserved in this repository.
+The upstream Git history, MIT license (`LICENSE`), and original copyright
+notice are preserved in this repository. Bundled Lucide icons keep their
+notices in `assets/lucide/LICENSE`. Optional provider and terminal-agent
+artwork notices live beside those assets.
 
 ## Configure
 

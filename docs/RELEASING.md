@@ -2,8 +2,9 @@
 
 Use this sequence for every Dockrail release:
 
-1. Work on a feature branch in the canonical source clone at
-   `/home/admin/Projects/smart-omarchy-dock`.
+1. Work on a feature branch in your own clone of
+   https://github.com/fernandodamaso/dockrail. Do not edit an installed
+   plugin checkout.
 2. Update `manifest.json` and `CHANGELOG.md` together, including the release
    version and date.
 3. Run the complete source gate: `omarchy plugin validate .`, every
