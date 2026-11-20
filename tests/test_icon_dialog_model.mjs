@@ -259,6 +259,8 @@ function dialogHarness() {
     chooserSerial: 0, chooserLaunchSerial: -1, chooserExitCode: -1, chooserOutputDone: false,
     imageSources: ["file:///a/recent.svg"], selectedSource: "file:///a/recent.svg", windows: [],
     fileChooser: { running: false }, chooserOutput: { text: "" },
+    iconAssetIngest: { running: false }, iconAssetOutput: { text: "" },
+    ingestSerial: 0, ingesting: false, pendingIconChange: null,
     settings: {}, mutationController: null,
     titleInput: { text: "", forceActiveFocus() {} }, keyScope: { forceActiveFocus() {} },
     Qt: { callLater() {} }

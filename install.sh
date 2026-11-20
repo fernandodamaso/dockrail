@@ -95,6 +95,7 @@ install_client_bundle() {
     install -m 0644 "$source_dir/scripts/dockrail_claude.py" "$destination/scripts/dockrail_claude.py"
     install -m 0644 "$source_dir/scripts/smartdock_settings_actions.py" "$destination/scripts/smartdock_settings_actions.py"
     install -m 0644 "$source_dir/scripts/dockrail_paths.py" "$destination/scripts/dockrail_paths.py"
+    install -m 0644 "$source_dir/scripts/dockrail_icon_assets.py" "$destination/scripts/dockrail_icon_assets.py"
     install -m 0644 "$source_dir/scripts/dockrail_migrate.py" "$destination/scripts/dockrail_migrate.py"
     install -m 0644 "$source_dir/config/settings-schema.json" "$destination/config/settings-schema.json"
     install -m 0644 "$source_dir/config/dock.json" "$destination/config/dock.json"

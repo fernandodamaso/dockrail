@@ -145,11 +145,13 @@ class MutationCliTests(unittest.TestCase):
         source.write_text('<svg/>', encoding='utf-8')
         self.response(('icons', 'set', 'org.ghostty', str(source),
                        '--title-pattern', ' *solar* ', '--json'))
-        self.assertEqual(self.requests('icons.set')[-1], {
-            'id': 'org.ghostty',
-            'source': str(source.resolve()),
-            'titlePattern': ' *solar* ',
-        })
+        saved = self.requests('icons.set')[-1]
+        self.assertEqual(saved['id'], 'org.ghostty')
+        self.assertEqual(saved['titlePattern'], ' *solar* ')
+        from urllib.parse import urlsplit, unquote
+        managed = Path(unquote(urlsplit(saved['source']).path))
+        self.assertEqual(managed.parent, Path(self.env['XDG_DATA_HOME']) / 'dockrail/icons')
+        self.assertEqual(managed.read_bytes(), source.read_bytes())
         self.response(('icons', 'reset', 'org.ghostty',
                        '--title-pattern', '*solar*', '--json'))
         self.assertEqual(self.requests('icons.reset')[-1], {

@@ -4,6 +4,7 @@ Only transport/FileView services are substituted. No copied patch validator,
 new runtime, or desktop session is involved. The marked guide blocks are inputs.
 """
 import argparse
+from contextlib import contextmanager
 import importlib.util
 import io
 import json
@@ -204,49 +205,71 @@ class CliDocumentationTests(unittest.TestCase):
         self.assertEqual(settings['extensionData'], self.transport.initial['extensionData'])
         self.assertEqual(settings['iconOverrides'], self.transport.initial['iconOverrides'])
 
+    @contextmanager
+    def local_icon_sources(self):
+        # Recipe examples are real files now: the CLI owns the copied bytes.
+        # Never create samples in the repository or the user's data root.
+        with tempfile.TemporaryDirectory(prefix="dockrail-docs-icons-") as temporary:
+            previous = Path.cwd()
+            directory = Path(temporary)
+            pictures = directory / "Pictures"
+            pictures.mkdir()
+            (pictures / "My Ícone.svg").write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
+            (pictures / "solar.svg").write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
+            with patch.dict(os.environ, {"XDG_DATA_HOME": str(directory / "data")}):
+                try:
+                    os.chdir(directory)
+                    yield directory
+                finally:
+                    os.chdir(previous)
+
     def test_icon_recipe_updates_only_one_mapping_and_never_claims_rendering(self):
-        pins = self.transport.initial['pinned']
-        reload_revision = None
-        for line in self.block('icons', 'sh').splitlines():
-            data = self.run_command(line)
-            self.assertFalse(data['renderVerified'])
-            if 'icons set ' in line:
-                self.assertTrue(data['persisted'])
-                reload_revision = data['iconReloadRevision']
-                expected = dict(self.transport.initial['iconOverrides'],
-                                code=Path('Pictures/My Ícone.svg').absolute().as_uri())
-                self.assertEqual(data['requested']['iconOverrides'], expected)
-            if 'icons reload ' in line:
-                self.assertFalse(data['applied'])
-                self.assertTrue(data['reloaded'])
-                self.assertGreater(data['iconReloadRevision'], reload_revision)
-        settings = self.run_command('dockrail config get --json')['settings']
-        self.assertEqual(settings['iconOverrides'], self.transport.initial['iconOverrides'])
-        self.assertEqual(settings['pinned'], pins)
-        self.assertEqual(settings['extensionData'], self.transport.initial['extensionData'])
+        with self.local_icon_sources():
+            pins = self.transport.initial['pinned']
+            reload_revision = None
+            for line in self.block('icons', 'sh').splitlines():
+                data = self.run_command(line)
+                self.assertFalse(data['renderVerified'])
+                if 'icons set ' in line:
+                    self.assertTrue(data['persisted'])
+                    reload_revision = data['iconReloadRevision']
+                    expected = dict(self.transport.initial['iconOverrides'],
+                                    code=self.transport.requests[-1][1]['source'])
+                    self.assertEqual(data['requested']['iconOverrides'], expected)
+                if 'icons reload ' in line:
+                    self.assertFalse(data['applied'])
+                    self.assertTrue(data['reloaded'])
+                    self.assertGreater(data['iconReloadRevision'], reload_revision)
+            settings = self.run_command('dockrail config get --json')['settings']
+            self.assertEqual(settings['iconOverrides'], self.transport.initial['iconOverrides'])
+            self.assertEqual(settings['pinned'], pins)
+            self.assertEqual(settings['extensionData'], self.transport.initial['extensionData'])
 
     def test_window_icon_recipe_roundtrips_exact_rule_without_touching_app_icons(self):
-        before_icons = dict(self.transport.initial['iconOverrides'])
-        saw_set = False
-        for line in self.block('window-icons', 'sh').splitlines():
-            data = self.run_command(line)
-            if 'icons ' in line:
-                self.assertFalse(data['renderVerified'])
-            if 'icons set ' in line:
-                saw_set = True
-                self.assertTrue(data['persisted'])
-                self.assertEqual(data['effectiveWindowOverrides'], [{
-                    'appId': 'com.mitchellh.ghostty',
-                    'titlePattern': '*solar*',
-                    'source': Path('Pictures/solar.svg').absolute().as_uri(),
-                }])
-            if 'icons reset ' in line:
-                self.assertEqual(data['requested']['windowIconOverrides'], [])
-        self.assertTrue(saw_set)
-        settings = self.run_command('dockrail config get --json')['settings']
-        self.assertEqual(settings['windowIconOverrides'], [])
-        self.assertEqual(settings['iconOverrides'], before_icons)
-        self.assertEqual(settings['extensionData'], self.transport.initial['extensionData'])
+        with self.local_icon_sources():
+            before_icons = dict(self.transport.initial['iconOverrides'])
+            saw_set = False
+            for line in self.block('window-icons', 'sh').splitlines():
+                data = self.run_command(line)
+                if 'icons ' in line:
+                    self.assertFalse(data['renderVerified'])
+                if 'icons set ' in line:
+                    saw_set = True
+                    self.assertTrue(data['persisted'])
+                    self.assertEqual(data['effectiveWindowOverrides'], [{
+                        'appId': 'com.mitchellh.ghostty',
+                        'titlePattern': '*solar*',
+                        'source': self.transport.requests[-1][1]['source'],
+                    }])
+                if 'icons reset ' in line:
+                    self.assertEqual(data['requested']['windowIconOverrides'], [])
+            self.assertTrue(saw_set)
+            settings = self.run_command('dockrail config get --json')['settings']
+            self.assertEqual(settings['windowIconOverrides'], [])
+            self.assertEqual(settings['iconOverrides'], before_icons)
+            self.assertEqual(settings['extensionData'], self.transport.initial['extensionData'])
 
     def test_document_shell_syntax_and_relative_links(self):
         for name in DOCUMENTS:

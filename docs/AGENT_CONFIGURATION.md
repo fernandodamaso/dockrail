@@ -116,7 +116,7 @@ dockrail icons reload code --json
 dockrail icons reset code --json
 ```
 
-The client resolves an ordinary relative path against its current directory; the shared host model validates absolute paths and supported local file URLs, preserving spaces/Unicode. Remote URLs, unsupported formats and invalid local URLs are rejected. Files are referenced in place, not downloaded/copied/imported; no `.desktop` or system theme edits occur. Shell expansion of an unquoted tilde or `$HOME` is distinct from file-URL parsing.
+The client resolves an ordinary relative path against its current directory, then the shared ingester validates the file and copies it to persistent `$XDG_DATA_HOME/dockrail/icons/` storage before submitting the icon set intent. The host still validates and saves settings through its single writer. Remote URLs, unsupported formats, broken paths and invalid file URLs are rejected before an icon set; no `.desktop` or system theme edits occur. Shell expansion of an unquoted tilde or `$HOME` is distinct from file-URL parsing.
 
 Set/reset updates only one canonical key against the latest map, preserving other entries and untouched legacy values. Preference reset preserves `iconOverrides` and `windowIconOverrides`. Bulk map replacement validates the entire map and rejects canonical duplicates. Missing/unreadable/corrupt files retain the requested mapping and fall back: custom → original desktop icon → generic executable → bundled theme-tinted `app-window` glyph. Custom artwork is not tinted. Main icons, preview metadata and picker rows share the mapping; identity, launch commands, screenshots, grouping, badges, Trash and action glyphs do not change.
 
@@ -139,7 +139,7 @@ rule and may reveal another matching rule or a lower-priority icon candidate. Do
 replace invalid/empty/oversized titles with broad `*`; the **Change Icon…** dialog
 surfaces validation instead.
 
-The dock watches referenced artwork files and refreshes automatically after same-path edits; explicit reload remains available for compatibility or forcing a refresh and advances the shared artwork revision without saving settings. Other mapped icons can refresh too. Same-source set also requests fresh bytes without a redundant settings write; repeated reset is a true no-op. `reloaded: true` means requested, not decoded; `applied`/`noop` describe settings, so reload can report `applied: false`, `noop: true`, `reloaded: true`. Every successful icon response has `renderVerified: false`. Verify cache invalidation, image decoding and multi-monitor redraw on the actual desktop; headless tests cannot establish those results.
+The dock watches managed artwork files and refreshes after edits to their stored bytes; changing the original source requires another `icons set` to ingest new content. Explicit reload remains available for forcing a refresh and advances the shared artwork revision without saving settings. Other mapped icons can refresh too. Same-source set also requests fresh bytes without a redundant settings write; repeated reset is a true no-op. `reloaded: true` means requested, not decoded; `applied`/`noop` describe settings, so reload can report `applied: false`, `noop: true`, `reloaded: true`. Every successful icon response has `renderVerified: false`. Verify cache invalidation, image decoding and multi-monitor redraw on the actual desktop; headless tests cannot establish those results.
 
 ## Persistence, recovery and rollback
 

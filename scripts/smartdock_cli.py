@@ -64,9 +64,9 @@ Applications (exact desktop IDs, not fuzzy application names):
   apps move ID (--before OTHER | --after OTHER)
                                Move one pinned ID relative to another, including hidden pins
 
-Artwork (Dockrail-only; local static PNG/SVG files referenced in place):
+Artwork (Dockrail-owned PNG/SVG copies stored under XDG_DATA_HOME):
   icons list                  Read requested/effective mappings, not rendering success
-  icons set ID PATH           Resolve a local relative path and send one host intent
+  icons set ID PATH           Copy local source to persistent storage and send one host intent
   icons reset ID              Remove only this application's mapping
   icons reload ID             Refresh an existing mapping after same-path file replacement
                                Reload uses the global artwork revision; never writes config
@@ -1589,6 +1589,19 @@ def app_icon_request(transport, instance, args):
                     source = os.path.abspath(source)
                 except (OSError, ValueError) as error:
                     raise CliError('E_VALIDATION', 'Cannot resolve local artwork path: ' + str(error)) from error
+            # FDM-1068: the CLI and Change Icon use the same stdlib-only
+            # ingester. No host config is ever written here; if copying fails,
+            # the host never receives a falsely successful icon mapping.
+            helper_path = BUNDLE / 'scripts' / 'dockrail_icon_assets.py'
+            spec = importlib.util.spec_from_file_location('dockrail_icon_assets', helper_path)
+            if spec is None or spec.loader is None:
+                raise CliError('E_SETUP', 'Managed icon ingester is unavailable.')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            try:
+                source = module.ingest(source)
+            except (module.IconAssetError, OSError) as error:
+                raise CliError('E_VALIDATION', str(error)) from error
             arguments['source'] = source
     reply = transport.request(instance, args.group + '.' + args.action, arguments)
     if args.group == 'icons':

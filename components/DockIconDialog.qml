@@ -46,7 +46,16 @@ PopupWindow {
   property int chooserLaunchSerial: -1
   property int chooserExitCode: -1
   property bool chooserOutputDone: false
-  readonly property bool dialogActive: root.visible || root.picking
+  // The chooser and the asset ingester are independent native subprocesses.
+  // Saving must not reference unowned artwork while a copy is in flight.
+  property bool ingesting: false
+  property var pendingIconChange: null
+  property int ingestSerial: 0
+  property int ingestExitCode: -1
+  property bool ingestOutputDone: false
+  readonly property string iconAssetScript: decodeURIComponent(
+    String(Qt.resolvedUrl("../scripts/dockrail_icon_assets.py")).slice(7))
+  readonly property bool dialogActive: root.visible || root.picking || root.ingesting
 
   readonly property var settings: root.mutationController && root.mutationController.settings
     ? root.mutationController.settings : ({})
@@ -110,6 +119,10 @@ PopupWindow {
     // its process alone; Choose file stays disabled until that process exits.
     root.chooserSerial++
     root.picking = false
+    root.ingestSerial++
+    root.ingesting = false
+    root.pendingIconChange = null
+    if (iconAssetIngest.running) iconAssetIngest.running = false
     if (root.mutationController && typeof root.mutationController.claimIconDialog === "function")
       root.mutationController.claimIconDialog(root)
     root.openAnchor = value.anchorItem
@@ -167,7 +180,11 @@ PopupWindow {
 
   function closeDialog() {
     root.chooserSerial++
+    root.ingestSerial++
     root.picking = false
+    root.ingesting = false
+    root.pendingIconChange = null
+    if (iconAssetIngest.running) iconAssetIngest.running = false
     root.inlineError = ""
     root.openAnchor = null
     root.windows = []
@@ -194,11 +211,7 @@ PopupWindow {
     if (value === "window" && !root.titleText) Qt.callLater(function() { titleInput.forceActiveFocus() })
   }
 
-  function commit(args) {
-    if (!root.mutationController || typeof root.mutationController.saveIconChange !== "function") {
-      root.inlineError = "Icon changes are not available right now."
-      return false
-    }
+  function commitResult(args) {
     var reply = root.mutationController.saveIconChange(args)
     if (reply && (reply.ok === true || (reply.data && reply.data.applied === true))) {
       root.closeDialog()
@@ -214,6 +227,48 @@ PopupWindow {
     return false
   }
 
+  function commit(args) {
+    if (root.ingesting || !root.mutationController
+        || typeof root.mutationController.saveIconChange !== "function") {
+      root.inlineError = "Icon changes are not available right now."
+      return false
+    }
+    if (!args || !args.set) return root.commitResult(args)
+    // Copy first. Only a successful, current process result may reach the
+    // host's single validated FileView writer. Dismissing/reopening the dialog
+    // invalidates the pending copy and cannot save into a newer session.
+    root.pendingIconChange = JSON.parse(JSON.stringify(args))
+    root.ingestExitCode = -1
+    root.ingestOutputDone = false
+    root.ingestSerial++
+    root.ingesting = true
+    root.inlineError = ""
+    iconAssetIngest.running = true
+    return false
+  }
+
+  function settleIconIngest() {
+    if (!root.ingesting || root.ingestExitCode < 0) return
+    if (root.ingestExitCode === 0 && !root.ingestOutputDone) return
+    var args = root.pendingIconChange
+    root.pendingIconChange = null
+    root.ingesting = false
+    if (root.ingestExitCode !== 0) {
+      root.inlineError = "Could not copy the artwork into Dockrail storage. Check the file and permissions."
+      return
+    }
+    var managed = ""
+    try {
+      managed = DockIconModel.normalizeSource(JSON.parse(iconAssetOutput.text).source)
+    } catch (error) { managed = "" }
+    if (!managed || !args || !args.set || !root.openAnchor) {
+      root.inlineError = "The icon copy did not return a usable local image."
+      return
+    }
+    args.set.source = managed
+    root.commitResult(args)
+  }
+
   function changeArguments() {
     return DockIconModel.iconChangeArguments(root.current, {
       kind: root.scope, source: root.selectedSource, desktopId: root.desktopId,
@@ -223,6 +278,7 @@ PopupWindow {
   }
 
   function save() {
+    if (root.ingesting) return false
     var built = root.changeArguments()
     if (!built.ok) {
       root.inlineError = built.error
@@ -240,7 +296,7 @@ PopupWindow {
   }
 
   function chooseFile() {
-    if (root.picking || fileChooser.running) return
+    if (root.ingesting || root.picking || fileChooser.running) return
     root.chooserSerial++
     root.chooserLaunchSerial = root.chooserSerial
     root.chooserExitCode = -1
@@ -892,7 +948,8 @@ PopupWindow {
               }
               Button {
                 id: saveButton
-                text: "Save"
+                text: root.ingesting ? "Copying…" : "Save"
+                enabled: !root.ingesting
                 bordered: true
                 focusable: true
                 active: true
@@ -903,6 +960,27 @@ PopupWindow {
           }
         }
       }
+    }
+  }
+
+
+  // The same helper powers the CLI, legacy migration and Change Icon.
+  Process {
+    id: iconAssetIngest
+    command: ["python3", root.iconAssetScript, "ingest",
+      root.pendingIconChange && root.pendingIconChange.set
+        ? String(root.pendingIconChange.set.source || "") : ""]
+    stdout: StdioCollector {
+      id: iconAssetOutput
+      waitForEnd: true
+      onStreamFinished: {
+        root.ingestOutputDone = true
+        root.settleIconIngest()
+      }
+    }
+    onExited: function(code) {
+      root.ingestExitCode = code
+      root.settleIconIngest()
     }
   }
 
