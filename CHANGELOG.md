@@ -4,8 +4,6 @@
 
 ## 3.1.0 - YYYY-MM-DD
 
-Replace `YYYY-MM-DD` with the tag-day date before tagging. This note is a placeholder; the release pull request does not choose the date.
-
 Dockrail 3.1 adds native Settings and developer-session integrations on top of the 3.0 compatibility-preserving SmartDock-to-Dockrail migration. This release retains the existing plugin ID, user configuration and legacy compatibility; the intentional 4.0 cutover is not part of this release.
 
 ### Added
