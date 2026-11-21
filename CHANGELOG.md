@@ -2,11 +2,9 @@
 
 ## [Unreleased]
 
-- Hide windows on Hyprland special workspaces (the scratchpad) from the dock and sidebar in every window scope. Dockrail-minimized windows keep their recorded origin; unknown locations fail open.
+## 3.1.0 - YYYY-MM-DD
 
-## 3.1.0 - Release candidate (publication date pending)
-
-Dockrail 3.1 adds native Settings and developer-session integrations on top of the 3.0 compatibility-preserving SmartDock-to-Dockrail migration. This candidate retains the existing plugin ID, user configuration and legacy compatibility; the intentional 4.0 cutover is not part of this release.
+Dockrail 3.1 adds native Settings and developer-session integrations on top of the 3.0 compatibility-preserving SmartDock-to-Dockrail migration. This release retains the existing plugin ID, user configuration and legacy compatibility; the intentional 4.0 cutover is not part of this release.
 
 ### Added
 
@@ -24,6 +22,7 @@ Dockrail 3.1 adds native Settings and developer-session integrations on top of t
 
 ### Fixed
 
+- Hide windows on Hyprland special workspaces (the scratchpad) from the dock and sidebar in every window scope. Dockrail-minimized windows keep their recorded origin; unknown locations fail open.
 - T3 attention and idle-row classification and agent row ordering.
 - Classic-dock pointer input no longer includes transparent animation headroom.
 - Sidebar monitor cards render as translucent overlays instead of opaque surfaces.

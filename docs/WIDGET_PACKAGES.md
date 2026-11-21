@@ -8,9 +8,8 @@ checkout.
 
 There are three different locations with different ownership:
 
-1. **Dockrail core source** -- `/home/admin/Projects/smart-omarchy-dock` on the
-   development machine. Core changes use an ordinary branch/worktree and
-   `dockrail dev use`.
+1. **Dockrail core source** -- this repository's root (`.`). Core changes use
+   an ordinary branch/worktree and `dockrail dev use`.
 2. **Custom Widget source** -- a separate directory or Git repository owned by the
    Widget developer, normally under `~/Projects/dockrail-widgets/`. Use the
    `dockrail widget ...` commands below.

@@ -165,8 +165,7 @@ never be recreated. Existing plugin checkouts keep their old origin URL and
 continue updating through that redirect. Upstream attribution to
 `nick-friedrich/hyprland-dock` and the fork relationship are unchanged. The
 repository had no GitHub Pages site or external Actions consumers to migrate.
-Local checkout paths such as `/home/admin/Projects/smart-omarchy-dock` were not
-moved.
+The GitHub rename did not rename local checkout directories.
 
 Current installation examples use `https://github.com/fernandodamaso/dockrail.git`.
 The plugin ID changed from `io.github.fernandodamaso.smartdock` to
