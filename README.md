@@ -1,7 +1,8 @@
 # Dockrail
 
 <p align="center">
-  <strong>Pinned apps, live windows, and workspaces on one Hyprland rail.</strong>
+  <strong>A dock when you want a dock. A workspace rail when you're shipping.</strong><br>
+  Apps, live windows, workspaces, Chrome tabs, widgets, and coding-agent sessions in one native Hyprland surface.
 </p>
 
 <p align="center">
@@ -36,21 +37,21 @@ Do not commit stand-in GIFs.
 </p>
 -->
 
-Dockrail is a developer workspace rail for Hyprland, built with Quickshell. Pinned applications stay first. Running applications from every workspace are grouped after them. One monitor can keep the bottom dock while another uses the sidebar, and both follow the Omarchy theme. It runs inside the existing Omarchy shell.
+**Dockrail** is a developer workspace rail for Hyprland, built with Quickshell and Qt/QML to run directly inside the existing Omarchy shell. Start with a smooth, theme-native bottom dock where pinned apps stay first and running apps from every workspace group cleanly after them. Drag it left — on one display or all of them — and it becomes a full workspace sidebar with nested Chrome tabs, extensible widgets, and live status for your AI coding agents.
 
 Dockrail is an MIT-licensed fork of [nick-friedrich/hyprland-dock](https://github.com/nick-friedrich/hyprland-dock). The upstream history and the original copyright notice stay in `LICENSE`.
 
 ## Features
 
-- Pointer-distance magnification, running-app indicators, and optional window previews
-- Pin, unpin, hide, and drag-to-reorder applications, with fuzzy search when adding one
-- A trailing workspace switcher and per-window move, fullscreen, minimize, focus, and close
-- Bottom dock or left sidebar, including a different presentation on each monitor
-- Optional auto-hide, reserved screen space, and live configuration reload
-- Omarchy colors, borders, type, and hover states
-- Settings in the sidebar, and the same changes through `dockrail config`
-- Optional Herdr, T3 Code, and Claude Desktop session marks
-- Windows on Hyprland special workspaces stay off the dock and the sidebar
+- **Bottom dock or workspace sidebar — per monitor, on demand.** Run a classic bottom dock on one display and a resizable, collapsible left sidebar on another at the exact same time. Drag empty dock background left to morph into a sidebar with a live edge silhouette, drag back down to return, or bind `dockrail mode toggle` to flip only the focused monitor.
+- **Live mission control for coding agents.** Stop hunting through terminals to see which agent finished or got blocked. Surface live working, input-needed, and done marks directly on dock icons and sidebar rows for **Claude Desktop** (Claude Code sessions with click-to-open attention rows), **Herdr** (local and attached-remote agents with click-to-focus), and **T3 Code** (read-only local threads with project branding), plus bundled Ghostty launchers for Claude Code, Cursor Agent, Pi, Oh My Pi, Command Code, Kilo Code, and Cline.
+- **Workspace choreography without breaking flow.** Switch the classic dock to horizontal **Workspace Cards** to see every workspace across every monitor at a glance. Drag running windows between cards, drop onto a dynamic **+ New workspace** target, or drag an entire workspace header onto another monitor's dock. Plain click focuses a window or workspace in place; `Ctrl+click` pulls it straight to your current monitor.
+- **Mid-drag navigation across windows, workspaces, and tabs.** Grab a file, screenshot, or text snippet and hover over any sidebar window, workspace, Chrome tab, or classic dock icon/preview — Dockrail navigates there while you keep holding the drag so you can drop straight into the destination app.
+- **Chrome profiles, unread activity, and sidebar tabs.** Tell work and personal Chrome windows apart with per-window profile badges or custom icons. Hover Chrome for a privacy-respecting unread card (Gmail, WhatsApp, Instagram) that jumps straight to the exact tab with one-click service muting, or expand open Chrome tabs directly under their window in the sidebar.
+- **Calm attention and per-window custom icons.** Dot-first attention badges combine Hyprland urgency, StatusNotifierItem, and Omarchy notifications, with optional authoritative `LauncherEntry` numeric counts and a gentle bounded nudge. Swap artwork app-wide, per Chrome profile, or by window-title wildcard (`*solar*`) from the **Change Icon…** dialog or CLI.
+- **Extensible sidebar widgets (`WidgetKit 1.0`).** Drop built-in or standalone external QML widget packages into an independent split-scroll sidebar pane without touching core files.
+- **Built for humans and coding agents.** Tune every detail in the native, searchable Omarchy **Settings** panel or automate cleanly through the JSON-first `dockrail` CLI (`dockrail config`, `dockrail doctor`, `dockrail agent-guide`, and guided setup). Both share one atomic host writer, live-reload your Omarchy theme tokens, and keep Hyprland special workspaces (the scratchpad) out of the way.
+- **Polished dock fundamentals.** Smooth pointer-distance magnification, hover glow, optional grouped window previews, fuzzy app search, drag-to-reorder pins, hide/restore, optional dynamic Trash, auto-hide with edge reveal, reserved screen space, and configurable left/middle/scroll pointer actions.
 
 ## Requirements
 
