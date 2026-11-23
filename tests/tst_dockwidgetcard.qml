@@ -96,7 +96,7 @@ TestCase {
     var card = makeCard()
     compare(card.appearance, null)
     var surface = findByName(card, "widget-card-surface")
-    compare(surface.color, Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035)))
+    compare(surface.color, Util.alpha(Commons.Color.foreground, 0.035))
     compare(surface.radius, Math.min(3, Style.cornerRadius))
   }
 
@@ -116,7 +116,7 @@ TestCase {
     compare(surface.color, testAppearance.monitorFill)
     compare(surface.radius, 0)
     card.appearance = null
-    compare(surface.color, Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.foreground, 0.035)))
+    compare(surface.color, Util.alpha(Commons.Color.foreground, 0.035))
     compare(surface.radius, Math.min(3, Style.cornerRadius))
   }
 

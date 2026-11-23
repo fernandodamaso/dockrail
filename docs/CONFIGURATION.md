@@ -6,7 +6,7 @@ Use [the agent workflow](AGENT_CONFIGURATION.md) for minimal, reversible changes
 
 ## All declared settings
 
-Defaults below are JSON literals. `tests/test_cli_docs.py` checks these 58 rows against the shipped defaults. Bounds apply to new CLI writes; compatible legacy requested values survive unrelated changes. There is no automatic whole-file migration.
+Defaults below are JSON literals. `tests/test_cli_docs.py` checks these 60 rows against the shipped defaults. Bounds apply to new CLI writes; compatible legacy requested values survive unrelated changes. There is no automatic whole-file migration.
 
 | Key | Declared default | New-write type, limits and dependencies |
 | --- | --- | --- |
@@ -19,6 +19,8 @@ Defaults below are JSON literals. `tests/test_cli_docs.py` checks these 58 rows 
 | `hoverGlowOpacity` | `0.72` | Number 0–1; effective step 0.05. |
 | `hoverGlowRadius` | `28` | Number 0–100; effective step 5; relevant when glow is enabled. |
 | `showPreviews` | `true` | Boolean; permits ordinary grouped-window previews and the previews pointer action. |
+| `dragHoverNavigationEnabled` | `true` | Boolean; dwell on a dock or sidebar window/workspace target while dragging external content to navigate there. Applies to both presentations. |
+| `dragHoverDelayMs` | `500` | Integer 100–2000 ms; effective step 100. Dwell time before external drag navigation activates; dimmed while dragHoverNavigationEnabled is false and preserved. |
 | `showTrash` | `true` | Boolean; false removes Trash and pauses its polling, never empties it. |
 | `margin` | `10` | Nonnegative integer, no arbitrary maximum; preserved by preference reset. |
 | `backgroundOpacity` | `0.88` | Number 0–1; effective step 0.05; multiplies background color alpha. |
@@ -100,6 +102,8 @@ Colors remain live theme bindings after Settings removal. Custom background alph
 Workspace groups are opt-in per canonical application/workspace pair and never span workspaces. A saved pair survives empty workspaces and restart, new arrivals join automatically, moved windows follow the destination policy, minimized windows retain membership through their recorded origin, and unresolved/special workspace membership remains individual. Browser profile metadata does not create a second grouping dimension.
 
 Workspace cards and window filtering are different features. Grouped cards organize all matching workspace members using workspaceMonitorScope; flat layout retains windowScope, sortByWorkspace and urgent-outside-scope filtering. Do not move a vertical dock without authorization merely to make cards visible. In flat layout, workspace scope uses the focused monitor's active workspace, monitor scope uses each dock's screen, and combined scope requires both. Closed pinned launchers remain visible; explicitly hidden applications remain hidden. Minimized origins and transient location fallbacks remain owned by the shared window controller.
+
+Windows on a Hyprland special workspace (`special:*`, including the scratchpad) are never presented as dock icons or sidebar rows, in any `windowScope`. Special workspaces are overlays rather than desktop space, so their windows contribute no items, counts, folds or browser-tab groups. Dockrail's own `special:smartdock-minimized` windows keep their recorded origin and stay visible; a window whose origin cannot be resolved fails open.
 
 In grouped `workspaceMonitorScope: all`, monitor sections use `workspaceMonitorOrder`. With `[]`, connected monitors with usable finite positions are sorted numerically by x then y, followed by deterministic connector/identity ties; monitors without usable positions follow positioned monitors. A saved order such as `["HDMI-A-1","DP-1"]` puts those connected connectors first and appends other connected monitors using the same automatic geometry order. A disconnected listed connector is not rendered but stays saved and resumes its configured slot after reconnect. This setting never dispatches monitor/workspace moves and has no visual effect in flat or `current-monitor` layouts. Workspace/application presentation identities and global badge traversal remain independent from section order.
 

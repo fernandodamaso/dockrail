@@ -320,6 +320,30 @@ function locationMatchesContext(location, context) {
   return workspaceMatches && monitorMatches
 }
 
+function isSpecialWorkspace(identity) {
+  return String(identity || "").indexOf("special:") === 0
+}
+
+// Special workspaces are overlays, not desktop space: nothing they hold belongs
+// in the dock or sidebar. Unknown locations fail open, and Dockrail's own
+// minimized workspace resolves to its recorded origin before this check.
+function locationHiddenFromPresentation(location) {
+  var value = location || ({})
+  return value.workspaceKnown === true && isSpecialWorkspace(value.workspace)
+}
+
+function filterPresentationToplevels(toplevels, handles, originSnapshot) {
+  var values = toplevels || []
+  var result = []
+  for (var i = 0; i < values.length; ++i) {
+    if (!values[i]) continue
+    if (locationHiddenFromPresentation(
+      locationForToplevel(values[i], handles, originSnapshot))) continue
+    result.push(values[i])
+  }
+  return result
+}
+
 function filterToplevelsByScope(toplevels, handles, originSnapshot, context) {
   var values = toplevels || []
   var result = []
@@ -329,6 +353,7 @@ function filterToplevelsByScope(toplevels, handles, originSnapshot, context) {
     var toplevel = values[i]
     if (!toplevel) continue
     var location = locationForToplevel(toplevel, handles, originSnapshot)
+    if (locationHiddenFromPresentation(location)) continue
     var inScope = locationMatchesContext(location, scopeContext)
     var urgentException = scopeContext.scope !== "all"
       && scopeContext.showUrgentOutsideScope === true

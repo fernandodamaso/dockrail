@@ -72,7 +72,8 @@ with the same feature-readiness checks and guides optional setup through the run
 shell's `PATH` to use `dockrail` by name.
 
 Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
-Dockrail 3.0.0 uses a new plugin ID, so reinstall once. Your settings in
+Dockrail 3.0.0 introduced the new plugin ID (retained in 3.1.0), so
+reinstall once when upgrading from SmartDock. Your settings in
 `~/.config/dockrail` (or legacy `~/.config/smartdock`) are kept:
 
 ```bash
@@ -469,9 +470,13 @@ for atomic patches, dry runs, persistence errors, reset scope and safe exports.
 [`config/dock.json`](config/dock.json) contains bundled defaults, not necessarily
 the running configuration.
 
-The CLI is the configuration interface for AI coding agents and automation.
-The accepted [Settings 3.1 design](docs/SETTINGS.md) is not shipped yet; there is
-no live preference preview. **Change Icon** remains the sole icon editor:
+The CLI remains the complete configuration interface for AI coding agents
+and automation. Dockrail 3.1 also includes a host-owned graphical Settings
+panel on Omarchy, available from the sidebar Settings gear and through
+`dockrail settings` against a running host. Settings applies changes through
+the same writer as the CLI; it does not create a separate unsaved-preview
+configuration. See the [Settings design and behavior](docs/SETTINGS.md).
+**Change Icon** remains the sole icon editor:
 right-click an app, window or pinned app and choose **Change Icon…** to edit its app-wide, browser-profile or window-title icon
 through the same host writer. The dock, ordinary window previews, application picker,
 context menus, drag reordering, workspace controls and Trash remain available.
@@ -734,6 +739,56 @@ deltas accumulate in 120-unit steps, residual input resets after about 220 ms,
 and minimized targets restore through the shared host-owned window controller
 before focus.
 
+### External drag hover navigation
+
+Holding a file, image, text selection or other externally draggable content and
+hovering a Dockrail window or workspace navigates there without releasing the
+drag, so the original drag continues into the destination application.
+
+```json
+{
+  "dragHoverNavigationEnabled": true,
+  "dragHoverDelayMs": 500
+}
+```
+
+- `dragHoverNavigationEnabled` (default `true`) turns the gesture on or off.
+- `dragHoverDelayMs` (default `500`, integer `100–2000`, 100 ms steps) is how
+  long the pointer must rest on one stable destination before it activates.
+
+In the **sidebar**, hovering a window row focuses that exact window in place, a
+workspace row or badge switches to that workspace, an exact browser-tab row
+focuses its browser window and selects that tab, and a collapsed application row
+expands once so its windows become reachable. The leading inline workspace badge
+wins over the row that contains it.
+
+In the **classic dock**, hovering a running application icon focuses that window,
+with app grouping a multiwindow icon opens its existing window preview so a
+specific tile can be targeted, and hovering a workspace header or strip cell
+switches workspace.
+
+Behaviour worth knowing:
+
+- Activation happens once per hovered target; moving inside the same target does
+  not re-arm it, and a new drag can activate the same target again.
+- The dock reveals from its existing edge strip during a drag and stays open
+  while the drag is on the dock or its window preview.
+- Releasing on Dockrail never takes the content: the drop is rejected so the
+  source drag ends normally. Escape cancels and leaves you at the reached
+  destination (no focus or workspace restore).
+- Hovering never launches, minimizes, closes, relocates or writes configuration,
+  and the drag's payload is never read.
+- Ctrl during the drag never triggers the Ctrl-click relocation path.
+
+Qualified on a real desktop for sidebar window/workspace targets (including
+mirrored cross-monitor targets), classic running-icon targets and their reveal
+strip during a held drag, multiwindow preview tile selection with grouped
+windows, and text/image drags — verified by the desktop owner on the installed
+build. XWayland drag sources are untested by choice: this desktop has no X11
+application that can drag content out, so there was nothing to exercise. A
+measured cursor-shape check also remains open; see
+`tests/runtime/external-drag-navigation.md`.
+
 ### Window scope filtering
 
 `windowScope` filters individual running windows before grouping. `all` preserves
@@ -834,6 +889,35 @@ pinned position without pinning or unpinning anything. `config reset --preferenc
 intentionally preserves `hiddenApplications` and the other application collections.
 
 The configuration file is watched and updates automatically. Drag a dock icon to another slot to reorder it; the new `pinned` order is written back to this file. Switch to the sidebar using **Switch to sidebar** in Dock Controls; return to the classic dock through the Layout section of Dockrail Settings or a background drag. You can also drag genuinely empty background: drag the bottom dock's background left (48 px or more) to switch that monitor to the sidebar, or drag empty sidebar background downward to return it to the bottom dock. The hint pill, the destination silhouette and the result stay on the monitor where the drag started; other monitors keep their own modes, so a mixed layout with a classic dock beside a sidebar is normal. While you drag, a direction hint pill appears and, once the threshold is crossed, a silhouette of the destination edge previews where it will render; releasing past the threshold commits one `presentationModeByMonitor` entry for that connector once, and releasing earlier, pressing Escape, or an interrupted drag (open menu, popup, resize or row drag) cancels with no settings write. Only background is eligible — rows, widgets, headers, pinned strips and controls keep their own input. The existing settings writer persists the mode only after release. Feedback for a rejected or failed commit appears only on the monitor that produced the gesture. Reserved space follows visibility: while auto-hide is off, the `reserveSpace` option decides whether tiled windows keep a clear dock-sized area; while auto-hide is on, the hidden dock never reserves space.
+
+### Focused-monitor keyboard shortcut
+
+Toggle **only the currently focused monitor** between the bottom dock and
+sidebar without restarting the host:
+
+```bash
+dockrail mode toggle --json
+```
+
+For Omarchy Quattro, add this optional binding to
+`~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + ALT + D", "Toggle Dockrail dock/sidebar", "dockrail mode toggle")
+```
+
+Check `omarchy menu keybindings --print` first and choose a different chord
+if it is occupied; Dockrail does not install or override user keybindings.
+Use `o.rebind` only when you intentionally replace an existing binding on
+Omarchy versions supporting that helper. After editing, run
+`hyprctl reload` and `hyprctl configerrors`. The monitor is selected by
+Hyprland focus, **not** by pointer hover. The command updates just that
+output's `presentationModeByMonitor` entry through the host's existing
+settings writer; all other monitor overrides survive unchanged. An inherited
+sidebar hidden by a `sidebarMonitor` pin is revealed on the first toggle.
+For an `E_BUSY` or `E_PERSISTENCE` response, inspect
+`dockrail status --json` before assuming the choice was saved.
+See the [CLI reference](docs/CLI_REFERENCE.md#focused-monitor-presentation-shortcut).
 
 Surface override settings are independent. Leave an `*Enabled` flag set to
 `false` to follow the active Omarchy theme; enable it to use the matching

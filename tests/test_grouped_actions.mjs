@@ -177,8 +177,43 @@ function expectSequence(steps, usingLua, label) {
     ]], label)
   }
 }
+// External drag hover uses the same in-place focus path as ordinary activation.
+for (const usingLua of [false, true]) {
+  hyprland.usingLua = usingLua
+  const restore = 'movetoworkspace name:Design work,address:0x1'
+  const luaRestore = 'hl.dsp.window.move({ window = "address:0x1", workspace = "name:Design work", follow = true })'
+  const focus = usingLua
+    ? 'hl.dsp.focus({ window = "address:0x1" })' : 'focuswindow address:0x1'
+  handles[0].lastIpcObject = { workspace: { name: 'special:smartdock-minimized' }, monitor: 0 }
+  actions.minimizedOrigins = { '0x1': { workspace: 'name:Design work', monitor: '0' } }
+  clearSubmissions()
+  assert.equal(actions.focusToplevelInPlace(windows[0]), true)
+  expectRequests(requests, [usingLua ? luaRestore : restore, focus],
+    `hover restores then focuses explicitly (${usingLua ? 'lua' : 'legacy'})`)
+  expectRequests(batches, [], 'hover never batches or relocates a monitor')
+}
+hyprland.usingLua = false
+handles[0].lastIpcObject = { workspace: { id: 9 }, monitor: 1 }
+actions.minimizedOrigins = {}
+clearSubmissions()
+assert.equal(actions.focusToplevelInPlace(windows[0]), true)
+expectRequests(requests, ['focuswindow address:0x1'],
+  'hover focuses a normal window where it currently lives')
+assert.doesNotMatch(requests.join(' '), /moveworkspace|movecurrentworkspace/i,
+  'hover never pulls a destination to another monitor')
+handles[0].lastIpcObject = { workspace: { name: 'special:smartdock-minimized' }, monitor: 0 }
+actions.minimizedOrigins = { '0x1': { workspace: 'name:bad,dispatch', monitor: '0' } }
+clearSubmissions()
+assert.equal(actions.focusToplevelInPlace(windows[0]), false,
+  'a stale/invalid minimized origin fails closed')
+expectRequests(requests, [], 'no restore or focus dispatch after a stale origin')
+clearSubmissions()
+assert.equal(actions.focusToplevelInPlace({}), false, 'a dead toplevel is not focusable')
+expectRequests(requests, [])
+
 hyprland.usingLua = true
 handles[0].lastIpcObject = { workspace: { id: 9 }, monitor: 1 }
+actions.minimizedOrigins = {}
 clearSubmissions()
 assert.equal(item.dispatchPointerAction('left', {}), true)
 expectRequests(requests, [
@@ -742,6 +777,39 @@ function dockGeometry(options = {}) {
     visibleRight: surfaceX + viewportX + groupedLayout.contentPadding + 300,
     desiredWidth: groupedLayout.desiredWidth }
 }
+// The animation canvas must not intercept input above the visible dock.
+// Keep the screen-edge margin reachable for auto-hide and native drag reveal.
+const inputSource = dockSource.split('id: interactionArea')[1]
+function inputGeometry({ iconSize = 24, magnification = 1.15, grouped = true,
+  position = 'bottom', edgeMargin = 10, fullLength = false } = {}) {
+  const root = { iconSize, magnification, grouped, position, edgeMargin,
+    fullLength, vertical: false, compactPanelExtent: 600 }
+  const parent = { width: fullLength ? 1920 : 600,
+    height: binding(dockSource, 'readonly property int crossExtent', root) }
+  const dockBackground = { height: binding(backgroundSource, 'height', { root, parent }) }
+  dockBackground.y = binding(backgroundSource, 'y',
+    { root, parent, height: dockBackground.height })
+  const area = { height: binding(inputSource, 'height', { root, parent, dockBackground }) }
+  area.y = inputSource.match(/^    y:/m)
+    ? binding(inputSource, 'y', { root, parent, dockBackground, ...area }) : 0
+  return { parent, dockBackground, area }
+}
+const reportedInput = inputGeometry()
+assert.equal(reportedInput.parent.height, 102, 'drawing canvas retains animation headroom')
+assert.equal(reportedInput.area.y, 36, 'input starts at the visible dock, below blank headroom')
+assert.equal(reportedInput.area.height, 66, 'input retains the 56px dock and 10px edge approach')
+for (const iconSize of [24, 64, 96]) for (const magnification of [1, 1.15, 2])
+  for (const grouped of [false, true]) for (const fullLength of [false, true])
+    for (const edgeMargin of [0, 10, 24]) {
+      const { parent, dockBackground, area } = inputGeometry({
+        iconSize, magnification, grouped, fullLength, edgeMargin })
+      const containsY = y => y >= area.y && y < area.y + area.height
+      assert.equal(containsY(dockBackground.y - 1), false,
+        'transparent headroom passes hover and clicks to the window below')
+      assert.equal(containsY(dockBackground.y), true, 'visible dock remains interactive')
+      assert.equal(containsY(parent.height - 1), true, 'screen-edge reveal approach stays interactive')
+    }
+
 for (const iconSize of [24, 31, 64, 96]) for (const magnification of [1, 1.2, 2])
   for (const groupedFullscreenModeActive of [false, true]) {
     const g = dockGeometry({ iconSize, magnification, groupedFullscreenModeActive })

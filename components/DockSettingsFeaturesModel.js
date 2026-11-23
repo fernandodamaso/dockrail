@@ -28,20 +28,32 @@ function aggregate(metadata, id) {
   return null
 }
 function equal(left, right) { return JSON.stringify(left) === JSON.stringify(right) }
+// Qt 6.12 exposes arrays that crossed a QML property boundary as V4 sequence
+// objects: indexed access works, but Array.isArray() is false. Copy them into
+// real arrays so membership edits keep plain JavaScript arrays.
+function list(value) {
+  if (Array.isArray(value)) return value
+  if (!value || typeof value !== "object" || typeof value.length !== "number"
+      || !isFinite(value.length) || value.length < 0) return null
+  var copy = []
+  for (var i = 0; i < value.length; ++i) copy.push(value[i])
+  return copy
+}
 function desired(settings, feature, enabled) {
-  if (!feature || !Array.isArray(feature.keys) || !feature.keys.length) return null
+  var keys = feature ? list(feature.keys) : null
+  if (!keys || !keys.length) return null
   var values = enabled ? feature.on : feature.off
   if (!values || typeof values !== "object") return null
   var patch = {}, expected = {}, current = settings || {}
-  for (var i=0;i<feature.keys.length;i++) {
-    var key = feature.keys[i], existing = current[key]
-    expected[key] = Array.isArray(existing) ? existing.slice() : existing
+  for (var i=0;i<keys.length;i++) {
+    var key = keys[i], existing = current[key], existingList = list(existing)
+    expected[key] = existingList ? existingList.slice() : existing
     if (feature.membership === "append-or-remove-id" && key === "sidebarWidgets") {
-      if (!Array.isArray(existing) || !feature.widgetId) return null
-      var members = existing.filter(function(id) { return id !== feature.widgetId })
-      patch[key] = enabled && existing.indexOf(feature.widgetId) < 0
-        ? existing.concat([feature.widgetId])
-        : enabled ? existing.slice() : members
+      if (!existingList || !feature.widgetId) return null
+      var members = existingList.filter(function(id) { return id !== feature.widgetId })
+      patch[key] = enabled && existingList.indexOf(feature.widgetId) < 0
+        ? existingList.concat([feature.widgetId])
+        : enabled ? existingList.slice() : members
     } else if (Object.prototype.hasOwnProperty.call(values,key)) {
       patch[key] = values[key]
     } else return null
@@ -51,7 +63,7 @@ function desired(settings, feature, enabled) {
 function shortcutState(settings, feature) {
   var on = desired(settings,feature,true), off = desired(settings,feature,false)
   if (!on || !off) return "unavailable"
-  var keys = feature.keys
+  var keys = list(feature.keys)
   var matches = function(candidate) {
     return keys.every(function(key) {return equal(settings[key],candidate.patch[key])})
   }
@@ -89,6 +101,6 @@ function summary(features) {
   return parts.join(" · ")
 }
 function agentSummary(feature) {
-  var agents=feature && Array.isArray(feature.agents) ? feature.agents : []
+  var agents=list(feature && feature.agents) || []
   return agents.filter(function(agent){return agent.found === true}).length+" of "+agents.length+" found on this computer"
 }

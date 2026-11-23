@@ -50,5 +50,12 @@ Omarchy commands operate on the plugin path and could otherwise modify the
 linked source checkout. Do not delete or switch branches inside a selected
 worktree unless you intend to change the live dock. Use `dev use` for switching.
 
+`omarchy plugin update` rewrites the installed plugin in place but does not
+restart the shell, so the running dock keeps executing the previous QML until it
+does. Run `omarchy-restart-shell` after the update, then confirm the shell
+process started after the plugin files were written (`ps -o lstart= -C quickshell`
+against the file modification time). Reloading the top bar or rescanning plugins
+is not enough; published fixes look absent until the shell restarts.
+
 Normal PR delivery rules still apply to merging changes into `main`. VM sessions
 in `DEV_SESSIONS.md` remain available for isolated autonomous testing.

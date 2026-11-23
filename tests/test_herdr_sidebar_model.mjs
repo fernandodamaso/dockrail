@@ -369,31 +369,31 @@ console.log('herdr sidebar model association: PASS')
   const nested = projected.rows.filter(row =>
     row.windowKey === windowKey
     && row.kind === 'herdr-agent')
-  // Sorted agents: blocked (c), working (a), idle (b)
+  // Sorted agents: blocked (c), idle (b), working (a)
   assert.deepEqual(nested.map(row => row.kind), [
     'herdr-agent', 'herdr-agent', 'herdr-agent',
   ])
   assert.ok(!projected.rows.some(row => row.kind === 'herdr-tab'))
   assert.ok(!projected.rows.some(row => row.kind === 'herdr-workspace'))
 
-  assert.deepEqual(nested.map(row => row.status), ['blocked', 'working', 'idle'])
-  assert.deepEqual(nested.map(row => row.title), ['Needs input', 'Codex Review', 'Claude Fix'])
+  assert.deepEqual(nested.map(row => row.status), ['blocked', 'idle', 'working'])
+  assert.deepEqual(nested.map(row => row.title), ['Needs input', 'Claude Fix', 'Codex Review'])
   assert.deepEqual(nested.map(row => row.tabTitle),
     ['Shared blocked tab', 'Shared multi tab', 'Shared multi tab'])
-  assert.deepEqual(nested.map(row => row.paneId), ['pane-c', 'pane-a', 'pane-b'])
+  assert.deepEqual(nested.map(row => row.paneId), ['pane-c', 'pane-b', 'pane-a'])
   assert.deepEqual(nested.map(row => row.agentId), [
     'local-matched:1:pane-c',
-    'local-matched:1:pane-a',
     'local-matched:1:pane-b',
+    'local-matched:1:pane-a',
   ])
   assert.equal(nested[0].subtitle, 'smart-omarchy-dock - OpenCode')
-  assert.equal(nested[1].subtitle, 'smart-omarchy-dock - Codex')
-  assert.equal(nested[2].subtitle, 'smart-omarchy-dock - Claude')
-  assert.equal(nested[1].key, JSON.stringify(['herdr-agent', windowKey, 'local-matched:1:pane-a']))
+  assert.equal(nested[1].subtitle, 'smart-omarchy-dock - Claude')
+  assert.equal(nested[2].subtitle, 'smart-omarchy-dock - Codex')
+  assert.equal(nested[1].key, JSON.stringify(['herdr-agent', windowKey, 'local-matched:1:pane-b']))
   assert.equal(nested[1].windowKey, windowKey)
   assert.equal(nested[1].providerEpoch, 'epoch-b')
   assert.equal(nested[1].serverId, 'local-matched')
-  assert.equal(nested[1].terminalId, 'term-a')
+  assert.equal(nested[2].terminalId, 'term-a')
   nested.forEach(row => {
     assert.equal(row.actionable, true)
     assert.equal(row.parentKey, windowKey)
@@ -427,7 +427,7 @@ console.log('herdr sidebar model association: PASS')
       { id: '4', status: 'working' },
       { id: '5', status: 'unknown' },
     ]).map(a => a.status),
-    ['blocked', 'working', 'done', 'idle', 'unknown'],
+    ['blocked', 'done', 'idle', 'working', 'unknown'],
   )
   const summary = Model.windowAgentSummary([
     { id: 'idle', status: 'idle', title: 'Idle', focusAgentSupported: true },
@@ -444,9 +444,9 @@ console.log('herdr sidebar model association: PASS')
     { status: 'unknown', count: 1 }
   ])
   assert.deepEqual(Array.from(summary.rows, row => row.id),
-    ['blocked', 'working', 'done', 'idle', 'stale'])
+    ['blocked', 'done', 'idle', 'working', 'stale'])
   assert.equal(summary.rows[0].status, 'blocked', 'rows retain raw status')
-  assert.equal(summary.rows[2].focusAgentSupported, false,
+  assert.equal(summary.rows[1].focusAgentSupported, false,
     'remote focus capability remains visible in summary rows')
   assert.equal(Model.windowAgentSummary([
     { id: 'done', status: 'done' }, { id: 'idle', status: 'idle' }
@@ -1155,11 +1155,11 @@ console.log('herdr sidebar model projection: PASS')
   const agentRows = expanded.rows.filter(row =>
     row.kind === 'herdr-agent' && row.windowKey === windowKey)
   assert.equal(agentRows.length, 28)
-  // Sort: blocked → working → done → idle → unknown
+  // Sort: blocked → done → idle → working → unknown
   assert.equal(agentRows[0].status, 'blocked')
-  assert.equal(agentRows[10].status, 'working')
-  assert.equal(agentRows[22].status, 'done')
-  assert.equal(agentRows[23].status, 'idle')
+  assert.equal(agentRows[10].status, 'done')
+  assert.equal(agentRows[11].status, 'idle')
+  assert.equal(agentRows[14].status, 'working')
   assert.equal(agentRows[26].status, 'unknown')
   const markup = agentRows.find(row =>
     row.title === '<b>Long markup-like agent name that must stay plain text</b>')
@@ -1289,19 +1289,19 @@ console.log('herdr sidebar model appearance: PASS')
   assert.equal(flatTabs.length, 0, 'single multi-agent tab must not emit a tab header')
   const flatAgents = flat.rows.filter(row => row.kind === 'herdr-agent' && row.windowKey === windowKey)
   assert.equal(flatAgents.length, 2)
-  // Sorted: working then idle; titles are agent titles, not the tab title.
-  assert.deepEqual(flatAgents.map(row => row.title), ['Agent Alpha', 'Agent Beta'])
+  // Sorted: idle then working; titles are agent titles, not the tab title.
+  assert.deepEqual(flatAgents.map(row => row.title), ['Agent Beta', 'Agent Alpha'])
   assert.deepEqual(flatAgents.map(row => row.agentId),
-    ['local-matched:1:pane-a', 'local-matched:1:pane-b'])
-  assert.deepEqual(flatAgents.map(row => row.paneId), ['pane-a', 'pane-b'])
+    ['local-matched:1:pane-b', 'local-matched:1:pane-a'])
+  assert.deepEqual(flatAgents.map(row => row.paneId), ['pane-b', 'pane-a'])
   flatAgents.forEach(row => {
     assert.equal(row.parentKey, windowKey)
     assert.equal(row.treeDepth, flatParent.treeDepth + 1)
     assert.equal(row.tabTitle, 'Solo tab')
     assert.equal(row.actionable, true)
   })
-  assert.equal(flatAgents[0].subtitle, 'smart-omarchy-dock - Codex')
-  assert.equal(flatAgents[1].subtitle, 'smart-omarchy-dock - Claude')
+  assert.equal(flatAgents[0].subtitle, 'smart-omarchy-dock - Claude')
+  assert.equal(flatAgents[1].subtitle, 'smart-omarchy-dock - Codex')
 
   // Adding a second tab preserves tab/pane order but still emits only agents.
   const twoTabAgents = soloAgents.concat([{
@@ -1321,12 +1321,12 @@ console.log('herdr sidebar model appearance: PASS')
   const groupedAgents = grouped.rows.filter(row => row.kind === 'herdr-agent' && row.windowKey === windowKey)
   assert.ok(!grouped.rows.some(row => row.kind === 'herdr-tab'))
   assert.equal(groupedAgents.length, 3)
-  assert.deepEqual(groupedAgents.map(row => row.paneId), ['pane-c', 'pane-a', 'pane-b'])
+  assert.deepEqual(groupedAgents.map(row => row.paneId), ['pane-c', 'pane-b', 'pane-a'])
   assert.deepEqual(groupedAgents.map(row => row.tabTitle),
     ['Second tab', 'Solo tab', 'Solo tab'])
   const regroupedAlpha = groupedAgents.find(row => row.agentId === 'local-matched:1:pane-a')
   assert.ok(regroupedAlpha)
-  assert.equal(regroupedAlpha.key, flatAgents[0].key)
+  assert.equal(regroupedAlpha.key, flatAgents[1].key)
   assert.equal(regroupedAlpha.parentKey, windowKey)
   assert.equal(regroupedAlpha.treeDepth, flatParent.treeDepth + 1)
 
@@ -1350,7 +1350,7 @@ console.log('herdr sidebar model appearance: PASS')
   assert.ok(!crossWorkspace.rows.some(row => row.kind === 'herdr-tab'))
   assert.equal(crossAgents.length, 2)
   assert.deepEqual(crossAgents.map(row => row.workspaceLabel),
-    ['smart-omarchy-dock', 'other-repo'])
+    ['other-repo', 'smart-omarchy-dock'])
 
   // Partial inventory still reports its state row after the flattened agents.
   const partial = projectAgents(soloAgents, { state: 'partial' })
