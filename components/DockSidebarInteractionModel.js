@@ -80,12 +80,7 @@ function nextKey(rows, key, direction) {
 // present (id:10 named Work → "Work"); otherwise id:3→3, name:Work→Work.
 // Explicit prefixes only — never first-digits regex or slice(0, 2).
 function workspaceBadgeLabel(identity, displayLabel) {
-  var label = String(displayLabel || "").trim()
-  if (label) return label
-  var raw = String(identity || "")
-  if (raw.indexOf("id:") === 0) return raw.slice(3)
-  if (raw.indexOf("name:") === 0) return raw.slice(5)
-  return raw
+  return WorkspaceModel.workspaceBadgeLabel(identity, displayLabel)
 }
 
 // Collapsed rail keeps a compact token: full numerics preserved, other labels

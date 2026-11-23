@@ -237,6 +237,35 @@ function projectMonitorDrag(presentation, drag, visibleMonitorIdentity) {
   })
 }
 
+function workspaceBadgeLabel(identity, displayLabel) {
+  var raw = String(identity || "")
+  var explicitLabel = String(displayLabel || "").trim()
+  if (raw.indexOf("name:") === 0) {
+    var namePart = raw.slice(5)
+    return explicitLabel || namePart
+  }
+  if (raw.indexOf("id:") === 0) {
+    var idText = raw.slice(3)
+    var idNumber = Number(idText)
+    var fallbackLabel = idText
+    if (explicitLabel && explicitLabel !== fallbackLabel)
+      return explicitLabel
+    if (!isFinite(idNumber) || idNumber <= 0) return fallbackLabel
+    var slot = (idNumber - 1) % 10 + 1
+    return slot === 10 ? "0" : String(slot)
+  }
+  if (explicitLabel) return explicitLabel
+  return raw
+}
+
+function workspaceLabel(identity, displayLabel) {
+  return workspaceBadgeLabel(identity, displayLabel)
+}
+
+function workspaceDisplayLabel(identity, displayLabel) {
+  return workspaceBadgeLabel(identity, displayLabel)
+}
+
 function buildWorkspacePresentation(appItems, records, workspaces, context) {
   context = context || ({})
   var groups = []
@@ -261,7 +290,7 @@ function buildWorkspacePresentation(appItems, records, workspaces, context) {
     if (!target) return
     var fallbackLabel = identity.replace(/^(id:|name:)/, "")
     var explicitLabel = String(displayName || "").trim()
-    var label = explicitLabel || fallbackLabel
+    var label = workspaceBadgeLabel(identity, displayName)
     var showFullLabel = identity.indexOf("id:") === 0
       && explicitLabel !== "" && explicitLabel !== fallbackLabel
     if (byWorkspace[identity]) {

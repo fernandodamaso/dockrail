@@ -216,13 +216,22 @@ assert.notEqual(SidebarModel.compactMonitorRailLabel('Virtual-1', 0),
 // Workspace badge identity: prefer display label; id:/name: fallback only.
 assert.equal(Interaction.workspaceBadgeLabel('id:3'), '3')
 assert.equal(Interaction.workspaceBadgeLabel('name:Work'), 'Work')
-assert.equal(Interaction.workspaceBadgeLabel('id:10'), '10', 'id:10 must not truncate to 1')
+assert.equal(Interaction.workspaceBadgeLabel('id:10'), '0', 'id:10 maps to slot 0')
 assert.equal(Interaction.workspaceBadgeLabel('id:10', 'Work'), 'Work',
   'Hyprland id:10 named Work shows Work, not 10')
 assert.equal(Interaction.workspaceBadgeLabel('id:3', '3'), '3')
 assert.equal(Interaction.workspaceBadgeLabel('name:Design work'), 'Design work')
 assert.equal(Interaction.workspaceBadgeLabel('', 'Work'), 'Work')
 assert.equal(Interaction.workspaceBadgeLabel(''), '')
+// Per-monitor slot numbering (Omarchy top bar parity)
+assert.equal(Interaction.workspaceBadgeLabel('id:1'), '1')
+assert.equal(Interaction.workspaceBadgeLabel('id:10'), '0')
+assert.equal(Interaction.workspaceBadgeLabel('id:22'), '2')
+assert.equal(Interaction.workspaceBadgeLabel('id:32'), '2')
+assert.equal(Interaction.workspaceBadgeLabel('id:40'), '0')
+assert.equal(Interaction.workspaceBadgeLabel('id:20', 'Work'), 'Work')
+assert.equal(Interaction.workspaceBadgeLabel('id:33', '33'), '3')
+assert.equal(Interaction.workspaceBadgeLabel('name:foo'), 'foo')
 
 // Collapsed rail abbreviation: full numerics preserved, others two code points.
 assert.equal(Interaction.compactWorkspaceBadgeLabel('Work'), 'Wo')

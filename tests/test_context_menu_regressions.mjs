@@ -23,6 +23,7 @@ const DockMenuModel = model('DockMenuModel.js')
 const DockIconModel = model('DockIconModel.js')
 const FullscreenModel = model('DockFullscreenModel.js')
 const WorkspaceGroupModel = model('DockWorkspaceGroupModel.js', { DockModel })
+const WorkspaceModel = model('DockWorkspaceModel.js', { DockModel, DockWindowModel })
 
 function fixture(usingLua = false) {
   const A = { appId: 'editor', title: 'A' }
@@ -59,7 +60,7 @@ function fixture(usingLua = false) {
     applicationMutationController: controller, runtimeMode: 'plugin', instanceId: '42'
   })
   const menu = methods('DockContextMenu.qml', {
-    DockModel, DockMenuModel, DockIconModel, FullscreenModel, WorkspaceGroupModel,
+    DockModel, DockMenuModel, DockIconModel, FullscreenModel, WorkspaceGroupModel, WorkspaceModel,
     Hyprland, windowActions: actions, contextActions,
     DesktopEntries: { applications: { values: [{ id: 'editor', name: 'Editor' }] } },
     Qt: { callLater() {} }, menuSurface: { forceActiveFocus() {} },

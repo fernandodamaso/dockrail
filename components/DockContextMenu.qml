@@ -12,6 +12,7 @@ import "DockHerdrModel.js" as HerdrModel
 import "DockIconModel.js" as DockIconModel
 import "DockFullscreenModel.js" as FullscreenModel
 import "DockWorkspaceGroupModel.js" as WorkspaceGroupModel
+import "DockWorkspaceModel.js" as WorkspaceModel
 
 PopupWindow {
   id: root
@@ -300,8 +301,8 @@ PopupWindow {
     if (!targetContext || !root.targetIsValid(targetContext)) return ""
     var state = root.windowState(targetContext.toplevel)
     var workspace = String(state.workspace || "")
-    if (workspace.indexOf("name:") === 0) workspace = workspace.slice(5)
-    return workspace ? "Workspace " + workspace : ""
+    var label = WorkspaceModel.workspaceBadgeLabel(workspace, "")
+    return label ? "Workspace " + label : ""
   }
 
   function representedWorkspaceLabel() {
@@ -396,9 +397,7 @@ PopupWindow {
   }
 
   function windowPinWorkspaceLabel(identity) {
-    var value = String(identity || "")
-    if (value.indexOf("id:") === 0) value = value.slice(3)
-    else if (value.indexOf("name:") === 0) value = value.slice(5)
+    var value = WorkspaceModel.workspaceBadgeLabel(identity, "")
     return value ? "Workspace " + value : "Workspace"
   }
 

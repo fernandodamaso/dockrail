@@ -1,5 +1,6 @@
 .pragma library
 .import "DockWindowModel.js" as DockWindowModel
+.import "DockWorkspaceModel.js" as WorkspaceModel
 
 function groupedPreviewMembers(candidates, liveToplevels) {
   var members = DockWindowModel.liveGroupMembers(candidates, liveToplevels)
@@ -76,8 +77,8 @@ function previewStatus(state) {
 
   var workspace = String(value.workspace || "").trim()
   if (!workspace) return "Workspace unknown"
-  if (workspace.indexOf("name:") === 0) workspace = workspace.slice(5)
-  return "Workspace " + workspace
+  var label = WorkspaceModel.workspaceBadgeLabel(workspace, "")
+  return "Workspace " + (label || workspace)
 }
 
 function visiblePreviewTarget(items, presentationId, identityToplevel) {
