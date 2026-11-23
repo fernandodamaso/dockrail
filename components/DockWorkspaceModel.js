@@ -237,6 +237,9 @@ function projectMonitorDrag(presentation, drag, visibleMonitorIdentity) {
   })
 }
 
+// User-facing workspace label. A custom name wins; a numeric id shows its slot
+// in the monitor's Omarchy block (1-10, 10 as "0"), like the Omarchy bar:
+// id:22 -> "2", id:40 -> "0", name:Work -> "Work".
 function workspaceBadgeLabel(identity, displayLabel) {
   var raw = String(identity || "")
   var explicitLabel = String(displayLabel || "").trim()
@@ -256,14 +259,6 @@ function workspaceBadgeLabel(identity, displayLabel) {
   }
   if (explicitLabel) return explicitLabel
   return raw
-}
-
-function workspaceLabel(identity, displayLabel) {
-  return workspaceBadgeLabel(identity, displayLabel)
-}
-
-function workspaceDisplayLabel(identity, displayLabel) {
-  return workspaceBadgeLabel(identity, displayLabel)
 }
 
 function buildWorkspacePresentation(appItems, records, workspaces, context) {

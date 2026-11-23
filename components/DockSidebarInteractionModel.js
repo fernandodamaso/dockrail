@@ -76,9 +76,9 @@ function nextKey(rows, key, direction) {
   return keys[Math.max(0, Math.min(keys.length - 1, index + (direction < 0 ? -1 : 1)))]
 }
 
-// Canonical workspace badge label. Prefer the shared model display label when
-// present (id:10 named Work → "Work"); otherwise id:3→3, name:Work→Work.
-// Explicit prefixes only — never first-digits regex or slice(0, 2).
+// Canonical workspace badge label (see DockWorkspaceModel.workspaceBadgeLabel):
+// custom names win (id:10 named Work → "Work"); numeric ids show their
+// per-monitor slot (id:22 → "2", id:30 → "0"); name:Work → "Work".
 function workspaceBadgeLabel(identity, displayLabel) {
   return WorkspaceModel.workspaceBadgeLabel(identity, displayLabel)
 }
