@@ -5,7 +5,12 @@ Dockrail is installed as a Git-managed Omarchy plugin from the public
 
 ```bash
 omarchy plugin update io.github.fernandodamaso.dockrail --yes
+omarchy restart shell
 ```
+
+The update rewrites the installed plugin but leaves the running dock on the
+previous QML until the shell starts again. Run `omarchy restart shell` before
+judging the new dock.
 
 Updates pull the repository's default `main` branch. They preserve the
 canonical user configuration at `~/.config/dockrail/dock.json` (or its

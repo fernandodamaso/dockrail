@@ -1,42 +1,57 @@
 # Dockrail
 
-> Local Omarchy variant: pinned applications remain first, while grouped
-> running applications from every workspace are appended automatically.
+<p align="center">
+  <strong>A dock when you want a dock. A workspace rail when you're shipping.</strong><br>
+  Apps, live windows, workspaces, Chrome tabs, widgets, and coding-agent sessions in one native Hyprland surface.
+</p>
 
-A developer-focused workspace rail for Hyprland — apps, windows, workspaces, widgets, and coding-agent sessions in one surface, built with Quickshell and Qt/QML.
+<p align="center">
+  <img src="preview.png" alt="Dockrail along the bottom of an Omarchy desktop" width="800">
+</p>
 
-![Dockrail running at the bottom of an Omarchy desktop](preview.png)
+<p align="center">
+  <em>The still above is the current preview. Clip list: <a href="docs/media/RECORDING.md">docs/media/RECORDING.md</a>.</em>
+</p>
+
+<!--
+TODO: record the clips in docs/media/RECORDING.md, then uncomment these tags.
+Do not commit stand-in GIFs.
+
+<p align="center">
+  <img src="docs/media/hero.gif" alt="Dockrail magnifying under the pointer" width="800">
+</p>
+<p align="center">
+  <img src="docs/media/autohide.gif" alt="The dock hiding and revealing from the screen edge" width="800">
+</p>
+<p align="center">
+  <img src="docs/media/workspaces.gif" alt="Switching workspaces from the dock" width="800">
+</p>
+<p align="center">
+  <img src="docs/media/pinning.gif" alt="Dragging pinned applications into a new order" width="800">
+</p>
+<p align="center">
+  <img src="docs/media/theming.gif" alt="The dock following an Omarchy theme change" width="800">
+</p>
+<p align="center">
+  <img src="docs/media/sidebar.gif" alt="Switching one monitor from the dock to the sidebar" width="800">
+</p>
+-->
+
+**Dockrail** is a developer workspace rail for Hyprland, built with Quickshell and Qt/QML to run directly inside the existing Omarchy shell. Start with a smooth, theme-native bottom dock where pinned apps stay first and running apps from every workspace group cleanly after them. Drag it left — on one display or all of them — and it becomes a full workspace sidebar with nested Chrome tabs, extensible widgets, and live status for your AI coding agents.
+
+Dockrail is an MIT-licensed fork of [nick-friedrich/hyprland-dock](https://github.com/nick-friedrich/hyprland-dock). The upstream history and the original copyright notice stay in `LICENSE`.
 
 ## Features
 
-- Smooth pointer-distance magnification
-- Freedesktop application icons and launching
-- Configurable application-icon left, middle, and grouped-window scroll actions
-- Optional grouped window previews when hovering application icons
-- Focuses an existing application on another workspace
-- Running-application indicators
-- Dot-first application attention badges from live SNI/Hyprland state and available Omarchy notifications
-- Reduced-motion bounded attention nudge with three-second reminders while attention remains active
-- Optional authoritative application-provided launcher badge counts with dot fallback
-- First-position sliders control for the app launcher, adding applications, and auto-hide
-- Bundled Lucide SVG artwork for the Trash icon and dock context-menu actions
-- Host-owned CLI configuration, app management, and local PNG/SVG icon overrides
-- Optional dynamic Trash icon with item count, open, and confirmed empty actions
-- Compact trailing workspace switcher that mirrors the Omarchy top-bar visibility rule
-- Minimized-window markers, counts, tooltip summaries, and per-window status labels
-- Fullscreen focus emphasis that enlarges the owner and fades other dock icons
-- Per-window right-click management for workspace moves, fullscreen-with-bars,
-  Hyprland-style minimize/restore, focus, and close
-- Drag-to-reorder with persistent pinned-app order
-- Context-menu hiding with persistent restoration through `dockrail apps show`
-- Right-click actions to launch, close, pin, or unpin applications
-- Fuzzy application search for adding dock items
-- Configurable dock background transparency
-- Omarchy theme-aware surfaces, borders, corner radius, typography, and hover states
-- Optional reserved screen space while the dock is visible
-- Optional auto-hide with screen-edge reveal
-- Live JSON configuration reload
-- Multi-monitor support
+- **Bottom dock or workspace sidebar — per monitor, on demand.** Run a classic bottom dock on one display and a resizable, collapsible left sidebar on another at the exact same time. Drag empty dock background left to morph into a sidebar with a live edge silhouette, drag back down to return, or bind `dockrail mode toggle` to flip only the focused monitor.
+- **Live mission control for coding agents.** Stop hunting through terminals to see which agent finished or got blocked. Surface live working, input-needed, and done marks directly on dock icons and sidebar rows for **Claude Desktop** (Claude Code sessions with click-to-open attention rows), **Herdr** (local and attached-remote agents with click-to-focus), and **T3 Code** (read-only local threads with project branding), plus bundled Ghostty launchers for Claude Code, Cursor Agent, Pi, Oh My Pi, Command Code, Kilo Code, and Cline.
+- **Workspace choreography without breaking flow.** Switch the classic dock to horizontal **Workspace Cards** to see every workspace across every monitor at a glance. Drag running windows between cards, drop onto a dynamic **+ New workspace** target, or drag an entire workspace header onto another monitor's dock. Plain click focuses a window or workspace in place; `Ctrl+click` pulls it straight to your current monitor.
+- **Mid-drag navigation across windows, workspaces, and tabs.** Grab a file, screenshot, or text snippet and hover over any sidebar window, workspace, Chrome tab, or classic dock icon/preview — Dockrail navigates there while you keep holding the drag so you can drop straight into the destination app.
+- **Chrome profiles, unread activity, and sidebar tabs.** Tell work and personal Chrome windows apart with per-window profile badges or custom icons. Hover Chrome for a privacy-respecting unread card (Gmail, WhatsApp, Instagram) that jumps straight to the exact tab with one-click service muting, or expand open Chrome tabs directly under their window in the sidebar.
+- **Calm attention and per-window custom icons.** Dot-first attention badges combine Hyprland urgency, StatusNotifierItem, and Omarchy notifications, with optional authoritative `LauncherEntry` numeric counts and a gentle bounded nudge. Swap artwork app-wide, per Chrome profile, or by window-title wildcard (`*solar*`) from the **Change Icon…** dialog or CLI.
+- **Extensible sidebar widgets (`WidgetKit 1.0`).** Drop built-in or standalone external QML widget packages into an independent split-scroll sidebar pane without touching core files.
+- **Built for humans and coding agents.** Tune every detail in the native, searchable Omarchy **Settings** panel or automate cleanly through the JSON-first `dockrail` CLI (`dockrail config`, `dockrail doctor`, `dockrail agent-guide`, and guided setup). Both share one atomic host writer, live-reload your Omarchy theme tokens, and keep Hyprland special workspaces (the scratchpad) out of the way.
+- **Polished dock fundamentals.** Smooth pointer-distance magnification, hover glow, optional grouped window previews, fuzzy app search, drag-to-reorder pins, hide/restore, optional dynamic Trash, auto-hide with edge reveal, reserved screen space, and configurable left/middle/scroll pointer actions.
 
 ## Requirements
 
@@ -57,7 +72,7 @@ Optional features have additional requirements:
 
 ## Install
 
-Install the Git-managed Omarchy plugin:
+Install the Git-managed Omarchy plugin, then the command-line client:
 
 ```bash
 omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes
@@ -65,90 +80,79 @@ bash ~/.config/omarchy/plugins/io.github.fernandodamaso.dockrail/install.sh --cl
 dockrail setup
 ```
 
-Omarchy does not run install hooks. The installed plugin directory is the
-checkout for this CLI command; its launchers read the current plugin files, so
-`omarchy plugin update` also refreshes CLI metadata. `dockrail setup` starts
-with the same feature-readiness checks and guides optional setup through the running host. If `${XDG_BIN_HOME:-$HOME/.local/bin}` is not on `PATH`, add it to your
-shell's `PATH` to use `dockrail` by name.
+Omarchy does not run install hooks. The plugin directory is the checkout those
+commands use, so a later update refreshes the client too. `dockrail setup`
+checks which optional features are ready. If `${XDG_BIN_HOME:-$HOME/.local/bin}`
+is not on `PATH`, add it before running `dockrail` by name.
 
-Upgrading from SmartDock (plugin ID `io.github.fernandodamaso.smartdock`)?
-Dockrail 3.0.0 introduced the new plugin ID (retained in 3.1.0), so
-reinstall once when upgrading from SmartDock. Your settings in
-`~/.config/dockrail` (or legacy `~/.config/smartdock`) are kept:
+Upgrading from SmartDock (`io.github.fernandodamaso.smartdock`)? Dockrail 3.0.0
+introduced the current plugin id, and 3.1.0 keeps it. Settings in
+`~/.config/dockrail` (or legacy `~/.config/smartdock`) stay:
 
 ```bash
 omarchy plugin remove io.github.fernandodamaso.smartdock --yes
 omarchy plugin add https://github.com/fernandodamaso/dockrail.git --enable --yes
 ```
 
-The normal update command is:
-
-```bash
-omarchy plugin update io.github.fernandodamaso.dockrail --yes
-```
-
-Updates pull the fork's default `main` branch and preserve
-`~/.config/dockrail/dock.json`. Installed plugin files are deployment state;
-do not edit them directly. Development belongs in a separate clone, such as
-`/home/admin/Projects/smart-omarchy-dock`, and changes reach an installed copy
-through Git push followed by `omarchy plugin update`.
-
 ### Standalone installation
 
-Standalone use is a secondary mode. After installing the requirements above,
-clone the source and run the installer:
+Standalone mode is the secondary path. Clone the source and run the installer:
 
 ```bash
 git clone https://github.com/fernandodamaso/dockrail.git && cd dockrail && ./install.sh
 ```
 
-The installer uses only user directories, requires no `sudo`, and creates an
-XDG autostart entry. To install without autostart, use
-`./install.sh --no-autostart`.
-
-Run the standalone dock immediately with:
+The installer uses only user directories and does not require sudo. It creates
+an XDG autostart entry. Skip that entry with `./install.sh --no-autostart`.
 
 ```bash
 dockrail --daemonize
-```
-
-Installed copies appear as **Dockrail** in application launchers.
-Run `dockrail help` to see every command.
-
-Manage autostart later from the CLI:
-
-```bash
 dockrail autostart status
 dockrail autostart enable
 dockrail autostart disable
 ```
 
-### Update or remove
+The launcher name is **Dockrail**. `dockrail help` lists every command.
 
-`dockrail update` only refreshes an installed standalone copy from its local
-source copy. It does not update the Omarchy plugin; use the Git-managed
-`omarchy plugin update` command above for that.
+## Update
+
+```bash
+omarchy plugin update io.github.fernandodamaso.dockrail --yes
+omarchy restart shell
+```
+
+The update pulls `main` and keeps `~/.config/dockrail/dock.json`. The shell
+keeps running the previous dock until `omarchy restart shell`. Do not edit
+files inside the installed plugin directory.
+
+`dockrail update` refreshes a standalone copy from its recorded source
+checkout. It does not update the Omarchy plugin.
 
 ```bash
 dockrail update
 dockrail restart
-dockrail uninstall
 ```
 
-Uninstalling preserves the configuration; remove it too with
-`dockrail uninstall --purge`.
+If a development checkout is linked, run `dockrail dev reset` before updating.
 
-To remove the Omarchy plugin:
+## Uninstall
+
+Remove the Omarchy plugin:
 
 ```bash
 omarchy plugin remove io.github.fernandodamaso.dockrail --yes
 ```
 
-Plugin removal leaves `~/.config/dockrail/dock.json`, shared Widget packages,
-optional providers, and migration recovery snapshots in place. Delete
-`~/.config/dockrail` yourself only if you no longer want those settings.
-If you switched to a local version with `dockrail dev use`, run
-`dockrail dev reset` before removing or updating the plugin.
+That leaves `~/.config/dockrail/dock.json`, shared Widget packages, optional
+providers, and migration snapshots in place. Delete `~/.config/dockrail`
+yourself only when you want those settings gone.
+
+Remove a standalone copy with `dockrail uninstall`. Add `--purge` to delete
+the standalone configuration as well. `--purge` refuses while the Omarchy
+plugin is still installed.
+
+Run `dockrail dev reset` before removing or updating the plugin when a local
+checkout is linked.
 
 ## Run as an Omarchy plugin
 
@@ -421,11 +425,11 @@ Want to try an unmerged version on your desktop? Use
 to return to the installed copy. See [local version switching](docs/DEV_SWITCH.md)
 for setup, reload, and recovery commands.
 
-Development happens in the canonical source checkout or in your own clone,
-never in the installed Omarchy checkout:
+Development happens in your own clone, never in the installed Omarchy checkout:
 
 ```bash
-cd /home/admin/Projects/smart-omarchy-dock
+git clone https://github.com/fernandodamaso/dockrail.git
+cd dockrail
 ./scripts/run
 ```
 
@@ -435,22 +439,26 @@ Quickshell watches the QML files, so UI changes reload while developing.
 
 Dockrail, formerly SmartDock for Omarchy, is an extensively developed MIT-licensed fork of
 [nick-friedrich/hyprland-dock](https://github.com/nick-friedrich/hyprland-dock).
-The upstream Git history, MIT license, and original copyright notice are
-preserved in this repository.
+The upstream Git history, MIT license (`LICENSE`), and original copyright
+notice are preserved in this repository. Bundled Lucide icons keep their
+notices in `assets/lucide/LICENSE`. Optional provider and terminal-agent
+artwork notices live beside those assets.
 
 ## Configure
 
-The [CLI reference](docs/CLI_REFERENCE.md) describes commands, JSON fields and
-errors; the [configuration inventory](docs/CONFIGURATION.md) lists all 58
-settings, declared defaults and dependencies. Both ship beside the offline
-[agent guide](docs/AGENT_CONFIGURATION.md). It explains safe changes, backups,
-readback and recovery. A successful CLI response confirms only the reported
-configuration and persistence state, not the visible result on your desktop.
+Change the running dock from the sidebar Settings panel or from the CLI. Both
+write through the same host. Open Settings from the sidebar gear, or run
+`dockrail settings` while the host is running. **Change Icon** stays on the
+right-click menu.
 
-Use the selected running host through the CLI rather than editing a live
-`dock.json`. The plugin installation command above installs the CLI from the
-installed plugin directory. For a separate source checkout, install a copied
-CLI bundle without starting a second dock:
+The [CLI reference](docs/CLI_REFERENCE.md) lists commands and errors. The
+[configuration inventory](docs/CONFIGURATION.md) lists all 58 settings. The
+[agent guide](docs/AGENT_CONFIGURATION.md) covers backups and readback. A
+successful CLI response confirms the saved value, not the picture on screen.
+
+Prefer `dockrail config` over editing `dock.json` by hand. The plugin install
+above already provides the CLI. From a separate source checkout, install only
+the client:
 
 ```bash
 bash ./install.sh --cli-only

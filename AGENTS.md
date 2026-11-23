@@ -6,7 +6,7 @@ Dockrail is a Hyprland developer workspace rail implemented with Quickshell and 
 
 ## Development
 
-- The canonical source checkout is `/home/admin/Projects/smart-omarchy-dock`.
+- The canonical source checkout is this repository's root (`.`).
 - Installed Omarchy plugin checkouts are read-only deployment state; never edit
   them directly. Push validated changes from the source checkout, then update
   the installed plugin through `omarchy plugin update`.
