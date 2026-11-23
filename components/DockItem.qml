@@ -74,6 +74,9 @@ Item {
     ? browserProfileService.profileFor(browserProfileKey) : null
   property bool presentationActive: true
   property bool originOnly: false
+  // A closed pinned launcher in grouped mode is reorderable even though it
+  // carries a presentationId. Running workspace-card icons retain window drag.
+  property bool pinReorderEnabled: false
   // External content-drag hover. Dock.qml injects the host coordinator, this
   // dock surface as the owner, and the workspace identity this icon represents
   // (the owning card in grouped layout, the item's own workspace in flat
@@ -233,8 +236,9 @@ Item {
   property real wheelRemainder: 0
   property double lastWheelTimestamp: 0
   signal dragStarted(int itemIndex)
-  signal dragMoved(real mainPosition)
-  signal dragFinished()
+  signal dragMoved(real mainPosition, point scenePosition)
+  signal dragFinished(point scenePosition)
+  signal dragCancelled()
   signal addApplicationRequested()
   signal removeRequested(string desktopId)
   signal hideRequested(string desktopId)
@@ -960,7 +964,8 @@ Item {
   DragHandler {
     id: dragHandler
 
-    enabled: root.presentationActive && root.pinnedItem && !root.originOnly
+    enabled: root.presentationActive && root.pinnedItem
+      && (!root.originOnly || root.pinReorderEnabled)
       && !root.workspaceInputSuppressed
     target: null
     acceptedButtons: Qt.LeftButton
@@ -971,14 +976,20 @@ Item {
       if (active) {
         root.previewDismissRequested()
         root.dragStarted(root.itemIndex)
-      } else {
-        root.dragFinished()
       }
+    }
+    // Cancellation also deactivates DragHandler: commit only on release.
+    onGrabChanged: function(transition, point) {
+      if (transition === PointerDevice.UngrabExclusive) root.dragFinished(point.scenePosition)
+      else if (transition === PointerDevice.CancelGrabExclusive
+               || transition === PointerDevice.CancelGrabPassive)
+        root.dragCancelled()
     }
     onActiveTranslationChanged: {
       if (active)
         root.dragMoved((root.vertical ? root.y + root.height / 2 : root.x + root.width / 2)
-          + (root.vertical ? activeTranslation.y : activeTranslation.x))
+          + (root.vertical ? activeTranslation.y : activeTranslation.x),
+          centroid.scenePosition)
     }
   }
 

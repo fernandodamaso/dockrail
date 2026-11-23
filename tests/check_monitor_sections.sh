@@ -42,7 +42,8 @@ rg -q 'card\.mapFromItem\(null, scenePoint\.x, scenePoint\.y\)' "$dock"
 rg -q 'groupedLayout\.ensureVisible\(card\.dropCard, card\.headerWidth\)' "$dock"
 
 # Singleton launchers/fallback stay outside the workspace-card repeater.
-[[ $(rg -c 'root\.workspacePresentation\.globalLaunchers' "$dock") -eq 1 ]]
+[[ $(rg -c 'model: root\.groupedRequested \? root\.workspacePresentation\.globalLaunchers : \[\]' "$dock") -eq 1 ]]
+[[ $(rg -c 'id: groupedPinRepeater' "$dock") -eq 1 ]]
 [[ $(rg -c 'root\.workspacePresentation\.fallbackItems' "$dock") -ge 2 ]]
 
 echo "monitor section structural contract: PASS"

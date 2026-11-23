@@ -219,6 +219,9 @@ PanelWindow {
 
   property int dragSource: -1
   property int dragTarget: -1
+  property string groupedPinSourceId: ""
+  property string groupedPinTargetId: ""
+  property var groupedPinOrder: []
   property int openMenuCount: 0
   property bool autoHideRevealed: false
   property bool dragRevealed: false
@@ -655,7 +658,7 @@ PanelWindow {
     ? root.externalDragNavigation.heldFor(root) : false
   readonly property bool keepAutoHideOpen: windowPointer.hovered
     || appPicker.visible || openMenuCount > 0
-    || dragSource >= 0 || windowPreview.interactionActive || workspaceDragActive
+    || dragSource >= 0 || groupedPinSourceId !== "" || windowPreview.interactionActive || workspaceDragActive
     || workspaceMonitorDragSourceActive || positionDragSurface.pressed || dragRevealed
     || root.externalDragHeld === true
   readonly property bool dockShown: !autoHide || autoHideRevealed || dragRevealed
@@ -978,6 +981,77 @@ PanelWindow {
     }
   }
 
+  // Grouped dock launcher tiles are scoped presentations (originOnly). They
+  // have their own visible indices, unlike the flat dock's visibleItems.
+  function groupedPinIndex(id) {
+    return (root.workspacePresentation.globalLaunchers || []).findIndex(function(pin) {
+      return String(pin.desktopId || "") === id
+    })
+  }
+
+  function beginGroupedPinReorder(id) {
+    if (!root.grouped || root.workspaceDragActive || root.groupedPinSourceId
+        || root.dragSource >= 0 || root.groupedPinIndex(id) < 0) return false
+    root.groupedPinSourceId = id
+    root.groupedPinTargetId = id
+    root.groupedPinOrder = (root.workspacePresentation.globalLaunchers || [])
+      .map(function(pin) { return String(pin.desktopId || "") })
+    windowPreview.dismissImmediately()
+    return true
+  }
+
+  function groupedPinTargetAt(scenePoint) {
+    if (!root.groupedPinSourceId || !scenePoint
+        || !isFinite(scenePoint.x) || !isFinite(scenePoint.y)
+        || !groupedLayout.containsScenePoint(scenePoint)) return ""
+    var point = groupedPinRow.mapFromItem(null, scenePoint.x, scenePoint.y)
+    if (point.x < 0 || point.x >= groupedPinRow.width
+        || point.y < 0 || point.y >= groupedPinRow.height) return ""
+    var list = root.workspacePresentation.globalLaunchers || []
+    var nearest = ""
+    var distance = Infinity
+    for (var i = 0; i < list.length; ++i) {
+      var tile = groupedPinRepeater.itemAt(i)
+      if (!tile) continue
+      var delta = Math.abs(point.x - (tile.x + tile.width / 2))
+      if (delta < distance) {
+        distance = delta
+        nearest = String(list[i].desktopId || "")
+      }
+    }
+    return nearest
+  }
+
+  function updateGroupedPinTarget(scenePoint) {
+    if (root.groupedPinSourceId)
+      root.groupedPinTargetId = root.groupedPinTargetAt(scenePoint)
+  }
+
+  function groupedPinOffset(index) {
+    var from = root.groupedPinIndex(root.groupedPinSourceId)
+    var to = root.groupedPinIndex(root.groupedPinTargetId)
+    if (from < 0 || to < 0) return 0
+    var step = root.itemSize + Math.max(0, root.pinnedIconGap - (root.itemSize - root.iconSize))
+    if (from < to && index > from && index <= to) return -step
+    if (from > to && index >= to && index < from) return step
+    return 0
+  }
+
+  function cancelGroupedPinReorder() {
+    root.groupedPinSourceId = ""
+    root.groupedPinTargetId = ""
+    root.groupedPinOrder = []
+  }
+
+  function finishGroupedPinReorder(scenePoint) {
+    var from = root.groupedPinSourceId
+    var to = root.groupedPinTargetAt(scenePoint)
+    root.cancelGroupedPinReorder()
+    if (from && to && from !== to
+        && root.groupedPinIndex(from) >= 0 && root.groupedPinIndex(to) >= 0)
+      root.reorderRequested(from, to)
+  }
+
   function reorderOffset(index) {
     if (dragSource < 0 || dragTarget < 0) return 0
     if (dragSource < dragTarget && index > dragSource && index <= dragTarget)
@@ -1042,13 +1116,34 @@ PanelWindow {
   onKeepAutoHideOpenChanged: updateAutoHideState()
   onOpenMenuCountChanged: if (openMenuCount > 0) windowPreview.dismissImmediately()
   onDragSourceChanged: if (dragSource >= 0) windowPreview.dismissImmediately()
+  onWorkspacePresentationChanged: {
+    if (root.groupedPinSourceId && JSON.stringify(root.groupedPinOrder)
+        !== JSON.stringify((root.workspacePresentation.globalLaunchers || [])
+          .map(function(pin) { return String(pin.desktopId || "") })))
+      root.cancelGroupedPinReorder()
+  }
   onShowPreviewsChanged: if (!showPreviews) windowPreview.dismissImmediately()
-  onSettingsChanged: { root.cancelWorkspaceGesture("settings changed"); root.scheduleVisibleItemsRefresh() }
-  onPositionChanged: root.cancelWorkspaceGesture("dock edge changed")
-  onScreenChanged: root.cancelWorkspaceGesture("screen changed")
-  onWidthChanged: root.cancelWorkspaceGesture("surface resized")
-  onHeightChanged: root.cancelWorkspaceGesture("surface resized")
-  onVisibleChanged: if (!visible) root.cancelWorkspaceGesture("surface hidden")
+  onSettingsChanged: { root.cancelGroupedPinReorder(); root.cancelWorkspaceGesture("settings changed"); root.scheduleVisibleItemsRefresh() }
+  onPositionChanged: {
+    root.cancelGroupedPinReorder()
+    root.cancelWorkspaceGesture("dock edge changed")
+  }
+  onScreenChanged: {
+    root.cancelGroupedPinReorder()
+    root.cancelWorkspaceGesture("screen changed")
+  }
+  onWidthChanged: {
+    root.cancelGroupedPinReorder()
+    root.cancelWorkspaceGesture("surface resized")
+  }
+  onHeightChanged: {
+    root.cancelGroupedPinReorder()
+    root.cancelWorkspaceGesture("surface resized")
+  }
+  onVisibleChanged: if (!visible) {
+    root.cancelGroupedPinReorder()
+    root.cancelWorkspaceGesture("surface hidden")
+  }
   onDockShownChanged: if (!dockShown && workspaceMonitorDrag && workspaceMonitorDrag.active && workspaceMonitorDrag.hoveredTarget === root) workspaceMonitorDrag.cancel("destination hidden")
   onPinnedChanged: root.scheduleVisibleItemsRefresh()
   onWorkspaceMonitorScopeChanged: root.scheduleVisibleItemsRefresh()
@@ -1056,6 +1151,7 @@ PanelWindow {
   onFocusedScopeWorkspaceChanged: root.scheduleVisibleItemsRefresh()
   onSortByWorkspaceChanged: root.scheduleVisibleItemsRefresh()
   onGroupedChanged: {
+    root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("layout changed")
     windowPreview.dismissImmediately()
     dragSource = -1
@@ -1064,15 +1160,18 @@ PanelWindow {
     if (grouped) Qt.callLater(root.revealActiveWorkspace)
   }
   onDockHyprMonitorChanged: {
+    root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("monitor mapping changed")
     root.scheduleVisibleItemsRefresh()
   }
   onHyprMonitorsChanged: {
+    root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("monitor inventory changed")
     root.scheduleVisibleItemsRefresh()
   }
   onHyprWorkspacesChanged: root.scheduleVisibleItemsRefresh()
   Component.onDestruction: {
+    root.cancelGroupedPinReorder()
     root.cancelWorkspaceGesture("surface destroyed")
     if (root.externalDragNavigation)
       root.externalDragNavigation.cancelOwner(root)
@@ -1500,8 +1599,10 @@ PanelWindow {
           animationsEnabled: root.interfaceAnimationsEnabled
         }
         Row {
+          id: groupedPinRow
           spacing: Math.max(0, root.pinnedIconGap - (root.itemSize - root.iconSize))
           Repeater {
+          id: groupedPinRepeater
           model: root.groupedRequested ? root.workspacePresentation.globalLaunchers : []
           AppIcon {
             y: 2
@@ -1837,6 +1938,8 @@ PanelWindow {
     required property var modelData
     required property int index
     originOnly: modelData.presentationId !== undefined
+    pinReorderEnabled: root.grouped && appItem.originOnly && modelData.pinned
+      && String(modelData.presentationId || "").indexOf("global/") === 0
     scopeRevision: root.scopeRevision
     presentationId: modelData.presentationId || modelData.desktopId
     identityToplevel: modelData.identityToplevel || null
@@ -1927,13 +2030,27 @@ PanelWindow {
     vertical: root.vertical
     previewActive: windowPreview.anchorItem === appItem
       && windowPreview.interactionActive
-    reorderOffset: originOnly ? 0 : root.reorderOffset(index)
+    reorderOffset: pinReorderEnabled ? root.groupedPinOffset(index)
+      : originOnly ? 0 : root.reorderOffset(index)
     onDragStarted: itemIndex => {
-      root.dragSource = itemIndex
-      root.dragTarget = itemIndex
+      if (appItem.pinReorderEnabled) root.beginGroupedPinReorder(appItem.desktopId)
+      else {
+        root.dragSource = itemIndex
+        root.dragTarget = itemIndex
+      }
     }
-    onDragMoved: mainPosition => root.updateDragTarget(mainPosition)
-    onDragFinished: root.finishDrag()
+    onDragMoved: (mainPosition, scenePoint) => {
+      if (appItem.pinReorderEnabled) root.updateGroupedPinTarget(scenePoint)
+      else root.updateDragTarget(mainPosition)
+    }
+    onDragFinished: scenePoint => {
+      if (appItem.pinReorderEnabled) root.finishGroupedPinReorder(scenePoint)
+      else root.finishDrag()
+    }
+    onDragCancelled: {
+      if (appItem.pinReorderEnabled) root.cancelGroupedPinReorder()
+      else { root.dragSource = -1; root.dragTarget = -1 }
+    }
     onRemoveRequested: desktopId => root.unpinRequested(desktopId)
     onHideRequested: desktopId => root.hideRequested(desktopId)
     onPreviewRequested: (anchorItem, desktopId, toplevels, applicationEntry) => {
